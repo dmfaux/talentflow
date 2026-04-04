@@ -2,7 +2,7 @@ import { jwtVerify } from "jose";
 import { NextRequest, NextResponse } from "next/server";
 
 const COOKIE_NAME = "admin_session";
-const PUBLIC_ADMIN_PATHS = ["/login"];
+const PUBLIC_ADMIN_PATHS = ["/", "/login"];
 
 function getSecret() {
   const secret = process.env.ADMIN_AUTH_SECRET;

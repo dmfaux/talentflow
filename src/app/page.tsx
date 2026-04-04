@@ -63,12 +63,20 @@ function Navbar() {
             About
           </a>
         </div>
-        <a
-          href="#get-started"
-          className="hidden sm:inline-flex items-center justify-center h-10 px-5 bg-accent text-white text-sm font-sans font-medium rounded-lg hover:bg-accent-light transition-colors"
-        >
-          Get Started
-        </a>
+        <div className="flex items-center gap-4">
+          <a
+            href="/login"
+            className="text-sm font-sans text-txt-secondary hover:text-txt-primary transition-colors"
+          >
+            Log in
+          </a>
+          <a
+            href="#get-started"
+            className="hidden sm:inline-flex items-center justify-center h-10 px-5 bg-accent text-white text-sm font-sans font-medium rounded-lg hover:bg-accent-light transition-colors"
+          >
+            Get Started
+          </a>
+        </div>
       </div>
     </nav>
   );
