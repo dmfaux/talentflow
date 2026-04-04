@@ -1,0 +1,139 @@
+import { Resend } from "resend";
+import { db } from "@/db";
+import { messages } from "@/db/schema";
+
+let resendClient: Resend | null = null;
+
+function getClient(): Resend {
+  if (!resendClient) {
+    resendClient = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resendClient;
+}
+
+const FROM =
+  process.env.EMAIL_FROM ?? "TalentStream <apply@talentstream.co.za>";
+
+// ── Send email ───────────────────────────────────────────────────────
+
+export async function sendCandidateEmail(
+  to: string,
+  subject: string,
+  htmlBody: string,
+  candidateId: string
+): Promise<string | null> {
+  try {
+    const { data, error } = await getClient().emails.send({
+      from: FROM,
+      to,
+      subject,
+      html: htmlBody,
+    });
+
+    if (error) {
+      console.error("sendCandidateEmail error:", error);
+    }
+
+    const externalId = data?.id ?? null;
+
+    await db.insert(messages).values({
+      candidate_id: candidateId,
+      channel: "email",
+      direction: "outbound",
+      content: subject,
+      status: error ? "failed" : "sent",
+      external_id: externalId,
+    });
+
+    return externalId;
+  } catch (err) {
+    console.error("sendCandidateEmail exception:", err);
+    return null;
+  }
+}
+
+// ── Email templates ──────────────────────────────────────────────────
+
+function wrapTemplate(body: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f5f4f0;font-family:Georgia,'Times New Roman',serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f4f0;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;border:1px solid #e8e8e4;">
+        <tr><td style="padding:32px 36px;">
+          ${body}
+        </td></tr>
+      </table>
+      <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;">
+        Powered by TalentStream
+      </p>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function applicationReceivedEmail(
+  candidateName: string,
+  roleTitle: string,
+  clientName: string
+): string {
+  return wrapTemplate(`
+    <h2 style="margin:0 0 16px;font-size:20px;color:#1B4332;font-weight:normal;font-style:italic;">
+      Application Received
+    </h2>
+    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
+      Hi ${candidateName},
+    </p>
+    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
+      Thank you for applying for the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>. We've received your application and it is now being processed.
+    </p>
+    <p style="margin:0;font-size:15px;color:#666;line-height:1.6;">
+      You'll hear from us soon with an update on the next steps.
+    </p>
+  `);
+}
+
+export function gatingPassedEmail(
+  candidateName: string,
+  roleTitle: string,
+  clientName: string
+): string {
+  return wrapTemplate(`
+    <h2 style="margin:0 0 16px;font-size:20px;color:#1B4332;font-weight:normal;font-style:italic;">
+      Application Update
+    </h2>
+    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
+      Hi ${candidateName},
+    </p>
+    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
+      Great news — you meet the initial requirements for the <strong>${roleTitle}</strong> role at <strong>${clientName}</strong>. Your CV is now being reviewed by our team.
+    </p>
+    <p style="margin:0;font-size:15px;color:#666;line-height:1.6;">
+      We'll be in touch with the outcome shortly. Thank you for your patience.
+    </p>
+  `);
+}
+
+export function gatingFailedEmail(
+  candidateName: string,
+  roleTitle: string,
+  clientName: string
+): string {
+  return wrapTemplate(`
+    <h2 style="margin:0 0 16px;font-size:20px;color:#1B4332;font-weight:normal;font-style:italic;">
+      Application Update
+    </h2>
+    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
+      Hi ${candidateName},
+    </p>
+    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
+      Thank you for your interest in the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>. Unfortunately, your profile does not meet the specific requirements for this role at this time.
+    </p>
+    <p style="margin:0;font-size:15px;color:#666;line-height:1.6;">
+      We encourage you to apply for future opportunities that may be a better fit. We wish you all the best.
+    </p>
+  `);
+}

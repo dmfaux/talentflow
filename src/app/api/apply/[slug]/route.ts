@@ -1,5 +1,11 @@
 import { db } from "@/db";
 import { campaigns, candidates, clients } from "@/db/schema";
+import {
+  applicationReceivedEmail,
+  gatingFailedEmail,
+  gatingPassedEmail,
+  sendCandidateEmail,
+} from "@/lib/email";
 import { evaluateGating, GatingQuestion } from "@/lib/gating";
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
@@ -17,14 +23,17 @@ export async function POST(
   try {
     const { slug } = await params;
 
-    // Look up campaign
+    // Look up campaign with client
     const [campaign] = await db
       .select({
         id: campaigns.id,
         status: campaigns.status,
+        role_title: campaigns.role_title,
         gating_config: campaigns.gating_config,
+        client_name: clients.name,
       })
       .from(campaigns)
+      .leftJoin(clients, eq(campaigns.client_id, clients.id))
       .where(eq(campaigns.slug, slug))
       .limit(1);
 
@@ -126,7 +135,7 @@ export async function POST(
     const purgeAt = new Date(now);
     purgeAt.setMonth(purgeAt.getMonth() + 12);
 
-    await db.insert(candidates).values({
+    const [newCandidate] = await db.insert(candidates).values({
       campaign_id: campaign.id,
       name: name.trim(),
       email: trimmedEmail,
@@ -138,19 +147,48 @@ export async function POST(
       source: source || null,
       popia_consent_at: now,
       data_purge_at: purgeAt,
-    });
+    }).returning({ id: candidates.id });
+
+    const candidateName = name.trim();
+    const roleTitle = campaign.role_title;
+    const clientName = campaign.client_name ?? "the company";
+    const candidateId = newCandidate.id;
+
+    // Fire-and-forget emails
+    sendCandidateEmail(
+      trimmedEmail,
+      `Application received — ${roleTitle}`,
+      applicationReceivedEmail(candidateName, roleTitle, clientName),
+      candidateId
+    ).catch((err) => console.error("Email send failed:", err));
 
     if (gatingPassed) {
+      sendCandidateEmail(
+        trimmedEmail,
+        `Good news — ${roleTitle}`,
+        gatingPassedEmail(candidateName, roleTitle, clientName),
+        candidateId
+      ).catch((err) => console.error("Email send failed:", err));
+
       return json({
         success: true,
         passed: true,
+        candidate_id: candidateId,
         message: "Thank you for applying! Your application has been received and will be reviewed shortly.",
       }, 201);
     }
 
+    sendCandidateEmail(
+      trimmedEmail,
+      `Application update — ${roleTitle}`,
+      gatingFailedEmail(candidateName, roleTitle, clientName),
+      candidateId
+    ).catch((err) => console.error("Email send failed:", err));
+
     return json({
       success: true,
       passed: false,
+      candidate_id: candidateId,
       message: "Thank you for your interest. Unfortunately, your profile does not meet the minimum requirements for this role at this time.",
     }, 201);
   } catch (err) {
