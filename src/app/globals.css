@@ -8,15 +8,33 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  /* Light theme palette */
   --color-cream: #f5f4f0;
   --color-warm-white: #fafaf7;
+  --color-surface: #ffffff;
+  --color-border: #e5e4df;
+  --color-border-strong: #d0cfca;
+
+  /* Text */
   --color-charcoal: #0c0c0e;
   --color-charcoal-light: #2a2a2e;
+  --color-txt-primary: #1a1a1a;
+  --color-txt-secondary: #6b6b65;
+  --color-txt-muted: #9a9a92;
+
+  /* Accents */
   --color-gold: #d4a843;
   --color-gold-light: #e2c06a;
-  --color-muted: #8a8a82;
+  --color-green: #16a34a;
+  --color-green-light: #dcfce7;
+  --color-red: #dc2626;
+  --color-red-light: #fef2f2;
+
+  /* Fonts */
   --font-serif: var(--font-instrument-serif);
   --font-sans: var(--font-dm-sans);
+  --font-mono: var(--font-dm-mono);
 }
 
 body {
