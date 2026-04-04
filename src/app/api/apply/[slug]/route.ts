@@ -1,5 +1,6 @@
 import { db } from "@/db";
 import { campaigns, candidates, clients } from "@/db/schema";
+import { uploadCV } from "@/lib/azure-storage";
 import {
   applicationReceivedEmail,
   gatingFailedEmail,
@@ -7,10 +8,13 @@ import {
   sendCandidateEmail,
 } from "@/lib/email";
 import { evaluateGating, GatingQuestion } from "@/lib/gating";
+import { processNewCandidate } from "@/lib/process-candidate";
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_CV_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_CV_EXTENSIONS = [".pdf", ".doc", ".docx"];
 
 function json(body: unknown, status = 200) {
   return NextResponse.json(body, { status });
@@ -50,6 +54,7 @@ export async function POST(
     let popiaConsent = false;
     let answers: Record<string, string> = {};
     let source: string | undefined;
+    let cvFile: File | null = null;
 
     if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
       const formData = await request.formData();
@@ -60,7 +65,7 @@ export async function POST(
       popiaConsent = formData.get("popia_consent") === "true" || formData.get("popia_consent") === "on";
       source = (formData.get("source") as string) || undefined;
 
-      // Parse answers from form fields named "answer_[questionId]"
+      // Parse answers from JSON string or individual fields
       const answersRaw = formData.get("answers");
       if (answersRaw && typeof answersRaw === "string") {
         try {
@@ -76,6 +81,12 @@ export async function POST(
           }
         }
       }
+
+      // CV file (optional)
+      const file = formData.get("cv");
+      if (file && file instanceof File && file.size > 0) {
+        cvFile = file;
+      }
     } else {
       const body = await request.json();
       name = body.name;
@@ -85,6 +96,7 @@ export async function POST(
       popiaConsent = !!body.popia_consent;
       answers = body.answers ?? {};
       source = body.source || undefined;
+      // JSON submissions cannot include files — CV can be uploaded separately
     }
 
     // Validation
@@ -96,6 +108,19 @@ export async function POST(
     }
     if (!popiaConsent) {
       return json({ error: "POPIA consent is required to process your application" }, 400);
+    }
+
+    // Validate CV if provided
+    if (cvFile) {
+      if (cvFile.size > MAX_CV_SIZE) {
+        return json({ error: "CV file must be under 10MB" }, 400);
+      }
+      const ext = cvFile.name.lastIndexOf(".") >= 0
+        ? cvFile.name.slice(cvFile.name.lastIndexOf(".")).toLowerCase()
+        : "";
+      if (!ALLOWED_CV_EXTENSIONS.includes(ext)) {
+        return json({ error: "CV must be a PDF, DOC, or DOCX file" }, 400);
+      }
     }
 
     const trimmedEmail = email.trim().toLowerCase();
@@ -153,6 +178,24 @@ export async function POST(
     const roleTitle = campaign.role_title;
     const clientName = campaign.client_name ?? "the company";
     const candidateId = newCandidate.id;
+
+    // Upload CV if provided and gating passed
+    if (cvFile && gatingPassed) {
+      const buffer = Buffer.from(await cvFile.arrayBuffer());
+      const blobUrl = await uploadCV(slug, candidateId, buffer, cvFile.name);
+
+      if (blobUrl) {
+        await db
+          .update(candidates)
+          .set({ cv_url: blobUrl, updated_at: new Date() })
+          .where(eq(candidates.id, candidateId));
+
+        // Fire-and-forget: extract text and score
+        processNewCandidate(candidateId).catch((err) =>
+          console.error("Background processing failed:", err)
+        );
+      }
+    }
 
     // Fire-and-forget emails
     sendCandidateEmail(

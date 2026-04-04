@@ -266,34 +266,72 @@ ${form.salary_range_min || form.salary_range_max ? `- **Salary Range:** R${form.
 The page must contain an application form that POSTs to:
 \`/api/apply/${slug}\`
 
-The form must use \`Content-Type: application/json\` and submit via JavaScript fetch (not a traditional form submit). On success, show a thank-you message inline. On error, show the error message from the response.
+The form must submit as **multipart/form-data** using JavaScript (FormData object with fetch). This is because the form includes an optional CV file upload. On success, show a thank-you message inline. On error, show the error message from the JSON response.
 
 ### Required Form Fields
 1. **name** (text input, required) — Candidate's full name
 2. **email** (email input, required) — Candidate's email address
 3. **phone** (tel input, optional) — Phone number
-4. **whatsapp_opt_in** (checkbox) — "I consent to receive WhatsApp messages about my application"
-5. **popia_consent** (checkbox, required) — "I consent to the processing of my personal information in accordance with POPIA"
+4. **cv** (file input, optional, accept=".pdf,.doc,.docx") — CV/Resume upload (max 10MB). Label it "Upload your CV (PDF, DOC, or DOCX)"
+5. **whatsapp_opt_in** (checkbox) — "I consent to receive WhatsApp messages about my application"
+6. **popia_consent** (checkbox, required) — "I consent to the processing of my personal information in accordance with POPIA"
 
 ### Gating Questions (Screening)
-These must be dropdown/select fields. Include them in the form submission as an \`answers\` object where keys are the question IDs.
+These must be dropdown/select fields. Include them as individual form fields named \`answer_{questionId}\`.
 
 ${questionsBlock || "No gating questions configured yet."}
 
-### Form Submission Format
-The form should submit JSON in this format:
-\`\`\`json
-{
-  "name": "string",
-  "email": "string",
-  "phone": "string or null",
-  "whatsapp_opt_in": true/false,
-  "popia_consent": true/false,
-  "answers": {
-${form.gating_config.map((q) => `    "${q.id}": "selected option value"`).join(",\n") || '    "question_id": "answer"'}
-  }
-}
+### Form Submission Code
+Use this pattern to submit the form:
+\`\`\`javascript
+const formData = new FormData();
+formData.append("name", nameValue);
+formData.append("email", emailValue);
+formData.append("phone", phoneValue);
+formData.append("whatsapp_opt_in", whatsappChecked ? "true" : "false");
+formData.append("popia_consent", popiaChecked ? "true" : "false");
+// Append each gating answer:
+${form.gating_config.map((q) => `formData.append("answer_${q.id}", selectedValue);`).join("\n") || '// formData.append("answer_{id}", selectedValue);'}
+// Append CV file if selected:
+if (cvInput.files[0]) formData.append("cv", cvInput.files[0]);
+
+const res = await fetch("/api/apply/${slug}", { method: "POST", body: formData });
+const data = await res.json();
 \`\`\`
+
+Do NOT set a Content-Type header — the browser sets it automatically with the multipart boundary.
+
+### API Response Handling
+The API returns JSON. Handle these cases:
+
+**Success (201):**
+\`\`\`json
+{ "success": true, "passed": true, "candidate_id": "...", "message": "Thank you for applying!..." }
+// or
+{ "success": true, "passed": false, "candidate_id": "...", "message": "Thank you for your interest. Unfortunately..." }
+\`\`\`
+- If \`passed\` is true: show a positive thank-you message (green accent), e.g. "Application received! Your CV is being reviewed."
+- If \`passed\` is false: show a polite, encouraging message (neutral tone), e.g. "Thank you for your interest. Unfortunately your profile does not meet the requirements for this role at this time."
+- In both cases, hide the form and show the message prominently.
+
+**Validation error (400):** \`{ "error": "Name is required" }\` or \`"A valid email address is required"\` or \`"POPIA consent is required..."\` or \`"CV must be a PDF, DOC, or DOCX file"\` or \`"CV file must be under 10MB"\`
+- Show the error message inline near the relevant field. Map known errors to fields:
+  - "Name" → name field
+  - "email" → email field
+  - "POPIA" → consent checkbox
+  - "CV" → file input
+  - For other errors, show at the top of the form.
+
+**Duplicate application (409):** \`{ "error": "You have already applied for this role" }\`
+- Show a friendly message: "It looks like you've already applied for this position. If you need to update your application, please contact us."
+
+**Campaign not active (404):** \`{ "error": "Campaign not found or not active" }\`
+- Show: "This position is no longer accepting applications."
+
+**Server error (500):** \`{ "error": "Internal server error" }\`
+- Show: "Something went wrong. Please try again in a moment."
+
+For all error states, keep the form visible so the candidate can correct and retry (except 409 and 404 where retry won't help — hide the form for those).
 
 ## Design Requirements
 - Professional, modern, clean design
@@ -309,7 +347,15 @@ ${form.gating_config.map((q) => `    "${q.id}": "selected option value"`).join("
 - Show validation errors inline next to the relevant fields
 - Disable the submit button while the request is in flight
 
-## Important
+## CRITICAL — Content Rules
+- Do NOT invent, fabricate, or embellish ANY information about the role, company, requirements, or benefits
+- Do NOT add job descriptions, responsibilities, qualifications, perks, or any content beyond what is explicitly provided above
+- Only use the exact role title, company name, department, location, and employment type as given — nothing more
+- The page should contain ONLY the form fields specified above, the company name, the role title, and the POPIA notice
+- If a field above says "Not specified", do NOT guess or fill in a value — simply omit that detail from the page
+- This is a legal document — accuracy is paramount
+
+## Technical Requirements
 - The HTML must be completely self-contained — inline CSS, no external dependencies
 - Use vanilla JavaScript for form handling (no frameworks)
 - The page should work in all modern browsers`;

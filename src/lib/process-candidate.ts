@@ -28,8 +28,12 @@ export async function processNewCandidate(
     // Download CV from Azure
     let cvText: string;
     try {
-      const { buffer, contentType } = await downloadBlob(candidate.cv_url);
-      cvText = await extractTextFromCV(buffer, contentType);
+      const blob = await downloadBlob(candidate.cv_url);
+      if (!blob) {
+        console.warn(`processNewCandidate: Azure Storage not configured — skipping CV processing for ${candidateId}`);
+        return;
+      }
+      cvText = await extractTextFromCV(blob.buffer, blob.contentType);
     } catch (err) {
       console.error(`processNewCandidate: CV extraction failed for ${candidateId}:`, err);
 

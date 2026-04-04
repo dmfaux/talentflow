@@ -23,6 +23,7 @@ export async function GET(
     if (!candidate.cv_url) return error("No CV uploaded", 404);
 
     const sasUrl = generateSasUrl(candidate.cv_url, 1);
+    if (!sasUrl) return error("Azure Storage not configured", 503);
     return success({ url: sasUrl });
   } catch (err) {
     console.error("GET /api/admin/candidates/[id]/cv error:", err);

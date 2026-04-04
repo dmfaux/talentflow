@@ -13,6 +13,13 @@ const CONTENT_TYPES: Record<string, string> = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 };
 
+function isConfigured(): boolean {
+  return !!(
+    process.env.AZURE_STORAGE_CONNECTION_STRING &&
+    process.env.AZURE_STORAGE_CONTAINER_NAME
+  );
+}
+
 let blobServiceClient: BlobServiceClient | null = null;
 
 function getServiceClient(): BlobServiceClient {
@@ -43,7 +50,12 @@ export async function uploadCV(
   candidateId: string,
   file: Buffer,
   filename: string
-): Promise<string> {
+): Promise<string | null> {
+  if (!isConfigured()) {
+    console.warn("Azure Storage not configured — CV discarded for", candidateId);
+    return null;
+  }
+
   const container = getContainerClient();
   const ext = getExtension(filename);
   const blobPath = `cvs/${campaignSlug}/${candidateId}/${filename}`;
@@ -60,7 +72,12 @@ export async function uploadCV(
 
 export async function downloadBlob(
   blobUrl: string
-): Promise<{ buffer: Buffer; contentType: string }> {
+): Promise<{ buffer: Buffer; contentType: string } | null> {
+  if (!isConfigured()) {
+    console.warn("Azure Storage not configured — cannot download blob");
+    return null;
+  }
+
   const container = getContainerClient();
   const containerUrl = container.url.replace(/\/$/, "");
   const blobPath = blobUrl.replace(containerUrl + "/", "");
@@ -79,8 +96,9 @@ export async function downloadBlob(
 }
 
 export async function deleteCV(blobUrl: string): Promise<void> {
+  if (!isConfigured()) return;
+
   const container = getContainerClient();
-  // Extract blob path from full URL
   const containerUrl = container.url.replace(/\/$/, "");
   const blobPath = blobUrl.replace(containerUrl + "/", "");
   const blockBlob = container.getBlockBlobClient(blobPath);
@@ -90,14 +108,15 @@ export async function deleteCV(blobUrl: string): Promise<void> {
 export function generateSasUrl(
   blobUrl: string,
   expiresInHours: number
-): string {
+): string | null {
+  if (!isConfigured()) return null;
+
   const client = getServiceClient();
   const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME!;
   const container = client.getContainerClient(containerName);
   const containerUrl = container.url.replace(/\/$/, "");
   const blobPath = blobUrl.replace(containerUrl + "/", "");
 
-  // Extract credentials from connection string
   const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING!;
   const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
   const accountKey = connectionString.match(/AccountKey=([^;]+)/)?.[1];

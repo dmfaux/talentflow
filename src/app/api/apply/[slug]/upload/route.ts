@@ -68,22 +68,23 @@ export async function POST(
       return json({ error: "Candidate not found" }, 404);
     }
 
-    // Upload to Azure
+    // Upload to Azure (returns null if storage not configured)
     const buffer = Buffer.from(await file.arrayBuffer());
     const blobUrl = await uploadCV(slug, candidateId, buffer, file.name);
 
-    // Update candidate record
-    await db
-      .update(candidates)
-      .set({ cv_url: blobUrl, updated_at: new Date() })
-      .where(eq(candidates.id, candidateId));
+    if (blobUrl) {
+      await db
+        .update(candidates)
+        .set({ cv_url: blobUrl, updated_at: new Date() })
+        .where(eq(candidates.id, candidateId));
 
-    // Fire-and-forget: extract text and queue scoring
-    processNewCandidate(candidateId).catch((err) =>
-      console.error("Background processing failed:", err)
-    );
+      // Fire-and-forget: extract text and queue scoring
+      processNewCandidate(candidateId).catch((err) =>
+        console.error("Background processing failed:", err)
+      );
+    }
 
-    return json({ success: true, url: blobUrl }, 201);
+    return json({ success: true, url: blobUrl, stored: !!blobUrl }, 201);
   } catch (err) {
     console.error("POST /api/apply/[slug]/upload error:", err);
     return json({ error: "Internal server error" }, 500);
