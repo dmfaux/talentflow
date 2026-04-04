@@ -92,6 +92,7 @@ export default function NewCampaignPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [promptCopied, setPromptCopied] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/clients")
@@ -234,6 +235,90 @@ export default function NewCampaignPage() {
 
   function removeListItem(key: "must_haves" | "nice_to_haves" | "dealbreakers", idx: number) {
     updateForm({ [key]: form[key].filter((_, i) => i !== idx) });
+  }
+
+  // ── AI Prompt builder ─────────────────────────────────────────────
+
+  function buildLandingPagePrompt(): string {
+    const slug = form.slug || "{slug}";
+    const clientName = clients.find((c) => c.id === form.client_id)?.name ?? "{Client Name}";
+    const questionsBlock = form.gating_config
+      .map((q, i) => {
+        const optionsList = q.options
+          .filter((o) => o.value)
+          .map((o) => `  - "${o.value}"`)
+          .join("\n");
+        return `Question ${i + 1}: "${q.label}"\nType: select (dropdown)\nOptions:\n${optionsList}\nField name: answer_${q.id}`;
+      })
+      .join("\n\n");
+
+    return `Create a complete, self-contained HTML landing page for a job application campaign.
+
+## Role Details
+- **Role Title:** ${form.role_title || "{Role Title}"}
+- **Company:** ${clientName}
+- **Department:** ${form.department || "Not specified"}
+- **Location:** ${form.location || "Not specified"}
+- **Employment Type:** ${form.employment_type || "Not specified"}
+${form.salary_range_min || form.salary_range_max ? `- **Salary Range:** R${form.salary_range_min || "?"} – R${form.salary_range_max || "?"}` : ""}
+
+## Form Requirements
+The page must contain an application form that POSTs to:
+\`/api/apply/${slug}\`
+
+The form must use \`Content-Type: application/json\` and submit via JavaScript fetch (not a traditional form submit). On success, show a thank-you message inline. On error, show the error message from the response.
+
+### Required Form Fields
+1. **name** (text input, required) — Candidate's full name
+2. **email** (email input, required) — Candidate's email address
+3. **phone** (tel input, optional) — Phone number
+4. **whatsapp_opt_in** (checkbox) — "I consent to receive WhatsApp messages about my application"
+5. **popia_consent** (checkbox, required) — "I consent to the processing of my personal information in accordance with POPIA"
+
+### Gating Questions (Screening)
+These must be dropdown/select fields. Include them in the form submission as an \`answers\` object where keys are the question IDs.
+
+${questionsBlock || "No gating questions configured yet."}
+
+### Form Submission Format
+The form should submit JSON in this format:
+\`\`\`json
+{
+  "name": "string",
+  "email": "string",
+  "phone": "string or null",
+  "whatsapp_opt_in": true/false,
+  "popia_consent": true/false,
+  "answers": {
+${form.gating_config.map((q) => `    "${q.id}": "selected option value"`).join(",\n") || '    "question_id": "answer"'}
+  }
+}
+\`\`\`
+
+## Design Requirements
+- Professional, modern, clean design
+- Mobile-responsive
+- Use inline CSS only (no external stylesheets) — the entire page must be a single HTML file
+- Use a warm, professional colour scheme appropriate for a recruitment page
+- Include the company name "${clientName}" prominently
+- Include a compelling headline and brief role description section
+- The form should be clearly visible and easy to complete
+- Add a POPIA compliance notice at the bottom
+- Include a "Powered by TalentStream" footer in small muted text
+- After successful submission, replace the form with a thank-you message
+- Show validation errors inline next to the relevant fields
+- Disable the submit button while the request is in flight
+
+## Important
+- The HTML must be completely self-contained — inline CSS, no external dependencies
+- Use vanilla JavaScript for form handling (no frameworks)
+- The page should work in all modern browsers`;
+  }
+
+  async function copyPrompt() {
+    await navigator.clipboard.writeText(buildLandingPagePrompt());
+    setPromptCopied(true);
+    setTimeout(() => setPromptCopied(false), 2000);
   }
 
   // ── Submit ───────────────────────────────────────────────────────
@@ -592,20 +677,66 @@ export default function NewCampaignPage() {
 
         {/* ── Step 3: Landing Page Template ────────────────────── */}
         {step === 3 && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <h2 className="text-base font-semibold text-charcoal">Landing Page Template</h2>
-            <p className="text-xs text-txt-secondary leading-relaxed">
-              Generate your landing page HTML using Claude, then paste it here.
-              The form in your template should POST to{" "}
-              <code className="rounded bg-cream px-1.5 py-0.5 font-mono text-[0.7rem] text-accent">
+
+            {/* Prompt generator */}
+            <div className="rounded-lg border border-accent/20 bg-accent/[0.03] p-4 space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-[0.78rem] font-semibold text-charcoal">
+                    Generate with AI
+                  </h3>
+                  <p className="mt-0.5 text-[0.7rem] leading-relaxed text-txt-secondary">
+                    Copy this prompt and paste it into Claude or ChatGPT. It includes your role details,
+                    gating questions, and the correct API endpoint. Paste the generated HTML below.
+                  </p>
+                </div>
+                <button
+                  onClick={copyPrompt}
+                  className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 text-[0.75rem] font-medium text-white transition-colors hover:bg-accent-light cursor-pointer"
+                >
+                  {promptCopied ? (
+                    <>
+                      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7.5L6 10l5-6" /></svg>
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="5" y="5" width="7" height="7" rx="1" />
+                        <path d="M9 5V3a1 1 0 00-1-1H3a1 1 0 00-1 1v5a1 1 0 001 1h2" />
+                      </svg>
+                      Copy Prompt
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Prompt preview */}
+              <details className="group">
+                <summary className="text-[0.68rem] font-medium text-accent cursor-pointer hover:underline">
+                  Preview prompt
+                </summary>
+                <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-cream p-3 font-mono text-[0.65rem] leading-relaxed text-charcoal whitespace-pre-wrap">
+                  {buildLandingPagePrompt()}
+                </pre>
+              </details>
+            </div>
+
+            {/* API endpoint reference */}
+            <div className="flex items-center gap-2 rounded-lg bg-cream px-4 py-2.5">
+              <span className="text-[0.7rem] text-txt-muted">Form endpoint:</span>
+              <code className="font-mono text-[0.72rem] font-medium text-accent">
                 /api/apply/{form.slug || "{slug}"}
               </code>
-            </p>
+            </div>
 
+            {/* HTML textarea */}
             <textarea
               value={form.html_template}
               onChange={(e) => updateForm({ html_template: e.target.value })}
-              placeholder="Paste your HTML template here..."
+              placeholder="Paste the generated HTML here..."
               rows={16}
               className="w-full rounded-lg border border-border bg-cream/40 px-4 py-3 font-mono text-xs text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none"
             />
