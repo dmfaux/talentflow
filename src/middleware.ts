@@ -2,7 +2,6 @@ import { jwtVerify } from "jose";
 import { NextRequest, NextResponse } from "next/server";
 
 const COOKIE_NAME = "admin_session";
-
 const PUBLIC_ADMIN_PATHS = ["/login"];
 
 function getSecret() {
@@ -20,16 +19,55 @@ async function isValidToken(token: string): Promise<boolean> {
   }
 }
 
+function isLocalDev(hostname: string): boolean {
+  return (
+    hostname === "localhost" ||
+    hostname.startsWith("localhost:") ||
+    hostname.startsWith("127.0.0.1")
+  );
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Only protect admin routes (those not in public list)
+  // Skip internals, API, and static assets
+  if (
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/_next/") ||
+    pathname === "/favicon.ico"
+  ) {
+    return NextResponse.next();
+  }
+
+  const hostname = request.headers.get("host") ?? "";
+  const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? "";
+
+  // ── Subdomain rewriting (production only) ──────────────────────
+  if (!isLocalDev(hostname) && appDomain) {
+    // Extract subdomain: "nedbank.talentstream.co.za" → "nedbank"
+    const subdomain = hostname.replace(`.${appDomain}`, "").replace(appDomain, "");
+
+    if (subdomain && subdomain !== "www") {
+      // Rewrite to /c/[subdomain] transparently
+      const url = request.nextUrl.clone();
+      url.pathname = `/c/${subdomain}${pathname === "/" ? "" : pathname}`;
+      return NextResponse.rewrite(url);
+    }
+  }
+
+  // ── Admin auth (no subdomain / www / localhost) ────────────────
+
+  // Allow candidate routes and public paths through without auth
+  if (pathname.startsWith("/c/")) {
+    return NextResponse.next();
+  }
+
   if (PUBLIC_ADMIN_PATHS.some((p) => pathname === p)) {
     return NextResponse.next();
   }
 
+  // Protect admin routes
   const token = request.cookies.get(COOKIE_NAME)?.value;
-
   if (!token || !(await isValidToken(token))) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
@@ -42,19 +80,11 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match admin routes only. Excludes:
-     * - /api (API routes)
+     * Run middleware on all routes except:
      * - /_next (Next.js internals)
-     * - /login (public admin page)
-     * - static files
-     * - candidate routes (everything not matched here)
-     *
-     * The (admin) group resolves to the root, so admin pages
-     * sit at /dashboard, /campaigns, etc. We list them explicitly
-     * as the app grows, or use a prefix convention.
-     *
-     * For now: protect /dashboard and everything under it.
+     * - /api (handled inside middleware with early return)
+     * - Static files with extensions
      */
-    "/dashboard/:path*",
+    "/((?!_next/|.*\\.).*)",
   ],
 };
