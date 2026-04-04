@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { campaigns, candidates } from "@/db/schema";
 import { uploadCV } from "@/lib/azure-storage";
+import { processNewCandidate } from "@/lib/process-candidate";
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -76,6 +77,11 @@ export async function POST(
       .update(candidates)
       .set({ cv_url: blobUrl, updated_at: new Date() })
       .where(eq(candidates.id, candidateId));
+
+    // Fire-and-forget: extract text and queue scoring
+    processNewCandidate(candidateId).catch((err) =>
+      console.error("Background processing failed:", err)
+    );
 
     return json({ success: true, url: blobUrl }, 201);
   } catch (err) {

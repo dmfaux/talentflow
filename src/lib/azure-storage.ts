@@ -58,6 +58,26 @@ export async function uploadCV(
   return blockBlob.url;
 }
 
+export async function downloadBlob(
+  blobUrl: string
+): Promise<{ buffer: Buffer; contentType: string }> {
+  const container = getContainerClient();
+  const containerUrl = container.url.replace(/\/$/, "");
+  const blobPath = blobUrl.replace(containerUrl + "/", "");
+  const blockBlob = container.getBlockBlobClient(blobPath);
+
+  const response = await blockBlob.download(0);
+  const chunks: Buffer[] = [];
+  for await (const chunk of response.readableStreamBody!) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+
+  return {
+    buffer: Buffer.concat(chunks),
+    contentType: response.contentType ?? "application/octet-stream",
+  };
+}
+
 export async function deleteCV(blobUrl: string): Promise<void> {
   const container = getContainerClient();
   // Extract blob path from full URL
