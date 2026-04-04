@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/db";
 import { candidates, campaigns, clients, scoringLogs } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { sendFollowUpQuestion } from "./whatsapp";
 
 const MODEL = "claude-sonnet-4-20250514";
 const MAX_TOKENS = 1024;
@@ -241,6 +242,13 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
     score: result.overall_score,
     processing_time_ms: processingTimeMs,
   });
+
+  // Auto-send follow-up if there are flags
+  if (hasFlags) {
+    sendFollowUpQuestion(candidateId).catch((err) =>
+      console.error(`scoreCandidate: follow-up failed for ${candidateId}:`, err)
+    );
+  }
 }
 
 async function handleApiFailure(
