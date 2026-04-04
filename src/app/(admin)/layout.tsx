@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { ActiveCampaignCount } from "@/components/admin/active-campaign-count";
+import { ToastProvider } from "@/components/ui/toast-provider";
 
 export default function AdminLayout({
   children,
@@ -27,7 +28,9 @@ export default function AdminLayout({
         <AdminSidebar />
 
         {/* Main content */}
-        <main className="flex-1 px-8 py-6">{children}</main>
+        <main className="flex-1 px-8 py-6">
+          <ToastProvider>{children}</ToastProvider>
+        </main>
       </div>
     </div>
   );

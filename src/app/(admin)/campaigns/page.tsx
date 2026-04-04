@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { EmptyState } from "@/components/ui/empty-state";
 
 interface Campaign {
   id: string;
@@ -98,18 +99,21 @@ export default function CampaignsPage() {
           Loading campaigns...
         </div>
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-border bg-surface px-5 py-16 text-center text-sm text-txt-muted">
-          {tab === "all" ? (
-            <>
-              No campaigns yet.{" "}
-              <Link href="/campaigns/new" className="text-accent hover:underline">
-                Create one
-              </Link>
-            </>
-          ) : (
-            `No ${tab} campaigns`
-          )}
-        </div>
+        tab === "all" ? (
+          <EmptyState
+            icon="campaigns"
+            title="No campaigns yet"
+            description="Create your first campaign to start screening candidates with AI-powered assessments."
+            actionLabel="Create Campaign"
+            actionHref="/campaigns/new"
+          />
+        ) : (
+          <EmptyState
+            icon="campaigns"
+            title={`No ${tab} campaigns`}
+            description={`There are no campaigns with "${tab}" status right now.`}
+          />
+        )
       ) : (
         <div className="space-y-3">
           {filtered.map((campaign) => (
