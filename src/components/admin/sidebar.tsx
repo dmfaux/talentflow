@@ -51,7 +51,7 @@ export function AdminSidebar() {
                   href={item.href}
                   className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-[0.8rem] font-medium transition-colors ${
                     active
-                      ? "bg-charcoal text-cream"
+                      ? "bg-accent text-white"
                       : "text-txt-secondary hover:bg-cream hover:text-charcoal"
                   }`}
                 >

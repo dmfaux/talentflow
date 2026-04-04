@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AdminSidebar } from "@/components/admin/sidebar";
+import { ActiveCampaignCount } from "@/components/admin/active-campaign-count";
 
 export default function AdminLayout({
   children,
@@ -18,10 +19,7 @@ export default function AdminLayout({
             Admin
           </span>
         </Link>
-        <div className="flex items-center gap-2 text-xs text-txt-secondary">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-green" />
-          <span className="font-mono">System online</span>
-        </div>
+        <ActiveCampaignCount />
       </header>
 
       <div className="flex">
