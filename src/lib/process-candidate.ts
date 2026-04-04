@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { candidates, campaigns } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { scoreCandidate } from "./ai-scoring";
 import { downloadBlob } from "./azure-storage";
 import { extractTextFromCV } from "./cv-parser";
 
@@ -59,8 +60,8 @@ export async function processNewCandidate(
       })
       .where(eq(candidates.id, candidateId));
 
-    // TODO: Call AI scoring function
-    console.log(`AI scoring would happen here for candidate ${candidateId}`);
+    // Score candidate with AI
+    await scoreCandidate(candidateId);
   } catch (err) {
     console.error(`processNewCandidate: unexpected error for ${candidateId}:`, err);
   }
