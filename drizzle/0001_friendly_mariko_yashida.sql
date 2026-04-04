@@ -1,0 +1,1 @@
+ALTER TABLE "candidates" ADD COLUMN "purged_at" timestamp;

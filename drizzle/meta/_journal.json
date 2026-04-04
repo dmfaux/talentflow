@@ -8,6 +8,13 @@
       "when": 1775283133820,
       "tag": "0000_worried_vulcan",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775285608074,
+      "tag": "0001_friendly_mariko_yashida",
+      "breakpoints": true
     }
   ]
 }

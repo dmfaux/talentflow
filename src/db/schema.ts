@@ -88,6 +88,7 @@ export const candidates = pgTable(
     source: text("source"),
     popia_consent_at: timestamp("popia_consent_at"),
     data_purge_at: timestamp("data_purge_at"),
+    purged_at: timestamp("purged_at"),
     created_at: timestamp("created_at").defaultNow().notNull(),
     updated_at: timestamp("updated_at").defaultNow().notNull(),
   },
