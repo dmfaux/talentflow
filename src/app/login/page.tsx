@@ -53,7 +53,7 @@ function LoginForm() {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 50% 40% at 20% 20%, rgba(28,53,240,0.06) 0%, transparent 60%), radial-gradient(ellipse 50% 40% at 80% 80%, rgba(230,57,23,0.04) 0%, transparent 60%)",
+            "radial-gradient(ellipse 50% 40% at 20% 20%, rgba(255,200,0,0.10) 0%, transparent 60%), radial-gradient(ellipse 50% 40% at 80% 80%, rgba(230,57,23,0.04) 0%, transparent 60%)",
         }}
         aria-hidden
       />
@@ -136,7 +136,7 @@ function LoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className="relative h-12 w-full rounded-lg bg-cobalt font-medium text-[0.92rem] text-white transition-all duration-200 hover:bg-cobalt-deep disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed shadow-[0_4px_16px_-4px_rgba(28,53,240,0.3)]"
+              className="relative h-12 w-full rounded-lg bg-cobalt font-medium text-[0.92rem] text-ink transition-all duration-200 hover:bg-cobalt-deep hover:text-white disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed shadow-[0_4px_16px_-4px_rgba(255,200,0,0.5)]"
             >
               {loading ? (
                 <span className="inline-flex items-center gap-2">

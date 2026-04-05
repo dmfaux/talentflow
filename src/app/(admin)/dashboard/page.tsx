@@ -227,7 +227,7 @@ function AreaChart({
 
             {/* Area fill */}
             {n > 1 && (
-              <path d={areaPath} fill="#1c35f0" fillOpacity="0.08" />
+              <path d={areaPath} fill="#ffc800" fillOpacity="0.08" />
             )}
 
             {/* Line */}
@@ -235,7 +235,7 @@ function AreaChart({
               <path
                 d={linePath}
                 fill="none"
-                stroke="#1c35f0"
+                stroke="#ffc800"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -250,7 +250,7 @@ function AreaChart({
                 cy={points[i].y}
                 r="3"
                 fill="#ffffff"
-                stroke="#1c35f0"
+                stroke="#ffc800"
                 strokeWidth="1.5"
               />
             ))}
@@ -497,7 +497,7 @@ export default function DashboardPage() {
           </div>
           <Link
             href="/campaigns/new"
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-[0.8rem] font-medium text-ink transition-colors hover:bg-accent-light hover:text-white"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M7 2v10M2 7h10" />
@@ -556,7 +556,7 @@ export default function DashboardPage() {
               {
                 label: "Scored",
                 value: data.status_breakdown.find((s) => s.status === "scored")?.count ?? 0,
-                color: "#1c35f0",
+                color: "#ffc800",
               },
               {
                 label: "Awaiting scoring",

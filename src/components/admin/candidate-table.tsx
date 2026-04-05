@@ -53,7 +53,7 @@ function initialsColor(name: string): string {
     "bg-green-light text-green",
     "bg-warning-light text-warning",
     "bg-red-light text-red",
-    "bg-cobalt-tint text-cobalt",
+    "bg-cobalt-tint text-cobalt-deep",
     "bg-vermillion-soft text-vermillion",
     "bg-moss-soft text-moss",
   ];

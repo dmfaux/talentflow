@@ -51,7 +51,7 @@ export function CampaignTabs({ activeTab, shortlistCount, campaignId }: Props) {
       {activeTab === "shortlist" && shortlistCount > 0 && (
         <a
           href={`/campaigns/${campaignId}/report`}
-          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3.5 text-[0.75rem] font-medium text-white transition-colors hover:bg-accent-light"
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3.5 text-[0.75rem] font-medium text-ink transition-colors hover:bg-accent-light hover:text-white"
         >
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 2h8a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" />

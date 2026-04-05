@@ -169,7 +169,7 @@ export default async function ReportPage({ params }: Props) {
                 {/* Candidate header */}
                 <div className="flex items-start justify-between mb-5">
                   <div className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-[0.65rem] font-bold text-white">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-[0.65rem] font-bold text-ink">
                       {idx + 1}
                     </span>
                     <div>

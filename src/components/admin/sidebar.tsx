@@ -58,7 +58,7 @@ export function AdminSidebar() {
   }
 
   return (
-    <aside className="sticky top-14 flex h-[calc(100vh-3.5rem)] w-52 flex-col border-r border-rule bg-paper">
+    <aside className="sticky top-14 flex h-[calc(100vh-3.5rem)] w-52 flex-col border-r border-cobalt-deep/30 bg-cobalt">
       <nav className="flex-1 px-3 pt-4">
         <ul className="space-y-0.5">
           {NAV_ITEMS.map((item) => {
@@ -69,11 +69,11 @@ export function AdminSidebar() {
                   href={item.href}
                   className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[0.8rem] font-medium transition-colors ${
                     active
-                      ? "bg-cobalt text-white shadow-[0_4px_12px_-4px_rgba(28,53,240,0.35)]"
-                      : "text-ink-muted hover:bg-canvas hover:text-ink"
+                      ? "bg-ink text-paper shadow-[0_4px_12px_-4px_rgba(11,15,28,0.35)]"
+                      : "text-ink/65 hover:bg-ink/10 hover:text-ink"
                   }`}
                 >
-                  <span className={active ? "text-white/90" : "text-ink-faint"}>
+                  <span className={active ? "text-paper/80" : "text-ink/50"}>
                     {ICONS[item.icon]}
                   </span>
                   {item.label}
@@ -87,10 +87,10 @@ export function AdminSidebar() {
         </ul>
       </nav>
 
-      <div className="border-t border-rule p-3">
+      <div className="border-t border-ink/15 p-3">
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[0.8rem] font-medium text-ink-faint transition-colors hover:bg-vermillion-soft hover:text-vermillion cursor-pointer"
+          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[0.8rem] font-medium text-ink/55 transition-colors hover:bg-vermillion hover:text-paper cursor-pointer"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M6 2H4a2 2 0 00-2 2v8a2 2 0 002 2h2M10.5 11.5L14 8l-3.5-3.5M14 8H6" />

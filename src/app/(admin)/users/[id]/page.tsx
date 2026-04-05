@@ -229,7 +229,7 @@ export default function UserDetailPage() {
           </button>
           <button
             onClick={() => setEditing(true)}
-            className="inline-flex h-9 items-center rounded-lg bg-accent px-4 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light cursor-pointer"
+            className="inline-flex h-9 items-center rounded-lg bg-accent px-4 text-[0.8rem] font-medium text-ink transition-colors hover:bg-accent-light hover:text-white cursor-pointer"
           >
             Edit
           </button>
@@ -383,7 +383,7 @@ export default function UserDetailPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-5 text-[0.8rem] font-medium text-ink transition-colors hover:bg-accent-light hover:text-white disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                 >
                   {saving ? "Saving..." : "Save"}
                 </button>
@@ -446,7 +446,7 @@ export default function UserDetailPage() {
                 <button
                   type="submit"
                   disabled={pwdSaving}
-                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-5 text-[0.8rem] font-medium text-ink transition-colors hover:bg-accent-light hover:text-white disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                 >
                   {pwdSaving ? "Updating..." : "Update password"}
                 </button>

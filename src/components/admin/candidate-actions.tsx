@@ -62,7 +62,7 @@ export function CandidateActions({ candidateId, status, hasCv }: Props) {
           <button
             onClick={() => updateStatus("shortlisted")}
             disabled={!!loading}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 text-[0.75rem] font-medium text-white transition-colors hover:bg-accent-light cursor-pointer disabled:opacity-50"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 text-[0.75rem] font-medium text-ink transition-colors hover:bg-accent-light hover:text-white cursor-pointer disabled:opacity-50"
           >
             {loading === "shortlisted" ? "..." : "Add to Shortlist"}
           </button>

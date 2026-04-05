@@ -171,7 +171,7 @@ function Hero() {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 60% 50% at 80% 20%, rgba(28, 53, 240, 0.07) 0%, transparent 60%), radial-gradient(ellipse 50% 40% at 10% 80%, rgba(230, 57, 23, 0.05) 0%, transparent 60%)",
+            "radial-gradient(ellipse 60% 50% at 80% 20%, rgba(255, 200, 0, 0.11) 0%, transparent 60%), radial-gradient(ellipse 50% 40% at 10% 80%, rgba(230, 57, 23, 0.05) 0%, transparent 60%)",
         }}
         aria-hidden
       />
@@ -198,7 +198,7 @@ function Hero() {
             <div className="load-fade load-4 mt-10 sm:mt-12 flex flex-wrap items-center gap-3 sm:gap-4">
               <a
                 href="#start"
-                className="arrow-parent group inline-flex items-center gap-2.5 h-[52px] px-7 bg-cobalt text-white text-[0.95rem] font-medium rounded-full hover:bg-cobalt-deep transition-colors duration-300 lift shadow-[0_8px_24px_-8px_rgba(28,53,240,0.35)]"
+                className="arrow-parent group inline-flex items-center gap-2.5 h-[52px] px-7 bg-cobalt text-ink text-[0.95rem] font-medium rounded-full hover:bg-cobalt-deep hover:text-white transition-colors duration-300 lift shadow-[0_8px_24px_-8px_rgba(255,200,0,0.55)]"
               >
                 Start a campaign
                 <span className="arrow-slide">→</span>
@@ -807,7 +807,7 @@ function FinalCTA() {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(28, 53, 240, 0.04) 0%, transparent 70%)",
+            "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(255, 200, 0, 0.07) 0%, transparent 70%)",
         }}
         aria-hidden
       />
@@ -838,7 +838,7 @@ function FinalCTA() {
             />
             <button
               type="submit"
-              className="arrow-parent group h-[56px] px-7 bg-cobalt text-white font-medium text-[0.95rem] rounded-full hover:bg-cobalt-deep transition-colors duration-300 shrink-0 inline-flex items-center justify-center gap-2.5 lift shadow-[0_8px_24px_-8px_rgba(28,53,240,0.35)]"
+              className="arrow-parent group h-[56px] px-7 bg-cobalt text-ink font-medium text-[0.95rem] rounded-full hover:bg-cobalt-deep hover:text-white transition-colors duration-300 shrink-0 inline-flex items-center justify-center gap-2.5 lift shadow-[0_8px_24px_-8px_rgba(255,200,0,0.55)]"
             >
               Start a campaign
               <span className="arrow-slide">→</span>

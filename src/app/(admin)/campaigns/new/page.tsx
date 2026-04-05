@@ -439,7 +439,7 @@ For all error states, keep the form visible so the candidate can correct and ret
               onClick={() => { if (i < step) setStep(i); }}
               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-semibold transition-colors cursor-pointer ${
                 i < step
-                  ? "bg-accent text-white"
+                  ? "bg-accent text-ink"
                   : i === step
                     ? "bg-charcoal text-white"
                     : "bg-cream text-txt-muted border border-border"
@@ -743,7 +743,7 @@ For all error states, keep the form visible so the candidate can correct and ret
                 </div>
                 <button
                   onClick={copyPrompt}
-                  className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 text-[0.75rem] font-medium text-white transition-colors hover:bg-accent-light cursor-pointer"
+                  className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 text-[0.75rem] font-medium text-ink transition-colors hover:bg-accent-light hover:text-white cursor-pointer"
                 >
                   {promptCopied ? (
                     <>
@@ -921,7 +921,7 @@ For all error states, keep the form visible so the candidate can correct and ret
               <button
                 onClick={() => submit("active")}
                 disabled={submitting}
-                className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-5 text-[0.8rem] font-medium text-ink transition-colors hover:bg-accent-light hover:text-white disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
                 {submitting && (
                   <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">

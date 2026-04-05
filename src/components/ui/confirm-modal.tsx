@@ -26,7 +26,7 @@ export function ConfirmModal({
   const btnClass =
     variant === "danger"
       ? "bg-red text-white hover:bg-red/90"
-      : "bg-accent text-white hover:bg-accent-light";
+      : "bg-accent text-ink hover:bg-accent-light hover:text-white";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/30 backdrop-blur-sm">

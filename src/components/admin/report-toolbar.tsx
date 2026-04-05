@@ -41,7 +41,7 @@ export function ReportToolbar() {
       </button>
       <button
         onClick={handlePrint}
-        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-[0.78rem] font-medium text-white shadow-sm transition-colors hover:bg-accent-light cursor-pointer"
+        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-[0.78rem] font-medium text-ink shadow-sm transition-colors hover:bg-accent-light hover:text-white cursor-pointer"
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3.5 5V2h7v3M3.5 10H2.5a1 1 0 01-1-1V6.5a1 1 0 011-1h9a1 1 0 011 1V9a1 1 0 01-1 1h-1" />
