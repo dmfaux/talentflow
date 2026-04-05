@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
   { label: "Campaigns", href: "/campaigns", icon: "campaign" },
   { label: "Clients", href: "/clients", icon: "client" },
+  { label: "Users", href: "/users", icon: "users" },
   { label: "Settings", href: "/settings", icon: "settings" },
 ] as const;
 
@@ -29,6 +30,14 @@ const ICONS: Record<string, React.ReactNode> = {
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="8" cy="5.5" r="2.5" />
       <path d="M3 13.5c0-2.5 2.2-4 5-4s5 1.5 5 4" />
+    </svg>
+  ),
+  users: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="6" cy="6" r="2.25" />
+      <circle cx="11.25" cy="6.5" r="1.75" />
+      <path d="M2 13c0-2.2 1.8-3.5 4-3.5s4 1.3 4 3.5" />
+      <path d="M10.5 13c0-1.7 1-2.8 2.5-2.8s1.5 1.1 1.5 2.8" />
     </svg>
   ),
   settings: (

@@ -1,15 +1,41 @@
-import { COOKIE_NAME, signToken } from "@/lib/auth";
+import { COOKIE_NAME, signToken, verifyPassword } from "@/lib/auth";
+import { db } from "@/db";
+import { users } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const { password } = await request.json();
-  const secret = process.env.ADMIN_AUTH_SECRET;
+  const { email, password } = await request.json();
 
-  if (!secret || password !== secret) {
-    return NextResponse.json({ error: "Invalid password" }, { status: 401 });
+  if (typeof email !== "string" || typeof password !== "string" || !email || !password) {
+    return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
   }
 
-  const token = await signToken();
+  const normalizedEmail = email.trim().toLowerCase();
+  const invalidCredentials = NextResponse.json(
+    { error: "Invalid email or password" },
+    { status: 401 }
+  );
+
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, normalizedEmail))
+    .limit(1);
+
+  if (!user || !user.is_active) {
+    return invalidCredentials;
+  }
+
+  if (!(await verifyPassword(password, user.password_hash))) {
+    return invalidCredentials;
+  }
+
+  const token = await signToken({
+    userId: user.id,
+    securityGroup: user.security_group,
+    clientId: user.client_id,
+  });
 
   const response = NextResponse.json({ success: true });
   response.cookies.set(COOKIE_NAME, token, {

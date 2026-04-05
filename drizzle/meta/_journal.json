@@ -22,6 +22,13 @@
       "when": 1775298503757,
       "tag": "0002_deep_domino",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1775367393980,
+      "tag": "0003_magenta_sersi",
+      "breakpoints": true
     }
   ]
 }
