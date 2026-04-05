@@ -12,7 +12,7 @@ export default function AdminLayout({
     <div className="min-h-screen bg-cream font-sans">
       {/* Top bar */}
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-surface/80 px-6 backdrop-blur-sm">
-        <Link href="/clients" className="flex items-baseline gap-2">
+        <Link href="/dashboard" className="flex items-baseline gap-2">
           <span className="font-serif text-xl italic text-charcoal">
             TalentStream
           </span>

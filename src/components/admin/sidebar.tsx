@@ -4,12 +4,21 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 const NAV_ITEMS = [
+  { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
   { label: "Campaigns", href: "/campaigns", icon: "campaign" },
   { label: "Clients", href: "/clients", icon: "client" },
   { label: "Settings", href: "/settings", icon: "settings" },
 ] as const;
 
 const ICONS: Record<string, React.ReactNode> = {
+  dashboard: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="5" height="5" rx="1" />
+      <rect x="9" y="2" width="5" height="3" rx="1" />
+      <rect x="2" y="9" width="5" height="5" rx="1" />
+      <rect x="9" y="7" width="5" height="7" rx="1" />
+    </svg>
+  ),
   campaign: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <rect x="2" y="3" width="12" height="10" rx="1.5" />
