@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
@@ -25,7 +26,11 @@ export function CampaignActions({ campaignId, status }: Props) {
         body: JSON.stringify({ status: newStatus }),
       });
       if (res.ok) {
+        // Draft → active is a publish (first activation), whereas
+        // paused → active is a resume.
+        const published = newStatus === "active" && status === "draft";
         toast(
+          published ? "Campaign published" :
           newStatus === "active" ? "Campaign resumed" :
           newStatus === "paused" ? "Campaign paused" :
           "Campaign closed",
@@ -42,6 +47,23 @@ export function CampaignActions({ campaignId, status }: Props) {
   return (
     <>
       <div className="flex items-center gap-2">
+        {status === "draft" && (
+          <>
+            <Link
+              href={`/campaigns/${campaignId}/edit`}
+              className="inline-flex h-8 items-center rounded-lg border border-border px-3 text-[0.75rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal"
+            >
+              Edit
+            </Link>
+            <button
+              onClick={() => updateStatus("active")}
+              disabled={loading}
+              className="inline-flex h-8 items-center rounded-lg bg-accent px-3 text-[0.75rem] font-medium text-ink transition-colors hover:bg-accent-light hover:text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Publish
+            </button>
+          </>
+        )}
         {status === "active" && (
           <button
             onClick={() => updateStatus("paused")}
