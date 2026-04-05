@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 
 interface Campaign {
@@ -18,8 +19,18 @@ interface Campaign {
   created_at: string;
 }
 
-const TABS = ["all", "active", "draft", "closed"] as const;
-type Tab = (typeof TABS)[number];
+const STATUSES = ["all", "draft", "active", "paused", "closed", "archived"] as const;
+type StatusFilter = (typeof STATUSES)[number];
+
+type SortKey =
+  | "role_title"
+  | "client_name"
+  | "department"
+  | "location"
+  | "status"
+  | "campaign_end"
+  | "created_at";
+type SortDir = "asc" | "desc";
 
 const STATUS_STYLES: Record<string, string> = {
   draft: "bg-cream text-txt-secondary",
@@ -30,19 +41,44 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 function daysRemaining(end: string | null): string {
-  if (!end) return "No end date";
+  if (!end) return "—";
   const diff = Math.ceil(
     (new Date(end).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   );
   if (diff < 0) return "Ended";
   if (diff === 0) return "Ends today";
-  return `${diff}d remaining`;
+  return `${diff}d`;
+}
+
+function compareNullable(
+  a: string | number | null | undefined,
+  b: string | number | null | undefined,
+  dir: SortDir,
+): number {
+  // Nulls always sort last regardless of direction
+  const aNull = a === null || a === undefined || a === "";
+  const bNull = b === null || b === undefined || b === "";
+  if (aNull && bNull) return 0;
+  if (aNull) return 1;
+  if (bNull) return -1;
+  const mult = dir === "asc" ? 1 : -1;
+  if (typeof a === "number" && typeof b === "number") return (a - b) * mult;
+  return String(a).localeCompare(String(b)) * mult;
 }
 
 export default function CampaignsPage() {
+  const router = useRouter();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>("all");
+
+  // Filters
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [clientFilter, setClientFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+
+  // Sort
+  const [sortKey, setSortKey] = useState<SortKey>("created_at");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   useEffect(() => {
     fetch("/api/admin/campaigns")
@@ -51,10 +87,57 @@ export default function CampaignsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered =
-    tab === "all"
-      ? campaigns
-      : campaigns.filter((c) => c.status === tab);
+  const clients = useMemo(() => {
+    const names = new Set<string>();
+    for (const c of campaigns) {
+      if (c.client_name) names.add(c.client_name);
+    }
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [campaigns]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = campaigns.filter((c) => {
+      if (statusFilter !== "all" && c.status !== statusFilter) return false;
+      if (clientFilter !== "all" && c.client_name !== clientFilter) return false;
+      if (q) {
+        const haystack = [
+          c.role_title,
+          c.client_name ?? "",
+          c.department ?? "",
+          c.location ?? "",
+          c.slug,
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+
+    return [...list].sort((a, b) =>
+      compareNullable(a[sortKey], b[sortKey], sortDir),
+    );
+  }, [campaigns, statusFilter, clientFilter, search, sortKey, sortDir]);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      // Default direction per column type: text ascending, dates descending
+      setSortDir(key === "created_at" || key === "campaign_end" ? "desc" : "asc");
+    }
+  }
+
+  function clearFilters() {
+    setStatusFilter("all");
+    setClientFilter("all");
+    setSearch("");
+  }
+
+  const hasActiveFilters =
+    statusFilter !== "all" || clientFilter !== "all" || search.trim() !== "";
 
   return (
     <div>
@@ -63,7 +146,11 @@ export default function CampaignsPage() {
         <div>
           <h1 className="text-lg font-semibold text-charcoal">Campaigns</h1>
           <p className="mt-0.5 text-xs text-txt-muted">
-            {loading ? "Loading..." : `${campaigns.length} total`}
+            {loading
+              ? "Loading..."
+              : hasActiveFilters
+                ? `${filtered.length} of ${campaigns.length}`
+                : `${campaigns.length} total`}
           </p>
         </div>
         <Link
@@ -77,96 +164,227 @@ export default function CampaignsPage() {
         </Link>
       </div>
 
-      {/* Filter tabs */}
-      <div className="mb-5 flex gap-1 rounded-lg bg-cream p-1 w-fit border border-border">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`rounded-md px-4 py-1.5 text-[0.78rem] font-medium capitalize transition-colors cursor-pointer ${
-              tab === t
-                ? "bg-surface text-charcoal shadow-sm"
-                : "text-txt-muted hover:text-txt-secondary"
-            }`}
+      {/* Toolbar */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-txt-muted pointer-events-none"
           >
-            {t}
+            <circle cx="6" cy="6" r="4" />
+            <path d="M9 9l3 3" />
+          </svg>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search role, client, location..."
+            className="h-9 w-full rounded-lg border border-border bg-surface pl-8 pr-3 text-[0.78rem] text-charcoal outline-none placeholder:text-txt-muted focus:border-accent"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-txt-muted hover:text-charcoal cursor-pointer"
+              aria-label="Clear search"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M3 3l6 6M9 3l-6 6" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Status filter */}
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          className="h-9 rounded-lg border border-border bg-surface px-2.5 text-[0.78rem] font-medium text-txt-secondary outline-none focus:border-accent cursor-pointer capitalize"
+        >
+          {STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s === "all" ? "All statuses" : s}
+            </option>
+          ))}
+        </select>
+
+        {/* Client filter */}
+        <select
+          value={clientFilter}
+          onChange={(e) => setClientFilter(e.target.value)}
+          disabled={clients.length === 0}
+          className="h-9 rounded-lg border border-border bg-surface px-2.5 text-[0.78rem] font-medium text-txt-secondary outline-none focus:border-accent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <option value="all">All clients</option>
+          {clients.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+
+        {hasActiveFilters && (
+          <button
+            onClick={clearFilters}
+            className="h-9 rounded-lg border border-transparent px-2.5 text-[0.78rem] font-medium text-txt-muted hover:text-charcoal cursor-pointer"
+          >
+            Clear filters
           </button>
-        ))}
+        )}
       </div>
 
-      {/* Campaign cards */}
+      {/* Data grid */}
       {loading ? (
-        <div className="py-20 text-center text-sm text-txt-muted">
+        <div className="rounded-xl border border-border bg-surface py-20 text-center text-sm text-txt-muted">
           Loading campaigns...
         </div>
+      ) : campaigns.length === 0 ? (
+        <EmptyState
+          icon="campaigns"
+          title="No campaigns yet"
+          description="Create your first campaign to start screening candidates with AI-powered assessments."
+          actionLabel="Create Campaign"
+          actionHref="/campaigns/new"
+        />
       ) : filtered.length === 0 ? (
-        tab === "all" ? (
-          <EmptyState
-            icon="campaigns"
-            title="No campaigns yet"
-            description="Create your first campaign to start screening candidates with AI-powered assessments."
-            actionLabel="Create Campaign"
-            actionHref="/campaigns/new"
-          />
-        ) : (
-          <EmptyState
-            icon="campaigns"
-            title={`No ${tab} campaigns`}
-            description={`There are no campaigns with "${tab}" status right now.`}
-          />
-        )
+        <div className="rounded-xl border border-border bg-surface py-20 text-center">
+          <p className="text-sm text-txt-secondary">No campaigns match your filters</p>
+          <button
+            onClick={clearFilters}
+            className="mt-2 text-[0.78rem] font-medium text-accent hover:underline cursor-pointer"
+          >
+            Clear filters
+          </button>
+        </div>
       ) : (
-        <div className="space-y-3">
-          {filtered.map((campaign) => (
-            <Link
-              key={campaign.id}
-              href={`/campaigns/${campaign.id}`}
-              className="group block rounded-xl border border-border bg-surface p-5 transition-all hover:border-border-strong hover:shadow-sm"
-            >
-              <div className="flex items-start justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2.5">
-                    <h3 className="text-sm font-semibold text-charcoal group-hover:text-accent transition-colors">
+        <div className="overflow-hidden rounded-xl border border-border bg-surface">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-border">
+                <SortHeader label="Role" sortKey="role_title" currentKey={sortKey} currentDir={sortDir} onSort={toggleSort} />
+                <SortHeader label="Client" sortKey="client_name" currentKey={sortKey} currentDir={sortDir} onSort={toggleSort} />
+                <SortHeader label="Department" sortKey="department" currentKey={sortKey} currentDir={sortDir} onSort={toggleSort} />
+                <SortHeader label="Location" sortKey="location" currentKey={sortKey} currentDir={sortDir} onSort={toggleSort} />
+                <SortHeader label="Status" sortKey="status" currentKey={sortKey} currentDir={sortDir} onSort={toggleSort} />
+                <SortHeader label="Ends" sortKey="campaign_end" currentKey={sortKey} currentDir={sortDir} onSort={toggleSort} align="right" />
+                <SortHeader label="Created" sortKey="created_at" currentKey={sortKey} currentDir={sortDir} onSort={toggleSort} align="right" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filtered.map((campaign) => (
+                <tr
+                  key={campaign.id}
+                  className="group cursor-pointer transition-colors hover:bg-cream/60"
+                  onClick={(e) => {
+                    // Let link clicks through without double-navigating
+                    if ((e.target as HTMLElement).closest("a")) return;
+                    router.push(`/campaigns/${campaign.id}`);
+                  }}
+                >
+                  <td className="px-5 py-3">
+                    <Link
+                      href={`/campaigns/${campaign.id}`}
+                      className="block text-sm font-medium text-charcoal group-hover:text-accent transition-colors"
+                    >
                       {campaign.role_title}
-                    </h3>
+                    </Link>
+                    <p className="mt-0.5 font-mono text-[0.62rem] text-txt-muted">
+                      {campaign.client_slug}/{campaign.slug}
+                    </p>
+                  </td>
+                  <td className="px-5 py-3 text-sm text-txt-secondary">
+                    {campaign.client_name ?? <span className="text-txt-muted">&mdash;</span>}
+                  </td>
+                  <td className="px-5 py-3 text-sm text-txt-secondary">
+                    {campaign.department ?? <span className="text-txt-muted">&mdash;</span>}
+                  </td>
+                  <td className="px-5 py-3 text-sm text-txt-secondary">
+                    {campaign.location ?? <span className="text-txt-muted">&mdash;</span>}
+                  </td>
+                  <td className="px-5 py-3">
                     <span
-                      className={`inline-block rounded-full px-2.5 py-0.5 text-[0.68rem] font-medium ${
+                      className={`inline-block rounded-full px-2.5 py-0.5 text-[0.68rem] font-medium capitalize ${
                         STATUS_STYLES[campaign.status] ?? STATUS_STYLES.draft
                       }`}
                     >
                       {campaign.status}
                     </span>
-                  </div>
-                  <div className="mt-1.5 flex items-center gap-3 text-xs text-txt-secondary">
-                    <span>{campaign.client_name ?? "No client"}</span>
-                    {campaign.department && (
-                      <>
-                        <span className="text-txt-muted">&middot;</span>
-                        <span>{campaign.department}</span>
-                      </>
-                    )}
-                    {campaign.location && (
-                      <>
-                        <span className="text-txt-muted">&middot;</span>
-                        <span>{campaign.location}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div className="ml-6 flex flex-col items-end gap-1 shrink-0">
-                  <span className="font-mono text-xs text-txt-muted">
+                  </td>
+                  <td className="px-5 py-3 text-right font-mono text-xs text-txt-secondary">
                     {daysRemaining(campaign.campaign_end)}
-                  </span>
-                  <span className="font-mono text-[0.65rem] text-txt-muted">
-                    {campaign.client_slug}/{campaign.slug}
-                  </span>
-                </div>
-              </div>
-            </Link>
-          ))}
+                  </td>
+                  <td className="px-5 py-3 text-right font-mono text-[0.65rem] text-txt-muted">
+                    {new Date(campaign.created_at).toLocaleDateString("en-ZA")}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
+  );
+}
+
+function SortHeader({
+  label,
+  sortKey,
+  currentKey,
+  currentDir,
+  onSort,
+  align = "left",
+}: {
+  label: string;
+  sortKey: SortKey;
+  currentKey: SortKey;
+  currentDir: SortDir;
+  onSort: (key: SortKey) => void;
+  align?: "left" | "right";
+}) {
+  const active = currentKey === sortKey;
+  return (
+    <th className={`px-5 py-3 ${align === "right" ? "text-right" : "text-left"}`}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1 text-[0.63rem] font-semibold uppercase tracking-[0.12em] transition-colors cursor-pointer ${
+          active ? "text-charcoal" : "text-txt-muted hover:text-txt-secondary"
+        }`}
+      >
+        {label}
+        <span className="flex flex-col leading-none">
+          <svg
+            width="8"
+            height="5"
+            viewBox="0 0 8 5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            className={active && currentDir === "asc" ? "text-accent" : "text-txt-muted/50"}
+          >
+            <path d="M1.5 3.5L4 1l2.5 2.5" />
+          </svg>
+          <svg
+            width="8"
+            height="5"
+            viewBox="0 0 8 5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            className={active && currentDir === "desc" ? "text-accent" : "text-txt-muted/50"}
+          >
+            <path d="M1.5 1.5L4 4l2.5-2.5" />
+          </svg>
+        </span>
+      </button>
+    </th>
   );
 }
