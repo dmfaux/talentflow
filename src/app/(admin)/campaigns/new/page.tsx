@@ -1064,41 +1064,11 @@ function TemplateGalleryStep({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-base font-semibold text-charcoal">Landing Page Template</h2>
-          <p className="mt-1 text-xs text-txt-muted">
-            Choose a template — candidates will see this exactly.
-          </p>
-        </div>
-        {selectedTemplate && (
-          <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-cream/40 p-1">
-            <button
-              type="button"
-              onClick={() => setPreviewDevice("desktop")}
-              className={`inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-[0.7rem] font-medium transition-colors cursor-pointer ${
-                previewDevice === "desktop"
-                  ? "bg-paper text-charcoal shadow-sm"
-                  : "text-txt-muted hover:text-charcoal"
-              }`}
-            >
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1.5" y="2.5" width="11" height="7" rx="1" /><path d="M5 12h4M7 10v2" strokeLinecap="round" /></svg>
-              Desktop
-            </button>
-            <button
-              type="button"
-              onClick={() => setPreviewDevice("mobile")}
-              className={`inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-[0.7rem] font-medium transition-colors cursor-pointer ${
-                previewDevice === "mobile"
-                  ? "bg-paper text-charcoal shadow-sm"
-                  : "text-txt-muted hover:text-charcoal"
-              }`}
-            >
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="4" y="1.5" width="6" height="11" rx="1" /><path d="M6.5 11h1" strokeLinecap="round" /></svg>
-              Mobile
-            </button>
-          </div>
-        )}
+      <div>
+        <h2 className="text-base font-semibold text-charcoal">Landing Page Template</h2>
+        <p className="mt-1 text-xs text-txt-muted">
+          Choose a template — candidates will see this exactly.
+        </p>
       </div>
 
       {validationError && <p className="text-xs text-red">{validationError}</p>}
@@ -1188,9 +1158,37 @@ function TemplateGalleryStep({
           {/* Live preview */}
           {selectedTemplate && previewUrl && (
             <div className="pt-2">
-              <p className="mb-2 text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
-                Preview
-              </p>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
+                  Preview
+                </p>
+                <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-cream/40 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDevice("desktop")}
+                    className={`inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-[0.7rem] font-medium transition-colors cursor-pointer ${
+                      previewDevice === "desktop"
+                        ? "bg-paper text-charcoal shadow-sm"
+                        : "text-txt-muted hover:text-charcoal"
+                    }`}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1.5" y="2.5" width="11" height="7" rx="1" /><path d="M5 12h4M7 10v2" strokeLinecap="round" /></svg>
+                    Desktop
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewDevice("mobile")}
+                    className={`inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-[0.7rem] font-medium transition-colors cursor-pointer ${
+                      previewDevice === "mobile"
+                        ? "bg-paper text-charcoal shadow-sm"
+                        : "text-txt-muted hover:text-charcoal"
+                    }`}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="4" y="1.5" width="6" height="11" rx="1" /><path d="M6.5 11h1" strokeLinecap="round" /></svg>
+                    Mobile
+                  </button>
+                </div>
+              </div>
               <div
                 className={previewDevice === "mobile" ? "mx-auto max-w-[390px]" : ""}
               >
