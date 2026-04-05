@@ -10,6 +10,13 @@ interface Client {
   id: string;
   slug: string;
   name: string;
+  branding_logo_url: string | null;
+  brand_primary_color: string | null;
+  brand_secondary_color: string | null;
+  brand_accent_color: string | null;
+  brand_text_color: string | null;
+  logo_background: string | null;
+  logo_position: string | null;
 }
 
 interface GatingOption {
@@ -496,6 +503,12 @@ For all error states, keep the form visible so the candidate can correct and ret
               {errors.client_id && <p className="mt-1 text-xs text-red">{errors.client_id}</p>}
             </div>
 
+            {form.client_id && (
+              <ClientBrandingSummary
+                client={clients.find((c) => c.id === form.client_id)}
+              />
+            )}
+
             <div>
               <label htmlFor="role_title" className={labelClass}>
                 Role Title <span className="text-red">*</span>
@@ -935,6 +948,106 @@ For all error states, keep the form visible so the candidate can correct and ret
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Client branding summary ─────────────────────────────────────────
+
+function ClientBrandingSummary({ client }: { client: Client | undefined }) {
+  if (!client) return null;
+
+  const swatches = [
+    { label: "Primary", value: client.brand_primary_color },
+    { label: "Secondary", value: client.brand_secondary_color },
+    { label: "Accent", value: client.brand_accent_color },
+    { label: "Text", value: client.brand_text_color },
+  ].filter((s) => s.value);
+
+  const hasAnyBranding = client.branding_logo_url || swatches.length > 0;
+
+  if (!hasAnyBranding) {
+    return (
+      <div className="rounded-lg border border-dashed border-border bg-cream/40 p-4 text-xs text-txt-muted">
+        <p className="font-medium text-txt-secondary">No branding set for {client.name}</p>
+        <p className="mt-1">
+          Add a logo and brand colours on the{" "}
+          <a href={`/clients/${client.id}/edit`} className="text-cobalt-deep underline hover:text-charcoal">
+            client edit page
+          </a>{" "}
+          so campaign landing pages can match the client&apos;s brand.
+        </p>
+      </div>
+    );
+  }
+
+  const logoBg = client.logo_background ?? "light";
+  const bgStyle =
+    logoBg === "transparent"
+      ? {
+          backgroundImage:
+            "linear-gradient(45deg, #e5dfd0 25%, transparent 25%), linear-gradient(-45deg, #e5dfd0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5dfd0 75%), linear-gradient(-45deg, transparent 75%, #e5dfd0 75%)",
+          backgroundSize: "8px 8px",
+          backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0",
+        }
+      : { backgroundColor: logoBg === "light" ? "#ffffff" : "#0b0f1c" };
+
+  const promptSnippet = swatches
+    .map((s) => `${s.label.toLowerCase()}: ${s.value}`)
+    .join(", ");
+
+  return (
+    <div className="rounded-lg border border-border bg-cream/40 p-4">
+      <p className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-txt-muted">
+        {client.name} — Brand Kit
+      </p>
+      <p className="mt-1 text-xs text-txt-secondary">
+        This campaign will inherit the client&apos;s branding. When generating the landing
+        page HTML with Claude, use these colours in your prompt so the page matches the client&apos;s brand.
+      </p>
+
+      <div className="mt-3 flex items-center gap-3">
+        {client.branding_logo_url && (
+          <div
+            className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded border border-border"
+            style={bgStyle}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={client.branding_logo_url}
+              alt=""
+              className="max-h-[80%] max-w-[80%] object-contain"
+            />
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {swatches.map((s) => (
+            <div key={s.label} className="flex items-center gap-2 rounded-md border border-border bg-paper px-2 py-1">
+              <span
+                className="h-4 w-4 rounded border border-border"
+                style={{ backgroundColor: s.value ?? undefined }}
+              />
+              <span className="text-[0.65rem] font-medium text-charcoal">{s.label}</span>
+              <span className="font-mono text-[0.65rem] text-txt-muted">{s.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {promptSnippet && (
+        <div className="mt-3 flex items-center gap-2">
+          <code className="flex-1 truncate rounded border border-border bg-paper px-2.5 py-1.5 font-mono text-[0.65rem] text-charcoal">
+            {promptSnippet}
+          </code>
+          <button
+            type="button"
+            onClick={() => navigator.clipboard?.writeText(promptSnippet)}
+            className="inline-flex h-7 items-center rounded-md border border-border bg-paper px-2.5 text-[0.65rem] font-medium text-txt-secondary transition-colors hover:bg-cream cursor-pointer"
+          >
+            Copy
+          </button>
+        </div>
+      )}
     </div>
   );
 }

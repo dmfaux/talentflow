@@ -11,6 +11,10 @@ const CONTENT_TYPES: Record<string, string> = {
   ".doc": "application/msword",
   ".docx":
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".svg": "image/svg+xml",
 };
 
 function isConfigured(): boolean {
@@ -65,6 +69,31 @@ export async function uploadCV(
   await blockBlob.uploadData(file, {
     blobHTTPHeaders: {
       blobContentType: CONTENT_TYPES[ext] ?? "application/octet-stream",
+    },
+  });
+
+  return blockBlob.url;
+}
+
+export async function uploadClientLogo(
+  clientId: string,
+  file: Buffer,
+  filename: string
+): Promise<string | null> {
+  if (!isConfigured()) {
+    console.warn("Azure Storage not configured — logo discarded for", clientId);
+    return null;
+  }
+
+  const container = getContainerClient();
+  const ext = getExtension(filename);
+  const blobPath = `logos/${clientId}/${filename}`;
+  const blockBlob = container.getBlockBlobClient(blobPath);
+
+  await blockBlob.uploadData(file, {
+    blobHTTPHeaders: {
+      blobContentType: CONTENT_TYPES[ext] ?? "application/octet-stream",
+      blobCacheControl: "public, max-age=3600",
     },
   });
 

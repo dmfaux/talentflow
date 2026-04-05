@@ -2,8 +2,16 @@ import { db } from "@/db";
 import { campaigns, clients } from "@/db/schema";
 import { error, requireApiAuth, success } from "@/lib/api";
 import { validateSlug } from "@/lib/slug";
+import { isLogoBackground, isLogoPosition, normaliseHexColor } from "@/lib/utils";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { NextRequest } from "next/server";
+
+const COLOR_FIELDS = [
+  "brand_primary_color",
+  "brand_secondary_color",
+  "brand_accent_color",
+  "brand_text_color",
+] as const;
 
 export async function GET(
   _request: Request,
@@ -63,6 +71,31 @@ export async function PATCH(
       if (body[field] !== undefined) {
         updates[field] = body[field];
       }
+    }
+
+    // Validate + normalise brand colours
+    for (const field of COLOR_FIELDS) {
+      if (body[field] === undefined) continue;
+      if (body[field] === null || body[field] === "") {
+        updates[field] = null;
+        continue;
+      }
+      const normalised = normaliseHexColor(body[field]);
+      if (!normalised) return error(`${field} must be a valid hex colour`);
+      updates[field] = normalised;
+    }
+
+    if (body.logo_background !== undefined) {
+      if (body.logo_background !== null && !isLogoBackground(body.logo_background)) {
+        return error("logo_background must be 'light', 'dark', or 'transparent'");
+      }
+      updates.logo_background = body.logo_background;
+    }
+    if (body.logo_position !== undefined) {
+      if (body.logo_position !== null && !isLogoPosition(body.logo_position)) {
+        return error("logo_position must be 'top-left' or 'top-centre'");
+      }
+      updates.logo_position = body.logo_position;
     }
 
     if (updates.name !== undefined && (!updates.name || typeof updates.name !== "string" || !(updates.name as string).trim())) {

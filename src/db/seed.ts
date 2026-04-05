@@ -54,48 +54,72 @@ const CLIENTS = [
     contact_name: "Thandi Mkhize", contact_email: "thandi.mkhize@nedbank.co.za",
     contact_phone: "+27 11 294 4444", billing_email: "accounts.digital@nedbank.co.za",
     notes: "Expanding digital banking team. Key partner for Q1-Q2 hiring.",
+    brand_primary_color: "#006341", brand_secondary_color: "#f2f7f4",
+    brand_accent_color: "#b4c905", brand_text_color: "#0b1f14",
+    logo_background: "light", logo_position: "top-left",
   },
   {
     slug: "discovery-health", name: "Discovery Health",
     contact_name: "Michael van der Merwe", contact_email: "michael.vdm@discovery.co.za",
     contact_phone: "+27 11 529 2888", billing_email: "hr.invoicing@discovery.co.za",
     notes: "Focus on data science and actuarial roles.",
+    brand_primary_color: "#00457c", brand_secondary_color: "#eef3f8",
+    brand_accent_color: "#ff6b00", brand_text_color: "#0b1424",
+    logo_background: "light", logo_position: "top-left",
   },
   {
     slug: "takealot-commerce", name: "Takealot Commerce",
     contact_name: "Sizwe Dlamini", contact_email: "sizwe.d@takealot.com",
     contact_phone: "+27 21 809 5900", billing_email: "finance@takealot.com",
     notes: "Rapid scaling across engineering and product teams.",
+    brand_primary_color: "#00a862", brand_secondary_color: "#eefbf4",
+    brand_accent_color: "#ffb01f", brand_text_color: "#0b1f14",
+    logo_background: "light", logo_position: "top-left",
   },
   {
     slug: "anglo-american", name: "Anglo American",
     contact_name: "Priya Naidoo", contact_email: "priya.naidoo@angloamerican.com",
     contact_phone: "+27 11 638 9111", billing_email: "talent.ops@angloamerican.com",
     notes: "Technology modernisation programme. Platform and cloud roles.",
+    brand_primary_color: "#003057", brand_secondary_color: "#f2f4f7",
+    brand_accent_color: "#e4b80e", brand_text_color: "#0b1424",
+    logo_background: "light", logo_position: "top-centre",
   },
   {
     slug: "woolworths-holdings", name: "Woolworths Holdings",
     contact_name: "Lerato Mokoena", contact_email: "lerato.mokoena@woolworths.co.za",
     contact_phone: "+27 21 407 9111", billing_email: "recruitment.finance@woolworths.co.za",
     notes: "Retail technology transformation.",
+    brand_primary_color: "#00573c", brand_secondary_color: "#f3f5f2",
+    brand_accent_color: "#9a8250", brand_text_color: "#0b1414",
+    logo_background: "light", logo_position: "top-left",
   },
   {
     slug: "mtn-group", name: "MTN Group",
     contact_name: "Johan Pretorius", contact_email: "johan.pretorius@mtn.com",
     contact_phone: "+27 11 912 3000", billing_email: "vendor.payments@mtn.com",
     notes: "Fintech and 5G platform initiatives.",
+    brand_primary_color: "#ffcc00", brand_secondary_color: "#1a1a1a",
+    brand_accent_color: "#ff6b00", brand_text_color: "#1a1a1a",
+    logo_background: "dark", logo_position: "top-left",
   },
   {
     slug: "standard-bank-tech", name: "Standard Bank Tech",
     contact_name: "Ayesha Patel", contact_email: "ayesha.patel@standardbank.co.za",
     contact_phone: "+27 11 721 5000", billing_email: "ap.tech@standardbank.co.za",
     notes: "Core banking platform rewrite. Multiple senior roles.",
+    brand_primary_color: "#0033a0", brand_secondary_color: "#eef1f8",
+    brand_accent_color: "#e30613", brand_text_color: "#0b1424",
+    logo_background: "light", logo_position: "top-left",
   },
   {
     slug: "adcorp-group", name: "Adcorp Group",
     contact_name: "Ayesha Patel", contact_email: "ayesha.patel@adcorpgroup.com",
     contact_phone: "+27 11 721 5000", billing_email: "ap.tech@adcorp-group.com",
     notes: "Core banking platform rewrite. Multiple senior roles.",
+    brand_primary_color: "#6b2c91", brand_secondary_color: "#f5f1f8",
+    brand_accent_color: "#f39c12", brand_text_color: "#1a0b24",
+    logo_background: "light", logo_position: "top-left",
   },
 ] as const;
 
@@ -230,6 +254,8 @@ async function main() {
   await db.delete(schema.messages);
   await db.delete(schema.candidates);
   await db.delete(schema.campaigns);
+  await db.delete(schema.passwordResetTokens);
+  await db.delete(schema.users);
   await db.delete(schema.clients);
 
   // Insert clients
@@ -244,6 +270,12 @@ async function main() {
       billing_email: c.billing_email,
       notes: c.notes,
       is_active: true,
+      brand_primary_color: c.brand_primary_color,
+      brand_secondary_color: c.brand_secondary_color,
+      brand_accent_color: c.brand_accent_color,
+      brand_text_color: c.brand_text_color,
+      logo_background: c.logo_background,
+      logo_position: c.logo_position,
     }))
   ).returning({ id: schema.clients.id, slug: schema.clients.slug, name: schema.clients.name });
 

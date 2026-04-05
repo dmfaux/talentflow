@@ -20,6 +20,12 @@ interface Client {
   contact_phone: string | null;
   billing_email: string | null;
   branding_logo_url: string | null;
+  brand_primary_color: string | null;
+  brand_secondary_color: string | null;
+  brand_accent_color: string | null;
+  brand_text_color: string | null;
+  logo_background: string | null;
+  logo_position: string | null;
   notes: string | null;
   is_active: boolean | null;
   created_at: string;
@@ -157,15 +163,23 @@ export default function ClientDetailPage() {
               </span>
             </div>
           </div>
-          <button
-            onClick={() => setEditing(true)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-[0.75rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer"
-          >
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11.5 2.5l2 2L5 13H3v-2L11.5 2.5z" />
-            </svg>
-            Edit
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setEditing(true)}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-[0.75rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer"
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11.5 2.5l2 2L5 13H3v-2L11.5 2.5z" />
+              </svg>
+              Quick edit
+            </button>
+            <Link
+              href={`/clients/${id}/edit`}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-cobalt px-3 text-[0.75rem] font-medium text-ink transition-colors hover:bg-cobalt-deep cursor-pointer"
+            >
+              Edit branding
+            </Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
@@ -191,6 +205,9 @@ export default function ClientDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Branding */}
+      <BrandingDisplay client={client} />
 
       {/* Edit modal */}
       {editing && (
@@ -282,7 +299,7 @@ export default function ClientDetailPage() {
       )}
 
       {/* Campaigns */}
-      <div>
+      <div className="mt-8">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-charcoal">
             Campaigns
@@ -350,6 +367,107 @@ export default function ClientDetailPage() {
             </table>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function BrandingDisplay({ client }: { client: Client }) {
+  const colors = [
+    { label: "Primary", value: client.brand_primary_color },
+    { label: "Secondary", value: client.brand_secondary_color },
+    { label: "Accent", value: client.brand_accent_color },
+    { label: "Text", value: client.brand_text_color },
+  ];
+
+  const hasAnyBranding =
+    client.branding_logo_url ||
+    colors.some((c) => c.value) ||
+    client.logo_background ||
+    client.logo_position;
+
+  if (!hasAnyBranding) return null;
+
+  const logoBg = client.logo_background ?? "light";
+  const logoPosition = client.logo_position ?? "top-left";
+
+  const bgStyle =
+    logoBg === "transparent"
+      ? {
+          backgroundImage:
+            "linear-gradient(45deg, #e5dfd0 25%, transparent 25%), linear-gradient(-45deg, #e5dfd0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5dfd0 75%), linear-gradient(-45deg, transparent 75%, #e5dfd0 75%)",
+          backgroundSize: "12px 12px",
+          backgroundPosition: "0 0, 0 6px, 6px -6px, -6px 0",
+        }
+      : { backgroundColor: logoBg === "light" ? "#ffffff" : "#0b0f1c" };
+
+  return (
+    <div className="mb-8 rounded-xl border border-border bg-surface p-6">
+      <h2 className="mb-4 text-sm font-semibold text-charcoal">Branding</h2>
+
+      <div className="grid gap-6 md:grid-cols-[auto_1fr]">
+        {/* Logo */}
+        <div>
+          <p className="mb-2 text-[0.65rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
+            Logo
+          </p>
+          <div
+            className={`relative flex h-28 w-40 items-center overflow-hidden rounded-lg border border-border ${
+              logoPosition === "top-centre" ? "justify-center" : "justify-start pl-4"
+            }`}
+            style={bgStyle}
+          >
+            {client.branding_logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={client.branding_logo_url}
+                alt={`${client.name} logo`}
+                className="max-h-[70%] max-w-[80%] object-contain"
+              />
+            ) : (
+              <span className="font-mono text-[0.7rem] text-txt-muted">no logo</span>
+            )}
+          </div>
+          <p className="mt-2 font-mono text-[0.65rem] text-txt-muted">
+            {logoBg} · {logoPosition}
+          </p>
+        </div>
+
+        {/* Colour swatches */}
+        <div>
+          <p className="mb-2 text-[0.65rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
+            Colours
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {colors.map((c) => (
+              <div
+                key={c.label}
+                className="rounded-lg border border-border bg-cream/30 p-3"
+              >
+                <div
+                  className="h-10 w-full rounded-md border border-border"
+                  style={{
+                    backgroundColor: c.value ?? "transparent",
+                    ...(c.value
+                      ? {}
+                      : {
+                          backgroundImage:
+                            "linear-gradient(45deg, #e5dfd0 25%, transparent 25%), linear-gradient(-45deg, #e5dfd0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5dfd0 75%), linear-gradient(-45deg, transparent 75%, #e5dfd0 75%)",
+                          backgroundSize: "8px 8px",
+                          backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0",
+                        }),
+                  }}
+                />
+                <p className="mt-2 text-[0.7rem] font-medium text-charcoal">
+                  {c.label}
+                </p>
+                <p className="font-mono text-[0.65rem] text-txt-muted">
+                  {c.value ?? "—"}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
