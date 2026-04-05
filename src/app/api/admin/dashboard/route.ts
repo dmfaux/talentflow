@@ -2,12 +2,38 @@ import { db } from "@/db";
 import { campaigns, candidates, clients } from "@/db/schema";
 import { error, requireApiAuth, success } from "@/lib/api";
 import { eq, sql } from "drizzle-orm";
+import { NextRequest } from "next/server";
 
-export async function GET() {
+type Range = "week" | "month" | "quarter" | "year" | "all";
+
+const RANGE_CONFIG: Record<Range, { days: number | null; bucket: "day" | "week" | "month"; periods: number }> = {
+  week: { days: 7, bucket: "day", periods: 7 },
+  month: { days: 30, bucket: "day", periods: 30 },
+  quarter: { days: 91, bucket: "week", periods: 13 },
+  year: { days: 365, bucket: "month", periods: 12 },
+  all: { days: null, bucket: "month", periods: 24 },
+};
+
+function parseRange(param: string | null): Range {
+  if (param === "week" || param === "month" || param === "quarter" || param === "year" || param === "all") {
+    return param;
+  }
+  return "month";
+}
+
+export async function GET(request: NextRequest) {
   const authError = await requireApiAuth();
   if (authError) return authError;
 
   try {
+    const range = parseRange(request.nextUrl.searchParams.get("range"));
+    const config = RANGE_CONFIG[range];
+
+    // Build the period filter SQL fragment
+    const periodFilter = config.days !== null
+      ? sql`${candidates.created_at} > now() - (${config.days} || ' days')::interval`
+      : sql`true`;
+
     const [
       campaignStats,
       candidateOverview,
@@ -15,9 +41,9 @@ export async function GET() {
       statusBreakdown,
       scoreDistribution,
       recentCampaigns,
-      weeklyVolume,
+      timeSeries,
     ] = await Promise.all([
-      // 1. Campaign counts by status
+      // 1. Campaign counts by status (not filtered — campaign lifecycle is independent of period)
       db
         .select({
           status: campaigns.status,
@@ -26,7 +52,7 @@ export async function GET() {
         .from(campaigns)
         .groupBy(campaigns.status),
 
-      // 2. Overall candidate totals
+      // 2. Overall candidate totals (filtered by period)
       db
         .select({
           total: sql<number>`count(*)::int`,
@@ -34,9 +60,10 @@ export async function GET() {
           shortlisted: sql<number>`count(*) filter (where ${candidates.status} = 'shortlisted')::int`,
           avg_score: sql<number>`round(avg(${candidates.ai_score})::numeric, 1)`,
         })
-        .from(candidates),
+        .from(candidates)
+        .where(periodFilter),
 
-      // 3. Gating funnel
+      // 3. Gating funnel (filtered by period)
       db
         .select({
           total: sql<number>`count(*)::int`,
@@ -44,19 +71,21 @@ export async function GET() {
           failed: sql<number>`count(*) filter (where ${candidates.gating_passed} = false)::int`,
           pending: sql<number>`count(*) filter (where ${candidates.gating_passed} is null)::int`,
         })
-        .from(candidates),
+        .from(candidates)
+        .where(periodFilter),
 
-      // 4. Candidate status breakdown
+      // 4. Candidate status breakdown (filtered by period)
       db
         .select({
           status: candidates.status,
           count: sql<number>`count(*)::int`,
         })
         .from(candidates)
+        .where(periodFilter)
         .groupBy(candidates.status)
         .orderBy(sql`count(*) desc`),
 
-      // 5. Score distribution across all campaigns
+      // 5. Score distribution (filtered by period)
       db
         .select({
           bucket: sql<string>`case
@@ -69,7 +98,7 @@ export async function GET() {
           count: sql<number>`count(*)::int`,
         })
         .from(candidates)
-        .where(sql`${candidates.ai_score} is not null`)
+        .where(sql`${candidates.ai_score} is not null and ${periodFilter}`)
         .groupBy(sql`case
           when ${candidates.ai_score} < 2 then '0-2'
           when ${candidates.ai_score} < 4 then '2-4'
@@ -78,7 +107,7 @@ export async function GET() {
           else '8-10'
         end`),
 
-      // 6. Recent/active campaigns with candidate counts
+      // 6. Recent/active campaigns — unfiltered
       db
         .select({
           id: campaigns.id,
@@ -98,16 +127,28 @@ export async function GET() {
         .orderBy(sql`case when ${campaigns.status} = 'active' then 0 else 1 end, ${campaigns.created_at} desc`)
         .limit(8),
 
-      // 7. Weekly application volume (last 8 weeks)
-      db
-        .select({
-          week: sql<string>`to_char(date_trunc('week', ${candidates.created_at}), 'YYYY-MM-DD')`,
-          count: sql<number>`count(*)::int`,
-        })
-        .from(candidates)
-        .where(sql`${candidates.created_at} > now() - interval '8 weeks'`)
-        .groupBy(sql`date_trunc('week', ${candidates.created_at})`)
-        .orderBy(sql`date_trunc('week', ${candidates.created_at})`),
+      // 7. Time-series application volume — adapts range + granularity to selected period
+      (() => {
+        const bucket = config.bucket; // 'day' | 'week' | 'month'
+        // Shared expression for both SELECT and GROUP BY to satisfy Postgres's
+        // structural equality check — bucket is injected via sql.raw so it becomes
+        // a literal rather than a bind parameter.
+        const bucketExpr = sql.raw(`date_trunc('${bucket}', "candidates"."created_at")`);
+        const intervalExpr = sql.raw(`${config.periods - 1} ${bucket}s`);
+        const tsFilter = config.days !== null
+          ? sql`"candidates"."created_at" > date_trunc('${sql.raw(bucket)}', now()) - interval '${intervalExpr}'`
+          : sql`"candidates"."created_at" > date_trunc('month', now()) - interval '23 months'`;
+
+        return db
+          .select({
+            period: sql<string>`to_char(${bucketExpr}, 'YYYY-MM-DD')`,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(candidates)
+          .where(tsFilter)
+          .groupBy(bucketExpr)
+          .orderBy(bucketExpr);
+      })(),
     ]);
 
     // Normalise campaign stats into an object
@@ -121,7 +162,6 @@ export async function GET() {
     const overview = candidateOverview[0] ?? { total: 0, scored: 0, shortlisted: 0, avg_score: null };
     const gating = gatingStats[0] ?? { total: 0, passed: 0, failed: 0, pending: 0 };
 
-    // Normalise score distribution
     const bucketOrder = ["0-2", "2-4", "4-6", "6-8", "8-10"];
     const scoreMap = new Map(scoreDistribution.map((r) => [r.bucket, r.count]));
     const normalisedScores = bucketOrder.map((bucket) => ({
@@ -130,6 +170,8 @@ export async function GET() {
     }));
 
     return success({
+      range,
+      granularity: config.bucket,
       campaigns: {
         total: totalCampaigns,
         by_status: campaignsByStatus,
@@ -152,7 +194,7 @@ export async function GET() {
       status_breakdown: statusBreakdown,
       score_distribution: normalisedScores,
       recent_campaigns: recentCampaigns,
-      weekly_volume: weeklyVolume,
+      time_series: timeSeries,
     });
   } catch (err) {
     console.error("GET /api/admin/dashboard error:", err);

@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+type Range = "week" | "month" | "quarter" | "year" | "all";
 
 interface DashboardData {
+  range: Range;
+  granularity: "day" | "week" | "month";
   campaigns: {
     total: number;
     by_status: Record<string, number>;
@@ -34,8 +38,35 @@ interface DashboardData {
     shortlisted: number;
     avg_score: number | null;
   }[];
-  weekly_volume: { week: string; count: number }[];
+  time_series: { period: string; count: number }[];
 }
+
+const RANGE_OPTIONS: { value: Range; label: string }[] = [
+  { value: "week", label: "Week" },
+  { value: "month", label: "Month" },
+  { value: "quarter", label: "Quarter" },
+  { value: "year", label: "Year" },
+  { value: "all", label: "All time" },
+];
+
+function formatPeriodLabel(period: string, granularity: "day" | "week" | "month"): string {
+  const date = new Date(period);
+  if (granularity === "month") {
+    return date.toLocaleDateString("en-ZA", { month: "short", year: "2-digit" });
+  }
+  if (granularity === "week") {
+    return date.toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
+  }
+  return date.toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
+}
+
+const RANGE_SUBTITLES: Record<Range, string> = {
+  week: "Last 7 days",
+  month: "Last 30 days",
+  quarter: "Last 13 weeks",
+  year: "Last 12 months",
+  all: "All time",
+};
 
 const STATUS_LABELS: Record<string, string> = {
   new: "New",
@@ -94,10 +125,11 @@ function BarChart({
 }) {
   const max = Math.max(...data.map((d) => Number(d[valueKey]) || 0), 1);
   return (
-    <div className="flex items-end gap-2" style={{ height: maxHeight }}>
+    <div className="flex items-end gap-2">
       {data.map((d, i) => {
         const val = Number(d[valueKey]) || 0;
         const pct = (val / max) * 100;
+        const barHeight = Math.max((pct / 100) * maxHeight, 2);
         return (
           <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
             <span className="text-[0.65rem] font-mono text-txt-muted">
@@ -105,7 +137,7 @@ function BarChart({
             </span>
             <div
               className={`w-full rounded-t ${barColor} transition-all duration-500`}
-              style={{ height: `${Math.max(pct, 2)}%` }}
+              style={{ height: `${barHeight}px` }}
             />
             <span className="text-[0.6rem] text-txt-muted whitespace-nowrap">
               {String(d[labelKey])}
@@ -113,6 +145,237 @@ function BarChart({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function AreaChart({
+  data,
+  height = 160,
+}: {
+  data: { period: string; count: number; label: string }[];
+  height?: number;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const el = containerRef.current;
+    const observer = new ResizeObserver((entries) => {
+      setWidth(entries[0].contentRect.width);
+    });
+    observer.observe(el);
+    setWidth(el.clientWidth);
+    return () => observer.disconnect();
+  }, []);
+
+  if (data.length === 0) {
+    return (
+      <p className="text-sm text-txt-muted py-10 text-center">
+        No applications in this period
+      </p>
+    );
+  }
+
+  const padTop = 8;
+  const padBottom = 4;
+  const plotHeight = height - padTop - padBottom;
+  const plotWidth = width;
+
+  const max = Math.max(...data.map((d) => d.count), 1);
+  const n = data.length;
+  const stepX = n > 1 ? plotWidth / (n - 1) : 0;
+
+  const points = data.map((d, i) => {
+    const x = i * stepX;
+    const y = padTop + plotHeight - (d.count / max) * plotHeight;
+    return { x, y, count: d.count, label: d.label, period: d.period };
+  });
+
+  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ");
+  const areaPath = n > 1
+    ? `${linePath} L${points[n - 1].x.toFixed(2)},${padTop + plotHeight} L${points[0].x.toFixed(2)},${padTop + plotHeight} Z`
+    : "";
+
+  const maxLabels = 6;
+  const labelStep = Math.max(1, Math.ceil(n / maxLabels));
+  const labelIndices = new Set<number>();
+  for (let i = 0; i < n; i += labelStep) labelIndices.add(i);
+  labelIndices.add(n - 1);
+
+  const latest = points[n - 1];
+  const maxIdx = points.reduce((m, p, i) => p.count > points[m].count ? i : m, 0);
+
+  return (
+    <div ref={containerRef}>
+      <div className="flex items-start justify-between mb-1">
+        <span className="font-mono text-[0.65rem] text-txt-muted">
+          max {max}
+        </span>
+        <span className="font-mono text-[0.65rem] text-txt-secondary">
+          latest: <span className="text-charcoal font-semibold">{latest.count}</span>
+        </span>
+      </div>
+      {width > 0 && (
+        <>
+          <svg width={width} height={height} className="block">
+            {/* Horizontal gridlines */}
+            <line x1={0} y1={padTop} x2={width} y2={padTop} stroke="#e8e8e4" strokeWidth="1" />
+            <line x1={0} y1={padTop + plotHeight / 2} x2={width} y2={padTop + plotHeight / 2} stroke="#e8e8e4" strokeWidth="1" strokeDasharray="2 2" />
+            <line x1={0} y1={padTop + plotHeight} x2={width} y2={padTop + plotHeight} stroke="#e8e8e4" strokeWidth="1" />
+
+            {/* Area fill */}
+            {n > 1 && (
+              <path d={areaPath} fill="#1b4332" fillOpacity="0.08" />
+            )}
+
+            {/* Line */}
+            {n > 1 && (
+              <path
+                d={linePath}
+                fill="none"
+                stroke="#1b4332"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
+
+            {/* Point markers — first, last, and max */}
+            {Array.from(new Set([0, n - 1, maxIdx])).map((i) => (
+              <circle
+                key={i}
+                cx={points[i].x}
+                cy={points[i].y}
+                r="3"
+                fill="#ffffff"
+                stroke="#1b4332"
+                strokeWidth="1.5"
+              />
+            ))}
+
+            {/* Hover hit zones with tooltips */}
+            {points.map((p, i) => (
+              <rect
+                key={i}
+                x={Math.max(0, p.x - stepX / 2)}
+                y={padTop}
+                width={stepX || plotWidth}
+                height={plotHeight}
+                fill="transparent"
+              >
+                <title>{p.label}: {p.count}</title>
+              </rect>
+            ))}
+          </svg>
+          <div className="relative mt-1" style={{ height: 14 }}>
+            {points.map((p, i) =>
+              labelIndices.has(i) ? (
+                <span
+                  key={i}
+                  className="absolute text-[0.6rem] text-txt-muted -translate-x-1/2 whitespace-nowrap"
+                  style={{ left: `${p.x}px` }}
+                >
+                  {p.label}
+                </span>
+              ) : null
+            )}
+          </div>
+        </>
+      )}
+      {width === 0 && <div style={{ height: height + 15 }} />}
+    </div>
+  );
+}
+
+function DonutChart({
+  segments,
+  total,
+  centerLabel,
+  centerValue,
+  size = 180,
+  thickness = 28,
+}: {
+  segments: { label: string; value: number; color: string }[];
+  total: number;
+  centerLabel: string;
+  centerValue: string | number;
+  size?: number;
+  thickness?: number;
+}) {
+  const radius = (size - thickness) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const cx = size / 2;
+  const cy = size / 2;
+  let offset = 0;
+
+  return (
+    <div className="flex items-center gap-6">
+      <div className="relative shrink-0" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90">
+          {/* Background ring */}
+          <circle
+            cx={cx}
+            cy={cy}
+            r={radius}
+            fill="none"
+            stroke="var(--color-cream)"
+            strokeWidth={thickness}
+          />
+          {/* Segments */}
+          {segments.map((seg, i) => {
+            if (seg.value === 0 || total === 0) return null;
+            const fraction = seg.value / total;
+            const dash = fraction * circumference;
+            const gap = circumference - dash;
+            const strokeDashoffset = -offset;
+            offset += dash;
+            return (
+              <circle
+                key={i}
+                cx={cx}
+                cy={cy}
+                r={radius}
+                fill="none"
+                stroke={seg.color}
+                strokeWidth={thickness}
+                strokeDasharray={`${dash} ${gap}`}
+                strokeDashoffset={strokeDashoffset}
+                className="transition-all duration-700"
+              />
+            );
+          })}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="font-mono text-2xl font-semibold text-charcoal">
+            {centerValue}
+          </span>
+          <span className="text-[0.65rem] font-medium uppercase tracking-wide text-txt-muted">
+            {centerLabel}
+          </span>
+        </div>
+      </div>
+      <div className="flex-1 space-y-2">
+        {segments.map((seg) => {
+          const pct = total > 0 ? (seg.value / total) * 100 : 0;
+          return (
+            <div key={seg.label} className="flex items-center gap-2.5 text-xs">
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-sm shrink-0"
+                style={{ backgroundColor: seg.color }}
+              />
+              <span className="flex-1 text-txt-secondary truncate">
+                {seg.label}
+              </span>
+              <span className="font-mono text-charcoal">{seg.value}</span>
+              <span className="font-mono text-txt-muted w-9 text-right">
+                {pct.toFixed(0)}%
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -172,13 +435,15 @@ function LoadingSkeleton() {
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState<Range>("month");
 
   useEffect(() => {
-    fetch("/api/admin/dashboard")
+    setLoading(true);
+    fetch(`/api/admin/dashboard?range=${range}`)
       .then((r) => r.json())
       .then((res) => setData(res.data ?? null))
       .finally(() => setLoading(false));
-  }, []);
+  }, [range]);
 
   if (loading) {
     return (
@@ -211,18 +476,35 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-lg font-semibold text-charcoal">Dashboard</h1>
           <p className="mt-0.5 text-xs text-txt-muted">
-            Cross-campaign performance overview
+            Cross-campaign performance overview &middot; {RANGE_SUBTITLES[range]}
           </p>
         </div>
-        <Link
-          href="/campaigns/new"
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M7 2v10M2 7h10" />
-          </svg>
-          New Campaign
-        </Link>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-0.5 rounded-lg border border-border bg-cream/60 p-0.5">
+            {RANGE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setRange(opt.value)}
+                className={`rounded-md px-2.5 py-1 text-[0.72rem] font-medium transition-colors cursor-pointer ${
+                  range === opt.value
+                    ? "bg-surface text-charcoal shadow-sm"
+                    : "text-txt-muted hover:text-txt-secondary"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <Link
+            href="/campaigns/new"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M7 2v10M2 7h10" />
+            </svg>
+            New Campaign
+          </Link>
+        </div>
       </div>
 
       {/* ── KPI Cards ── */}
@@ -245,49 +527,56 @@ export default function DashboardPage() {
         <StatCard
           label="Avg AI score"
           value={data.candidates.avg_score ?? "—"}
-          sub="Across all scored candidates"
+          sub={`${data.candidates.scored} scored candidates`}
         />
       </div>
 
       {/* ── Funnel + Score Distribution ── */}
       <div className="grid lg:grid-cols-2 gap-4 mb-6">
-        {/* Candidate funnel */}
+        {/* Candidate funnel — donut */}
         <div className="rounded-xl border border-border bg-surface p-6">
           <h2 className="text-sm font-semibold text-charcoal mb-5">
             Candidate funnel
           </h2>
-          <div className="space-y-4">
-            <FunnelRow
-              label="Applied"
-              count={data.gating.total}
-              total={data.gating.total}
-              color="bg-accent"
-            />
-            <FunnelRow
-              label="Passed gating"
-              count={data.gating.passed}
-              total={data.gating.total}
-              color="bg-accent-light"
-            />
-            <FunnelRow
-              label="Gating rejected"
-              count={data.gating.failed}
-              total={data.gating.total}
-              color="bg-red/70"
-            />
-            <FunnelRow
-              label="AI scored"
-              count={data.candidates.scored}
-              total={data.gating.total}
-              color="bg-gold"
-            />
-            <FunnelRow
-              label="Shortlisted"
-              count={data.candidates.shortlisted}
-              total={data.gating.total}
-              color="bg-green"
-            />
-          </div>
+          <DonutChart
+            total={data.gating.total}
+            centerLabel="Applied"
+            centerValue={data.gating.total}
+            segments={[
+              {
+                label: "Shortlisted",
+                value: data.status_breakdown.find((s) => s.status === "shortlisted")?.count ?? 0,
+                color: "#16a34a",
+              },
+              {
+                label: "Follow-up",
+                value: data.status_breakdown.find((s) => s.status === "follow_up")?.count ?? 0,
+                color: "#d4a843",
+              },
+              {
+                label: "Scored",
+                value: data.status_breakdown.find((s) => s.status === "scored")?.count ?? 0,
+                color: "#1b4332",
+              },
+              {
+                label: "Awaiting scoring",
+                value:
+                  (data.status_breakdown.find((s) => s.status === "gating_passed")?.count ?? 0) +
+                  (data.status_breakdown.find((s) => s.status === "scoring")?.count ?? 0),
+                color: "#2d6a4f",
+              },
+              {
+                label: "Rejected",
+                value: data.status_breakdown.find((s) => s.status === "rejected")?.count ?? 0,
+                color: "#dc2626",
+              },
+              {
+                label: "Gating failed",
+                value: data.status_breakdown.find((s) => s.status === "gating_failed")?.count ?? 0,
+                color: "#999999",
+              },
+            ]}
+          />
         </div>
 
         {/* Score distribution */}
@@ -306,33 +595,21 @@ export default function DashboardPage() {
 
       {/* ── Weekly Volume + Status Breakdown ── */}
       <div className="grid lg:grid-cols-2 gap-4 mb-6">
-        {/* Weekly application volume */}
+        {/* Application volume time series */}
         <div className="rounded-xl border border-border bg-surface p-6">
           <h2 className="text-sm font-semibold text-charcoal mb-5">
-            Weekly applications
+            Application volume
             <span className="ml-2 text-xs font-normal text-txt-muted">
-              Last 8 weeks
+              {RANGE_SUBTITLES[range]}
             </span>
           </h2>
-          {data.weekly_volume.length > 0 ? (
-            <BarChart
-              data={data.weekly_volume.map((w) => ({
-                ...w,
-                label: new Date(w.week).toLocaleDateString("en-ZA", {
-                  day: "numeric",
-                  month: "short",
-                }),
-              }))}
-              labelKey="label"
-              valueKey="count"
-              maxHeight={140}
-              barColor="bg-accent/70"
-            />
-          ) : (
-            <p className="text-sm text-txt-muted py-10 text-center">
-              No applications in the last 8 weeks
-            </p>
-          )}
+          <AreaChart
+            data={data.time_series.map((t) => ({
+              ...t,
+              label: formatPeriodLabel(t.period, data.granularity),
+            }))}
+            height={160}
+          />
         </div>
 
         {/* Status breakdown */}
