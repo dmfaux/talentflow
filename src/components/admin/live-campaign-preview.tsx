@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { BrandingValues } from "./branding-section";
 
 interface Props {
@@ -7,6 +8,8 @@ interface Props {
   clientName: string;
   clientSlug: string;
 }
+
+type ViewMode = "desktop" | "mobile";
 
 // ── Contrast helpers ──────────────────────────────────────────────────
 
@@ -46,6 +49,8 @@ function hexOrFallback(hex: string, fallback: string): string {
 // ── Preview component ────────────────────────────────────────────────
 
 export function LiveCampaignPreview({ values, clientName, clientSlug }: Props) {
+  const [viewMode, setViewMode] = useState<ViewMode>("desktop");
+
   const primary = hexOrFallback(values.brand_primary_color, "#0b0f1c");
   const secondary = hexOrFallback(values.brand_secondary_color, "#f3f0e8");
   const accent = values.brand_accent_color ? hexOrFallback(values.brand_accent_color, primary) : primary;
@@ -75,69 +80,168 @@ export function LiveCampaignPreview({ values, clientName, clientSlug }: Props) {
 
   const logoInitial = displayName.charAt(0).toUpperCase();
 
+  const isMobile = viewMode === "mobile";
+
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span className="text-[0.65rem] font-medium uppercase tracking-[0.14em] text-ink-faint">
           Live Preview
         </span>
-        {lowContrast && (
-          <span className="inline-flex items-center gap-1.5 text-[0.7rem] text-saffron">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-              <path d="M6 1L11 10H1L6 1z" />
-              <path d="M6 5v2M6 8.5v.1" />
-            </svg>
-            Low contrast detected — this may be hard for candidates to read
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {lowContrast && (
+            <span className="inline-flex items-center gap-1.5 text-[0.7rem] text-saffron">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M6 1L11 10H1L6 1z" />
+                <path d="M6 5v2M6 8.5v.1" />
+              </svg>
+              Low contrast
+            </span>
+          )}
+          <div
+            className="inline-flex items-center rounded-md border border-border bg-canvas-2 p-0.5"
+            role="group"
+            aria-label="Preview device"
+          >
+            <button
+              type="button"
+              onClick={() => setViewMode("desktop")}
+              aria-pressed={viewMode === "desktop"}
+              aria-label="Desktop preview"
+              title="Desktop"
+              className={`inline-flex h-6 w-7 items-center justify-center rounded transition-colors ${
+                viewMode === "desktop"
+                  ? "bg-paper text-ink shadow-sm"
+                  : "text-ink-muted hover:text-ink"
+              }`}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="1.5" y="2.5" width="13" height="9" rx="1" />
+                <path d="M6 14h4M8 11.5V14" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("mobile")}
+              aria-pressed={viewMode === "mobile"}
+              aria-label="Mobile preview"
+              title="Mobile"
+              className={`inline-flex h-6 w-7 items-center justify-center rounded transition-colors ${
+                viewMode === "mobile"
+                  ? "bg-paper text-ink shadow-sm"
+                  : "text-ink-muted hover:text-ink"
+              }`}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="4" y="1.5" width="8" height="13" rx="1.5" />
+                <path d="M7 12.5h2" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Browser chrome */}
-      <div
-        className="overflow-hidden rounded-xl border border-border bg-paper"
-        style={{ boxShadow: "0 12px 32px -16px rgba(11, 15, 28, 0.18)" }}
-      >
-        {/* Title bar */}
-        <div className="flex items-center gap-3 border-b border-border bg-canvas-2 px-3 py-2">
-          <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#d9b8b0]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#dfc9a0]" />
-            <span className="h-2.5 w-2.5 rounded-full bg-[#b4c7a8]" />
-          </div>
-          <div className="flex-1">
-            <div className="flex h-6 items-center justify-center rounded-md border border-border bg-paper px-3">
-              <span className="font-mono text-[0.65rem] text-ink-muted">
-                {subdomain}.talentstream.co.za
-              </span>
+      {isMobile ? (
+        <div className="flex justify-center rounded-xl border border-border bg-canvas-2 px-6 py-6">
+          {/* Phone frame */}
+          <div
+            className="overflow-hidden rounded-[1.75rem] border-[6px] border-[#0b0f1c] bg-paper"
+            style={{ width: "280px", boxShadow: "0 12px 32px -16px rgba(11, 15, 28, 0.35)" }}
+          >
+            {/* Status bar */}
+            <div className="relative flex items-center justify-between bg-white px-5 pb-1 pt-1.5">
+              <span className="font-mono text-[0.6rem] font-semibold text-[#0b0f1c]">9:41</span>
+              {/* Notch */}
+              <div className="absolute left-1/2 top-0 h-3 w-14 -translate-x-1/2 rounded-b-xl bg-[#0b0f1c]" />
+              <div className="flex items-center gap-1">
+                <svg width="10" height="7" viewBox="0 0 10 7" fill="currentColor" className="text-[#0b0f1c]">
+                  <rect x="0" y="5" width="1.5" height="2" rx="0.3" />
+                  <rect x="2.2" y="3.5" width="1.5" height="3.5" rx="0.3" />
+                  <rect x="4.4" y="2" width="1.5" height="5" rx="0.3" />
+                  <rect x="6.6" y="0.5" width="1.5" height="6.5" rx="0.3" />
+                </svg>
+                <svg width="12" height="7" viewBox="0 0 12 7" fill="none" stroke="currentColor" strokeWidth="0.8" className="text-[#0b0f1c]">
+                  <rect x="0.4" y="0.9" width="9.5" height="5.2" rx="1" />
+                  <rect x="1.6" y="2.1" width="7.1" height="2.8" rx="0.3" fill="currentColor" />
+                  <path d="M10.6 2.4v2.2" strokeLinecap="round" />
+                </svg>
+              </div>
+            </div>
+            {/* Page content — scaled to fit mobile frame */}
+            <div className="relative overflow-hidden bg-paper">
+              <div
+                className="origin-top-left"
+                style={{
+                  transform: "scale(0.715)",
+                  width: "139.86%", // 100 / 0.715
+                  marginBottom: "-40%",
+                }}
+              >
+                <FakeCampaignPage
+                  primary={primary}
+                  secondary={secondary}
+                  accent={accent}
+                  text={text}
+                  primaryButtonText={primaryButtonText}
+                  logoUrl={values.logo_url}
+                  logoBg={logoBg}
+                  logoJustify={logoJustify}
+                  logoInitial={logoInitial}
+                  displayName={displayName}
+                  isMobile
+                />
+              </div>
             </div>
           </div>
         </div>
+      ) : (
+        /* Browser chrome */
+        <div
+          className="overflow-hidden rounded-xl border border-border bg-paper"
+          style={{ boxShadow: "0 12px 32px -16px rgba(11, 15, 28, 0.18)" }}
+        >
+          {/* Title bar */}
+          <div className="flex items-center gap-3 border-b border-border bg-canvas-2 px-3 py-2">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#d9b8b0]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#dfc9a0]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#b4c7a8]" />
+            </div>
+            <div className="flex-1">
+              <div className="flex h-6 items-center justify-center rounded-md border border-border bg-paper px-3">
+                <span className="font-mono text-[0.65rem] text-ink-muted">
+                  {subdomain}.talentstream.co.za
+                </span>
+              </div>
+            </div>
+          </div>
 
-        {/* Page content — scaled */}
-        <div className="relative overflow-hidden bg-paper">
-          <div
-            className="origin-top-left"
-            style={{
-              transform: "scale(0.65)",
-              width: "153.85%", // 100 / 0.65
-              marginBottom: "-35%", // compensate for scale
-            }}
-          >
-            <FakeCampaignPage
-              primary={primary}
-              secondary={secondary}
-              accent={accent}
-              text={text}
-              primaryButtonText={primaryButtonText}
-              logoUrl={values.logo_url}
-              logoBg={logoBg}
-              logoJustify={logoJustify}
-              logoInitial={logoInitial}
-              displayName={displayName}
-            />
+          {/* Page content — scaled */}
+          <div className="relative overflow-hidden bg-paper">
+            <div
+              className="origin-top-left"
+              style={{
+                transform: "scale(0.65)",
+                width: "153.85%", // 100 / 0.65
+                marginBottom: "-35%", // compensate for scale
+              }}
+            >
+              <FakeCampaignPage
+                primary={primary}
+                secondary={secondary}
+                accent={accent}
+                text={text}
+                primaryButtonText={primaryButtonText}
+                logoUrl={values.logo_url}
+                logoBg={logoBg}
+                logoJustify={logoJustify}
+                logoInitial={logoInitial}
+                displayName={displayName}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -155,6 +259,7 @@ function FakeCampaignPage({
   logoJustify,
   logoInitial,
   displayName,
+  isMobile = false,
 }: {
   primary: string;
   secondary: string;
@@ -166,22 +271,35 @@ function FakeCampaignPage({
   logoJustify: string;
   logoInitial: string;
   displayName: string;
+  isMobile?: boolean;
 }) {
   const mutedText = text + "b3"; // ~70% opacity
+
+  // Responsive sizing — mobile uses tighter padding, smaller type, stacked grid
+  const headerPadding = isMobile ? "px-5 py-5" : "px-10 py-6";
+  const sectionPadding = isMobile ? "px-5 py-8" : "px-10 py-12";
+  const footerPadding = isMobile ? "px-5 py-5" : "px-10 py-6";
+  const heroTitleSize = isMobile ? "text-3xl" : "text-5xl";
+  const heroCopySize = isMobile ? "text-sm" : "text-[0.95rem]";
+  const subheadSize = isMobile ? "text-xl" : "text-2xl";
+  const logoSize = isMobile ? "h-8 max-w-[180px]" : "h-10 max-w-[220px]";
+  const logoInitialSize = isMobile ? "h-9 w-9 text-base" : "h-11 w-11 text-lg";
+  const questionsGrid = isMobile ? "grid-cols-1 gap-3" : "grid-cols-3 gap-4";
+  const questionCardPadding = isMobile ? "p-4" : "p-5";
 
   return (
     <div className="w-full bg-white" style={{ color: text, fontFamily: "var(--font-instrument-sans)" }}>
       {/* Logo header */}
       <div
-        className={`flex items-center border-b px-10 py-6 ${logoJustify}`}
+        className={`flex items-center border-b ${headerPadding} ${logoJustify}`}
         style={{ backgroundColor: logoBg, borderColor: "rgba(0,0,0,0.08)" }}
       >
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={logoUrl} alt="" className="h-10 max-w-[220px] object-contain" />
+          <img src={logoUrl} alt="" className={`${logoSize} object-contain`} />
         ) : (
           <div
-            className="flex h-11 w-11 items-center justify-center rounded-full text-lg font-semibold"
+            className={`flex items-center justify-center rounded-full font-semibold ${logoInitialSize}`}
             style={{ backgroundColor: primary, color: primaryButtonText, fontFamily: "var(--font-fraunces)" }}
           >
             {logoInitial}
@@ -190,7 +308,7 @@ function FakeCampaignPage({
       </div>
 
       {/* Hero */}
-      <div className="relative px-10 py-12">
+      <div className={`relative ${sectionPadding}`}>
         <span
           className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.12em]"
           style={{
@@ -206,7 +324,7 @@ function FakeCampaignPage({
         </span>
 
         <h1
-          className="mt-5 text-5xl font-medium tracking-tight"
+          className={`mt-5 font-medium tracking-tight ${heroTitleSize}`}
           style={{ fontFamily: "var(--font-fraunces)", color: primary }}
         >
           Senior Product Manager
@@ -215,7 +333,7 @@ function FakeCampaignPage({
           Join {displayName}&apos;s growing team
         </p>
 
-        <p className="mt-6 max-w-2xl text-[0.95rem] leading-relaxed" style={{ color: text }}>
+        <p className={`mt-6 max-w-2xl leading-relaxed ${heroCopySize}`} style={{ color: text }}>
           We&apos;re looking for a senior product leader to help shape the roadmap of our
           flagship platform. You&apos;ll partner with engineering, design, and commercial
           teams to ship products that customers love and that move the needle for the business.
@@ -234,9 +352,9 @@ function FakeCampaignPage({
       </div>
 
       {/* Gating questions section (uses secondary colour) */}
-      <div className="px-10 py-12" style={{ backgroundColor: secondary }}>
+      <div className={sectionPadding} style={{ backgroundColor: secondary }}>
         <h2
-          className="text-2xl font-medium"
+          className={`font-medium ${subheadSize}`}
           style={{ fontFamily: "var(--font-fraunces)", color: text }}
         >
           A few quick questions
@@ -245,7 +363,7 @@ function FakeCampaignPage({
           Help us understand your fit for the role.
         </p>
 
-        <div className="mt-6 grid grid-cols-3 gap-4">
+        <div className={`mt-6 grid ${questionsGrid}`}>
           {[
             "Years of product management experience",
             "Have you led a cross-functional team before?",
@@ -253,7 +371,7 @@ function FakeCampaignPage({
           ].map((q, i) => (
             <div
               key={i}
-              className="rounded-xl border bg-white p-5"
+              className={`rounded-xl border bg-white ${questionCardPadding}`}
               style={{ borderColor: "rgba(0,0,0,0.08)" }}
             >
               <div
@@ -271,7 +389,7 @@ function FakeCampaignPage({
       </div>
 
       {/* Footer */}
-      <div className="px-10 py-6" style={{ backgroundColor: "#ffffff" }}>
+      <div className={footerPadding} style={{ backgroundColor: "#ffffff" }}>
         <p className="font-mono text-[0.7rem]" style={{ color: mutedText }}>
           Powered by TalentStream · POPIA compliant
         </p>
