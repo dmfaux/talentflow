@@ -2,6 +2,7 @@
 
 import { TierBadge } from "@/components/admin/tier-badge";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 interface Client {
@@ -15,6 +16,7 @@ interface Client {
 }
 
 export default function ClientsPage() {
+  const router = useRouter();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -89,6 +91,10 @@ export default function ClientsPage() {
                 <tr
                   key={client.id}
                   className="group cursor-pointer transition-colors hover:bg-cream/60"
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest("a")) return;
+                    router.push(`/clients/${client.id}`);
+                  }}
                 >
                   <td className="px-5 py-3">
                     <Link

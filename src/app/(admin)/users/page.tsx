@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 interface UserRow {
@@ -22,6 +23,7 @@ const GROUP_LABELS: Record<string, string> = {
 };
 
 export default function UsersPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -96,6 +98,10 @@ export default function UsersPage() {
                 <tr
                   key={user.id}
                   className="group cursor-pointer transition-colors hover:bg-cream/60"
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest("a")) return;
+                    router.push(`/users/${user.id}`);
+                  }}
                 >
                   <td className="px-5 py-3">
                     <Link

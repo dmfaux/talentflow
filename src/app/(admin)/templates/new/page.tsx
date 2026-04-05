@@ -173,7 +173,7 @@ export default function NewTemplatePage() {
                 onChange={(e) => setOwnerClientId(e.target.value)}
                 className={inputClass}
               >
-                <option value="">Shared Library (null)</option>
+                <option value="">Shared Library</option>
                 {clientsList.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
