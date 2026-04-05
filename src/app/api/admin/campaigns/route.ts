@@ -1,9 +1,11 @@
 import { db } from "@/db";
-import { campaigns, clients } from "@/db/schema";
+import { campaigns, clients, templates } from "@/db/schema";
 import { error, requireApiAuth, success } from "@/lib/api";
 import { validateSlug } from "@/lib/slug";
 import { and, desc, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(request: NextRequest) {
   const authError = await requireApiAuth();
@@ -60,8 +62,14 @@ export async function POST(request: NextRequest) {
     if (!body.client_id) return error("client_id is required");
     if (!body.slug) return error("slug is required");
     if (!body.role_title) return error("role_title is required");
+    if (!body.template_id) return error("template_id is required");
     if (body.gating_config === undefined) return error("gating_config is required");
     if (body.scoring_rubric === undefined) return error("scoring_rubric is required");
+
+    // template_id must be a valid UUID
+    if (typeof body.template_id !== "string" || !UUID_REGEX.test(body.template_id)) {
+      return error("template_id must be a valid UUID");
+    }
 
     // Slug validation
     const slugCheck = validateSlug(body.slug);
@@ -88,6 +96,13 @@ export async function POST(request: NextRequest) {
     });
     if (!client) return error("Client not found", 404);
 
+    // Verify template exists and is active
+    const template = await db.query.templates.findFirst({
+      where: and(eq(templates.id, body.template_id), eq(templates.is_active, true)),
+      columns: { id: true },
+    });
+    if (!template) return error("Template not found or inactive", 404);
+
     // Check slug uniqueness per client
     const existing = await db.query.campaigns.findFirst({
       where: and(eq(campaigns.client_id, body.client_id), eq(campaigns.slug, body.slug)),
@@ -106,7 +121,7 @@ export async function POST(request: NextRequest) {
         location: body.location ?? null,
         employment_type: body.employment_type ?? null,
         status: body.status ?? "draft",
-        html_template: body.html_template ?? null,
+        template_id: body.template_id,
         gating_config: body.gating_config,
         scoring_rubric: body.scoring_rubric,
         campaign_start: body.campaign_start ? new Date(body.campaign_start) : null,

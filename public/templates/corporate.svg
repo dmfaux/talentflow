@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Corporate template preview">
+  <!-- White body -->
+  <rect width="600" height="400" fill="#ffffff" />
+
+  <!-- Strong coloured hero band -->
+  <rect width="600" height="150" fill="#123c6b" />
+
+  <!-- Logo + client name in hero -->
+  <g transform="translate(48 32)">
+    <rect x="0" y="0" width="32" height="32" rx="6" fill="#ffffff" />
+    <rect x="6" y="10" width="20" height="3" rx="1" fill="#123c6b" />
+    <rect x="6" y="17" width="14" height="3" rx="1" fill="#123c6b" />
+    <rect x="42" y="11" width="72" height="8" rx="2" fill="#ffffff" fill-opacity="0.65" />
+  </g>
+
+  <!-- Hero title -->
+  <g transform="translate(48 84)">
+    <rect x="0" y="0" width="380" height="18" rx="3" fill="#ffffff" />
+    <rect x="0" y="26" width="280" height="18" rx="3" fill="#ffffff" fill-opacity="0.82" />
+  </g>
+
+  <!-- Meta pills -->
+  <g transform="translate(48 172)">
+    <rect x="0" y="0" width="90" height="22" rx="11" fill="#ffffff" stroke="#0b0f1c" stroke-opacity="0.16" />
+    <rect x="100" y="0" width="78" height="22" rx="11" fill="#ffffff" stroke="#0b0f1c" stroke-opacity="0.16" />
+    <rect x="188" y="0" width="98" height="22" rx="11" fill="#ffffff" stroke="#0b0f1c" stroke-opacity="0.16" />
+  </g>
+
+  <!-- About section heading + body -->
+  <g transform="translate(48 216)">
+    <rect x="0" y="0" width="130" height="12" rx="3" fill="#0b0f1c" />
+    <rect x="0" y="22" width="500" height="5" rx="2" fill="#0b0f1c" fill-opacity="0.32" />
+    <rect x="0" y="33" width="490" height="5" rx="2" fill="#0b0f1c" fill-opacity="0.32" />
+    <rect x="0" y="44" width="380" height="5" rx="2" fill="#0b0f1c" fill-opacity="0.32" />
+  </g>
+
+  <!-- Why work here 3-column -->
+  <g transform="translate(48 284)">
+    <rect x="0" y="0" width="160" height="54" rx="8" fill="#ffffff" stroke="#0b0f1c" stroke-opacity="0.1" />
+    <rect x="12" y="12" width="18" height="18" rx="4" fill="#123c6b" fill-opacity="0.1" />
+    <rect x="12" y="36" width="110" height="5" rx="2" fill="#0b0f1c" fill-opacity="0.4" />
+
+    <rect x="172" y="0" width="160" height="54" rx="8" fill="#ffffff" stroke="#0b0f1c" stroke-opacity="0.1" />
+    <rect x="184" y="12" width="18" height="18" rx="4" fill="#123c6b" fill-opacity="0.1" />
+    <rect x="184" y="36" width="120" height="5" rx="2" fill="#0b0f1c" fill-opacity="0.4" />
+
+    <rect x="344" y="0" width="160" height="54" rx="8" fill="#ffffff" stroke="#0b0f1c" stroke-opacity="0.1" />
+    <rect x="356" y="12" width="18" height="18" rx="4" fill="#123c6b" fill-opacity="0.1" />
+    <rect x="356" y="36" width="100" height="5" rx="2" fill="#0b0f1c" fill-opacity="0.4" />
+  </g>
+
+  <!-- Accent separator bar -->
+  <rect x="0" y="360" width="600" height="4" fill="#d68a0b" />
+</svg>

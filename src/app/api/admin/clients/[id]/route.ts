@@ -1,9 +1,9 @@
 import { db } from "@/db";
-import { campaigns, clients } from "@/db/schema";
+import { clients } from "@/db/schema";
 import { error, requireApiAuth, success } from "@/lib/api";
 import { validateSlug } from "@/lib/slug";
 import { isLogoBackground, isLogoPosition, normaliseHexColor } from "@/lib/utils";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
 const COLOR_FIELDS = [
@@ -12,6 +12,11 @@ const COLOR_FIELDS = [
   "brand_accent_color",
   "brand_text_color",
 ] as const;
+
+const VALID_TIERS = ["standard", "premium", "enterprise"] as const;
+function isValidTier(value: unknown): value is (typeof VALID_TIERS)[number] {
+  return typeof value === "string" && (VALID_TIERS as readonly string[]).includes(value);
+}
 
 export async function GET(
   _request: Request,
@@ -65,7 +70,12 @@ export async function PATCH(
       "branding_logo_url",
       "notes",
       "is_active",
+      "tier",
     ] as const;
+
+    if (body.tier !== undefined && !isValidTier(body.tier)) {
+      return error("tier must be 'standard', 'premium', or 'enterprise'");
+    }
 
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
@@ -112,18 +122,6 @@ export async function PATCH(
         columns: { id: true },
       });
       if (slugTaken && slugTaken.id !== id) return error("This slug is already taken");
-
-      // Block slug change if client has campaigns with HTML templates
-      const hasTemplates = await db.query.campaigns.findFirst({
-        where: and(
-          eq(campaigns.client_id, id),
-          isNotNull(campaigns.html_template)
-        ),
-        columns: { id: true },
-      });
-      if (hasTemplates) {
-        return error("Cannot change client slug while campaigns with generated HTML templates exist. The templates reference the current slug in their form action URLs.");
-      }
     }
 
     const [row] = await db

@@ -4,7 +4,7 @@ dotenv.config();
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import * as schema from "./schema";
 
 const connectionString = process.env.DATABASE_URL!;
@@ -279,6 +279,15 @@ async function main() {
     }))
   ).returning({ id: schema.clients.id, slug: schema.clients.slug, name: schema.clients.name });
 
+  // Look up default template (editorial) for seeded campaigns
+  const defaultTemplate = await db.query.templates.findFirst({
+    where: eq(schema.templates.key, "editorial"),
+    columns: { id: true },
+  });
+  if (!defaultTemplate) {
+    throw new Error("Default template 'editorial' not found. Run the templates seed first.");
+  }
+
   // Generate campaigns — 2-4 per client
   console.log("Generating campaigns...");
   const campaignsToInsert: typeof schema.campaigns.$inferInsert[] = [];
@@ -312,7 +321,7 @@ async function main() {
         location: pick(LOCATIONS),
         employment_type: role.employment_type,
         status,
-        html_template: status !== "draft" ? `<html><body><h1>${role.title} at ${c.name}</h1><p>Apply now.</p></body></html>` : null,
+        template_id: defaultTemplate.id,
         gating_config: buildGating(role.department),
         scoring_rubric: buildRubric(role.title),
         campaign_start: campaignStart,

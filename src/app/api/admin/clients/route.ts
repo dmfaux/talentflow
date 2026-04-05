@@ -29,6 +29,12 @@ const COLOR_FIELDS = [
   "brand_text_color",
 ] as const;
 
+const VALID_TIERS = ["standard", "premium", "enterprise"] as const;
+type Tier = (typeof VALID_TIERS)[number];
+function isValidTier(value: unknown): value is Tier {
+  return typeof value === "string" && (VALID_TIERS as readonly string[]).includes(value);
+}
+
 export async function POST(request: NextRequest) {
   const authError = await requireApiAuth();
   if (authError) return authError;
@@ -70,6 +76,14 @@ export async function POST(request: NextRequest) {
       return error("logo_position must be 'top-left' or 'top-centre'");
     }
 
+    let tier: Tier = "standard";
+    if (body.tier !== undefined && body.tier !== null && body.tier !== "") {
+      if (!isValidTier(body.tier)) {
+        return error("tier must be 'standard', 'premium', or 'enterprise'");
+      }
+      tier = body.tier;
+    }
+
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const providedId = typeof body.id === "string" && UUID_REGEX.test(body.id) ? body.id : undefined;
 
@@ -79,6 +93,7 @@ export async function POST(request: NextRequest) {
         ...(providedId ? { id: providedId } : {}),
         slug,
         name: body.name.trim(),
+        tier,
         contact_name: body.contact_name ?? null,
         contact_email: body.contact_email ?? null,
         contact_phone: body.contact_phone ?? null,

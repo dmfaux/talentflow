@@ -6,6 +6,42 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
 
+type Tier = "standard" | "premium" | "enterprise";
+
+const TIER_OPTIONS: Array<{
+  value: Tier;
+  label: string;
+  tagline: string;
+  helper: string;
+  badgeClass: string;
+  badgeStyle?: React.CSSProperties;
+}> = [
+  {
+    value: "standard",
+    label: "Standard",
+    tagline: "Shared templates",
+    helper: "Pay per campaign. Access to the shared template library.",
+    badgeClass: "bg-canvas-2 text-ink-muted",
+  },
+  {
+    value: "premium",
+    label: "Premium",
+    tagline: "One bespoke template",
+    helper:
+      "Includes one bespoke template. Pay per campaign at a reduced rate.",
+    badgeClass: "",
+    badgeStyle: { backgroundColor: "#fff2c2", color: "#c29100" },
+  },
+  {
+    value: "enterprise",
+    label: "Enterprise",
+    tagline: "Unlimited & bespoke",
+    helper:
+      "Monthly retainer. Unlimited campaigns, multiple bespoke templates, dedicated support.",
+    badgeClass: "bg-vermillion-soft text-vermillion-deep",
+  },
+];
+
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
@@ -30,6 +66,7 @@ export default function NewClientPage() {
   const [slugManual, setSlugManual] = useState(false);
   const [slugChecking, setSlugChecking] = useState(false);
   const [branding, setBranding] = useState<BrandingValues>(INITIAL_BRANDING);
+  const [tier, setTier] = useState<Tier>("standard");
 
   // Stable UUID for this draft client — used as the logo upload path prefix
   // and then passed to POST so the server stores the same id.
@@ -85,6 +122,7 @@ export default function NewClientPage() {
           id: draftId,
           name: trimmedName,
           slug,
+          tier,
           contact_name: (form.get("contact_name") as string) || null,
           contact_email: (form.get("contact_email") as string) || null,
           contact_phone: (form.get("contact_phone") as string) || null,
@@ -214,6 +252,46 @@ export default function NewClientPage() {
                 className="w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-cobalt focus:ring-1 focus:ring-cobalt/20 resize-none"
               />
             </div>
+          </div>
+        </div>
+
+        {/* ── Subscription Tier ─────────────────────────────────── */}
+        <div className="rounded-xl border border-border bg-surface p-8">
+          <h2 className="font-display mb-2 text-base font-medium text-charcoal">
+            Subscription Tier
+          </h2>
+          <p className="mb-5 text-[0.75rem] text-txt-muted">
+            Choose the plan that best fits this client&apos;s needs.
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {TIER_OPTIONS.map((opt) => {
+              const selected = tier === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setTier(opt.value)}
+                  className={`flex flex-col gap-1.5 rounded-lg border px-3 py-2.5 text-left transition-colors cursor-pointer ${
+                    selected
+                      ? "border-cobalt bg-cobalt-tint"
+                      : "border-border bg-paper hover:border-border-strong"
+                  }`}
+                >
+                  <span
+                    className={`inline-flex w-fit items-center rounded px-1.5 py-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.14em] ${opt.badgeClass}`}
+                    style={opt.badgeStyle}
+                  >
+                    {opt.label}
+                  </span>
+                  <span className="text-[0.8rem] font-medium text-charcoal">
+                    {opt.tagline}
+                  </span>
+                  <span className="text-[0.7rem] leading-snug text-txt-muted">
+                    {opt.helper}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 

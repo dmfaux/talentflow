@@ -1,11 +1,13 @@
 "use client";
 
+import { TierBadge } from "@/components/admin/tier-badge";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 interface Client {
   id: string;
   name: string;
+  tier: string | null;
   contact_name: string | null;
   contact_email: string | null;
   is_active: boolean | null;
@@ -91,9 +93,10 @@ export default function ClientsPage() {
                   <td className="px-5 py-3">
                     <Link
                       href={`/clients/${client.id}`}
-                      className="block text-sm font-medium text-charcoal group-hover:text-accent"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-charcoal group-hover:text-accent"
                     >
-                      {client.name}
+                      <span className="text-[0.95rem] font-medium text-ink">{client.name}</span>
+                      <TierBadge tier={client.tier ?? "standard"} />
                     </Link>
                   </td>
                   <td className="px-5 py-3 text-sm text-txt-secondary">

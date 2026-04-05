@@ -1,9 +1,11 @@
 import { db } from "@/db";
-import { campaigns, candidates } from "@/db/schema";
+import { campaigns, candidates, templates } from "@/db/schema";
 import { error, requireApiAuth, success } from "@/lib/api";
 import { validateSlug } from "@/lib/slug";
 import { and, eq, sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(
   _request: Request,
@@ -58,17 +60,24 @@ export async function PATCH(
     // Check campaign exists
     const existing = await db.query.campaigns.findFirst({
       where: eq(campaigns.id, id),
-      columns: { id: true, slug: true, status: true, client_id: true, html_template: true },
+      columns: { id: true, slug: true, status: true, client_id: true },
     });
     if (!existing) return error("Campaign not found", 404);
 
+    // Validate template_id if provided
+    if (body.template_id !== undefined) {
+      if (typeof body.template_id !== "string" || !UUID_REGEX.test(body.template_id)) {
+        return error("template_id must be a valid UUID");
+      }
+      const template = await db.query.templates.findFirst({
+        where: and(eq(templates.id, body.template_id), eq(templates.is_active, true)),
+        columns: { id: true },
+      });
+      if (!template) return error("Template not found or inactive", 404);
+    }
+
     // Validate slug if provided
     if (body.slug !== undefined) {
-      // Block slug change if template exists
-      if (existing.html_template && body.slug !== existing.slug) {
-        return error("Cannot change slug after an HTML template has been set. Clear the template first.");
-      }
-
       const slugCheck = validateSlug(body.slug);
       if (!slugCheck.valid) return error(slugCheck.error!);
 
@@ -105,7 +114,7 @@ export async function PATCH(
       "location",
       "employment_type",
       "status",
-      "html_template",
+      "template_id",
       "gating_config",
       "scoring_rubric",
       "salary_range_min",

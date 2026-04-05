@@ -45,7 +45,17 @@ interface FormData {
   nice_to_haves: string[];
   dealbreakers: string[];
   dimension_weights: { skills: number; experience: number; progression: number; tenure: number };
-  html_template: string;
+  template_id: string;
+}
+
+interface Template {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  thumbnail_url: string | null;
+  owner_client_id: string | null;
+  is_active: boolean;
 }
 
 const STEPS = ["Basics", "Gating Questions", "Scoring Rubric", "Landing Page", "Review"] as const;
@@ -65,7 +75,7 @@ const INITIAL: FormData = {
   nice_to_haves: [""],
   dealbreakers: [""],
   dimension_weights: { skills: 25, experience: 25, progression: 25, tenure: 25 },
-  html_template: "",
+  template_id: "",
 };
 
 function slugify(s: string) {
@@ -99,14 +109,47 @@ export default function NewCampaignPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [promptCopied, setPromptCopied] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesError, setTemplatesError] = useState("");
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
 
   useEffect(() => {
     fetch("/api/admin/clients")
       .then((r) => r.json())
       .then((res) => setClients(res.data ?? []));
   }, []);
+
+  // Fetch templates when entering Step 3 / client changes
+  useEffect(() => {
+    if (step !== 3 || !form.client_id) return;
+    let cancelled = false;
+    setTemplatesLoading(true);
+    setTemplatesError("");
+    fetch(`/api/admin/templates?client_id=${encodeURIComponent(form.client_id)}`)
+      .then((r) => r.json())
+      .then((res) => {
+        if (cancelled) return;
+        const list: Template[] = res.data ?? [];
+        setTemplates(list);
+        // Auto-select bespoke if available and nothing selected yet
+        setForm((prev) => {
+          if (prev.template_id) return prev;
+          const bespoke = list.find((t) => t.owner_client_id === prev.client_id);
+          if (bespoke) return { ...prev, template_id: bespoke.id };
+          return prev;
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setTemplatesError("Failed to load templates");
+      })
+      .finally(() => {
+        if (!cancelled) setTemplatesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [form.client_id, step]);
 
   function updateForm(patch: Partial<FormData>) {
     setForm((prev) => ({ ...prev, ...patch }));
@@ -145,6 +188,10 @@ export default function NewCampaignPage() {
       const w = form.dimension_weights;
       const total = w.skills + w.experience + w.progression + w.tenure;
       if (total !== 100) errs.weights = `Weights must sum to 100% (currently ${total}%)`;
+    }
+
+    if (s === 3) {
+      if (!form.template_id) errs.template_id = "Select a template";
     }
 
     setErrors(errs);
@@ -245,138 +292,6 @@ export default function NewCampaignPage() {
     updateForm({ [key]: form[key].filter((_, i) => i !== idx) });
   }
 
-  // ── AI Prompt builder ─────────────────────────────────────────────
-
-  function buildLandingPagePrompt(): string {
-    const slug = form.slug || "{campaignSlug}";
-    const selectedClient = clients.find((c) => c.id === form.client_id);
-    const clientSlug = selectedClient?.slug || "{clientSlug}";
-    const clientName = selectedClient?.name ?? "{Client Name}";
-    const questionsBlock = form.gating_config
-      .map((q, i) => {
-        const optionsList = q.options
-          .filter((o) => o.value)
-          .map((o) => `  - "${o.value}"`)
-          .join("\n");
-        return `Question ${i + 1}: "${q.label}"\nType: select (dropdown)\nOptions:\n${optionsList}\nField name: answer_${q.id}`;
-      })
-      .join("\n\n");
-
-    return `Create a complete, self-contained HTML landing page for a job application campaign.
-
-## Role Details
-- **Role Title:** ${form.role_title || "{Role Title}"}
-- **Company:** ${clientName}
-- **Department:** ${form.department || "Not specified"}
-- **Location:** ${form.location || "Not specified"}
-- **Employment Type:** ${form.employment_type || "Not specified"}
-${form.salary_range_min || form.salary_range_max ? `- **Salary Range:** R${form.salary_range_min || "?"} – R${form.salary_range_max || "?"}` : ""}
-
-## Form Requirements
-The page must contain an application form that POSTs to:
-\`/api/apply/${clientSlug}/${slug}\`
-
-The form must submit as **multipart/form-data** using JavaScript (FormData object with fetch). This is because the form includes an optional CV file upload. On success, show a thank-you message inline. On error, show the error message from the JSON response.
-
-### Required Form Fields
-1. **name** (text input, required) — Candidate's full name
-2. **email** (email input, required) — Candidate's email address
-3. **phone** (tel input, optional) — Phone number
-4. **cv** (file input, optional, accept=".pdf,.doc,.docx") — CV/Resume upload (max 10MB). Label it "Upload your CV (PDF, DOC, or DOCX)"
-5. **whatsapp_opt_in** (checkbox) — "I consent to receive WhatsApp messages about my application"
-6. **popia_consent** (checkbox, required) — "I consent to the processing of my personal information in accordance with POPIA"
-
-### Gating Questions (Screening)
-These must be dropdown/select fields. Include them as individual form fields named \`answer_{questionId}\`.
-
-${questionsBlock || "No gating questions configured yet."}
-
-### Form Submission Code
-Use this pattern to submit the form:
-\`\`\`javascript
-const formData = new FormData();
-formData.append("name", nameValue);
-formData.append("email", emailValue);
-formData.append("phone", phoneValue);
-formData.append("whatsapp_opt_in", whatsappChecked ? "true" : "false");
-formData.append("popia_consent", popiaChecked ? "true" : "false");
-// Append each gating answer:
-${form.gating_config.map((q) => `formData.append("answer_${q.id}", selectedValue);`).join("\n") || '// formData.append("answer_{id}", selectedValue);'}
-// Append CV file if selected:
-if (cvInput.files[0]) formData.append("cv", cvInput.files[0]);
-
-const res = await fetch("/api/apply/${clientSlug}/${slug}", { method: "POST", body: formData });
-const data = await res.json();
-\`\`\`
-
-Do NOT set a Content-Type header — the browser sets it automatically with the multipart boundary.
-
-### API Response Handling
-The API returns JSON. Handle these cases:
-
-**Success (201):**
-\`\`\`json
-{ "success": true, "passed": true, "candidate_id": "...", "message": "Thank you for applying!..." }
-// or
-{ "success": true, "passed": false, "candidate_id": "...", "message": "Thank you for your interest. Unfortunately..." }
-\`\`\`
-- If \`passed\` is true: show a positive thank-you message (green accent), e.g. "Application received! Your CV is being reviewed."
-- If \`passed\` is false: show a polite, encouraging message (neutral tone), e.g. "Thank you for your interest. Unfortunately your profile does not meet the requirements for this role at this time."
-- In both cases, hide the form and show the message prominently.
-
-**Validation error (400):** \`{ "error": "Name is required" }\` or \`"A valid email address is required"\` or \`"POPIA consent is required..."\` or \`"CV must be a PDF, DOC, or DOCX file"\` or \`"CV file must be under 10MB"\`
-- Show the error message inline near the relevant field. Map known errors to fields:
-  - "Name" → name field
-  - "email" → email field
-  - "POPIA" → consent checkbox
-  - "CV" → file input
-  - For other errors, show at the top of the form.
-
-**Duplicate application (409):** \`{ "error": "You have already applied for this role" }\`
-- Show a friendly message: "It looks like you've already applied for this position. If you need to update your application, please contact us."
-
-**Campaign not active (404):** \`{ "error": "Campaign not found or not active" }\`
-- Show: "This position is no longer accepting applications."
-
-**Server error (500):** \`{ "error": "Internal server error" }\`
-- Show: "Something went wrong. Please try again in a moment."
-
-For all error states, keep the form visible so the candidate can correct and retry (except 409 and 404 where retry won't help — hide the form for those).
-
-## Design Requirements
-- Professional, modern, clean design
-- Mobile-responsive
-- Use inline CSS only (no external stylesheets) — the entire page must be a single HTML file
-- Use a warm, professional colour scheme appropriate for a recruitment page
-- Include the company name "${clientName}" prominently
-- Include a compelling headline and brief role description section
-- The form should be clearly visible and easy to complete
-- Add a POPIA compliance notice at the bottom
-- Include a "Powered by TalentStream" footer in small muted text
-- After successful submission, replace the form with a thank-you message
-- Show validation errors inline next to the relevant fields
-- Disable the submit button while the request is in flight
-
-## CRITICAL — Content Rules
-- Do NOT invent, fabricate, or embellish ANY information about the role, company, requirements, or benefits
-- Do NOT add job descriptions, responsibilities, qualifications, perks, or any content beyond what is explicitly provided above
-- Only use the exact role title, company name, department, location, and employment type as given — nothing more
-- The page should contain ONLY the form fields specified above, the company name, the role title, and the POPIA notice
-- If a field above says "Not specified", do NOT guess or fill in a value — simply omit that detail from the page
-- This is a legal document — accuracy is paramount
-
-## Technical Requirements
-- The HTML must be completely self-contained — inline CSS, no external dependencies
-- Use vanilla JavaScript for form handling (no frameworks)
-- The page should work in all modern browsers`;
-  }
-
-  async function copyPrompt() {
-    await navigator.clipboard.writeText(buildLandingPagePrompt());
-    setPromptCopied(true);
-    setTimeout(() => setPromptCopied(false), 2000);
-  }
-
   // ── Submit ───────────────────────────────────────────────────────
 
   async function submit(status: "draft" | "active") {
@@ -400,7 +315,7 @@ For all error states, keep the form visible so the candidate can correct and ret
         dealbreakers: form.dealbreakers.filter((s) => s.trim()),
         dimension_weights: form.dimension_weights,
       },
-      html_template: form.html_template || null,
+      template_id: form.template_id,
       status,
     };
 
@@ -736,105 +651,21 @@ For all error states, keep the form visible so the candidate can correct and ret
           </div>
         )}
 
-        {/* ── Step 3: Landing Page Template ────────────────────── */}
+        {/* ── Step 3: Landing Page Template Gallery ────────────── */}
         {step === 3 && (
-          <div className="space-y-5">
-            <h2 className="text-base font-semibold text-charcoal">Landing Page Template</h2>
-
-            {/* Prompt generator */}
-            <div className="rounded-lg border border-accent/20 bg-accent/[0.03] p-4 space-y-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-[0.78rem] font-semibold text-charcoal">
-                    Generate with AI
-                  </h3>
-                  <p className="mt-0.5 text-[0.7rem] leading-relaxed text-txt-secondary">
-                    Copy this prompt and paste it into Claude or ChatGPT. It includes your role details,
-                    gating questions, and the correct API endpoint. Paste the generated HTML below.
-                  </p>
-                </div>
-                <button
-                  onClick={copyPrompt}
-                  className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 text-[0.75rem] font-medium text-ink transition-colors hover:bg-accent-light hover:text-white cursor-pointer"
-                >
-                  {promptCopied ? (
-                    <>
-                      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7.5L6 10l5-6" /></svg>
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="5" y="5" width="7" height="7" rx="1" />
-                        <path d="M9 5V3a1 1 0 00-1-1H3a1 1 0 00-1 1v5a1 1 0 001 1h2" />
-                      </svg>
-                      Copy Prompt
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Prompt preview */}
-              <details className="group">
-                <summary className="text-[0.68rem] font-medium text-accent cursor-pointer hover:underline">
-                  Preview prompt
-                </summary>
-                <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-cream p-3 font-mono text-[0.65rem] leading-relaxed text-charcoal whitespace-pre-wrap">
-                  {buildLandingPagePrompt()}
-                </pre>
-              </details>
-            </div>
-
-            {/* API endpoint reference */}
-            <div className="flex items-center gap-2 rounded-lg bg-cream px-4 py-2.5">
-              <span className="text-[0.7rem] text-txt-muted">Form endpoint:</span>
-              <code className="font-mono text-[0.72rem] font-medium text-accent">
-                /api/apply/{clients.find((c) => c.id === form.client_id)?.slug || "{clientSlug}"}/{form.slug || "{campaignSlug}"}
-              </code>
-            </div>
-
-            {/* HTML textarea */}
-            <textarea
-              value={form.html_template}
-              onChange={(e) => updateForm({ html_template: e.target.value })}
-              placeholder="Paste the generated HTML here..."
-              rows={16}
-              className="w-full rounded-lg border border-border bg-cream/40 px-4 py-3 font-mono text-xs text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none"
-            />
-
-            {form.html_template && (
-              <button
-                onClick={() => setPreviewOpen(true)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-[0.75rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="7" cy="7" r="3" />
-                  <path d="M1 7s2.5-4.5 6-4.5S13 7 13 7s-2.5 4.5-6 4.5S1 7 1 7z" />
-                </svg>
-                Preview
-              </button>
-            )}
-
-            {/* Preview modal */}
-            {previewOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/30 backdrop-blur-sm p-8">
-                <div className="relative w-full max-w-4xl max-h-[80vh] rounded-xl border border-border bg-surface shadow-xl overflow-hidden flex flex-col">
-                  <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                    <span className="text-sm font-medium text-charcoal">Template Preview</span>
-                    <button onClick={() => setPreviewOpen(false)} className="p-1 text-txt-muted hover:text-charcoal cursor-pointer">
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M4 4l8 8M12 4l-8 8" /></svg>
-                    </button>
-                  </div>
-                  <iframe
-                    srcDoc={form.html_template}
-                    className="flex-1 w-full bg-white"
-                    sandbox="allow-scripts"
-                    title="Template preview"
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+          <TemplateGalleryStep
+            templates={templates}
+            loading={templatesLoading}
+            error={templatesError}
+            selectedTemplateId={form.template_id}
+            onSelect={(id) => updateForm({ template_id: id })}
+            clientId={form.client_id}
+            clientSlug={clients.find((c) => c.id === form.client_id)?.slug}
+            form={form}
+            previewDevice={previewDevice}
+            setPreviewDevice={setPreviewDevice}
+            validationError={errors.template_id}
+          />
         )}
 
         {/* ── Step 4: Review ───────────────────────────────────── */}
@@ -890,9 +721,30 @@ For all error states, keep the form visible so the candidate can correct and ret
             {/* Template summary */}
             <div className="rounded-lg border border-border p-4">
               <h3 className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-txt-muted">Landing Page</h3>
-              <p className="mt-1 text-sm text-charcoal">
-                {form.html_template ? `${form.html_template.length.toLocaleString()} characters` : "No template provided"}
-              </p>
+              {(() => {
+                const selected = templates.find((t) => t.id === form.template_id);
+                if (!selected) {
+                  return <p className="mt-1 text-sm text-charcoal">No template selected</p>;
+                }
+                return (
+                  <div className="mt-2 flex gap-3">
+                    <div className="h-[80px] w-[120px] shrink-0 overflow-hidden rounded border border-border bg-cream/40">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={selected.thumbnail_url ?? "/templates/default.svg"}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-display text-[1rem] text-charcoal">{selected.name}</p>
+                      {selected.description && (
+                        <p className="mt-0.5 text-xs text-txt-muted line-clamp-2">{selected.description}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}
@@ -1046,6 +898,227 @@ function ClientBrandingSummary({ client }: { client: Client | undefined }) {
             Copy
           </button>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ── Template Gallery Step ───────────────────────────────────────────
+
+interface TemplateGalleryStepProps {
+  templates: Template[];
+  loading: boolean;
+  error: string;
+  selectedTemplateId: string;
+  onSelect: (id: string) => void;
+  clientId: string;
+  clientSlug: string | undefined;
+  form: FormData;
+  previewDevice: "desktop" | "mobile";
+  setPreviewDevice: (d: "desktop" | "mobile") => void;
+  validationError?: string;
+}
+
+function TemplateGalleryStep({
+  templates,
+  loading,
+  error,
+  selectedTemplateId,
+  onSelect,
+  clientId,
+  clientSlug,
+  form,
+  previewDevice,
+  setPreviewDevice,
+  validationError,
+}: TemplateGalleryStepProps) {
+  // Sort: bespoke first (for this client), then shared library (null owner)
+  const sorted = [...templates].sort((a, b) => {
+    const aBespoke = a.owner_client_id === clientId ? 0 : 1;
+    const bBespoke = b.owner_client_id === clientId ? 0 : 1;
+    return aBespoke - bBespoke;
+  });
+
+  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
+
+  const previewUrl = (() => {
+    if (!selectedTemplate || !clientId) return "";
+    const params = new URLSearchParams();
+    params.set("clientId", clientId);
+    params.set("roleTitle", form.role_title || "Sample Role");
+    params.set("department", form.department);
+    params.set("location", form.location);
+    params.set("employmentType", form.employment_type);
+    if (form.salary_range_min) params.set("salaryMin", form.salary_range_min);
+    if (form.salary_range_max) params.set("salaryMax", form.salary_range_max);
+    params.set("gating", JSON.stringify(form.gating_config));
+    return `/preview/template/${selectedTemplate.key}?${params.toString()}`;
+  })();
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-base font-semibold text-charcoal">Landing Page Template</h2>
+          <p className="mt-1 text-xs text-txt-muted">
+            Choose a template — candidates will see this exactly.
+          </p>
+        </div>
+        {selectedTemplate && (
+          <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-cream/40 p-1">
+            <button
+              type="button"
+              onClick={() => setPreviewDevice("desktop")}
+              className={`inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-[0.7rem] font-medium transition-colors cursor-pointer ${
+                previewDevice === "desktop"
+                  ? "bg-paper text-charcoal shadow-sm"
+                  : "text-txt-muted hover:text-charcoal"
+              }`}
+            >
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1.5" y="2.5" width="11" height="7" rx="1" /><path d="M5 12h4M7 10v2" strokeLinecap="round" /></svg>
+              Desktop
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewDevice("mobile")}
+              className={`inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-[0.7rem] font-medium transition-colors cursor-pointer ${
+                previewDevice === "mobile"
+                  ? "bg-paper text-charcoal shadow-sm"
+                  : "text-txt-muted hover:text-charcoal"
+              }`}
+            >
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="4" y="1.5" width="6" height="11" rx="1" /><path d="M6.5 11h1" strokeLinecap="round" /></svg>
+              Mobile
+            </button>
+          </div>
+        )}
+      </div>
+
+      {validationError && <p className="text-xs text-red">{validationError}</p>}
+
+      {!clientId && (
+        <div className="rounded-lg border border-dashed border-border bg-cream/40 p-6 text-center text-xs text-txt-muted">
+          Pick a client on Step 1 to see available templates.
+        </div>
+      )}
+
+      {clientId && loading && (
+        <div className="rounded-lg border border-dashed border-border bg-cream/40 p-6 text-center text-xs text-txt-muted">
+          Loading templates...
+        </div>
+      )}
+
+      {clientId && !loading && error && (
+        <div className="rounded-lg border border-red/30 bg-red-light p-4 text-xs text-red">
+          {error}
+        </div>
+      )}
+
+      {clientId && !loading && !error && sorted.length === 0 && (
+        <div className="rounded-lg border border-dashed border-border bg-cream/40 p-6 text-center text-xs text-txt-muted">
+          No templates available for this client.
+        </div>
+      )}
+
+      {clientId && !loading && !error && sorted.length > 0 && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {sorted.map((template) => {
+              const isSelected = template.id === selectedTemplateId;
+              const isBespoke = template.owner_client_id !== null;
+              return (
+                <button
+                  key={template.id}
+                  type="button"
+                  onClick={() => onSelect(template.id)}
+                  className={`group text-left overflow-hidden rounded-xl border-2 transition-all cursor-pointer ${
+                    isSelected
+                      ? "border-cobalt ring-2 ring-cobalt/20"
+                      : "border-border hover:border-border-strong"
+                  } ${isBespoke ? "shadow-sm" : ""}`}
+                >
+                  <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-xl bg-cream/40">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={template.thumbnail_url ?? "/templates/default.svg"}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-center gap-2">
+                      {isBespoke ? (
+                        <span
+                          className="text-[0.6rem] font-semibold uppercase tracking-[0.14em] rounded px-2 py-0.5"
+                          style={{
+                            backgroundColor: "var(--color-vermillion-soft)",
+                            color: "var(--color-vermillion-deep)",
+                          }}
+                        >
+                          Bespoke
+                        </span>
+                      ) : (
+                        <span className="text-[0.6rem] font-semibold uppercase tracking-[0.14em] rounded px-2 py-0.5 bg-canvas-2 text-ink-muted">
+                          Shared Library
+                        </span>
+                      )}
+                      {isBespoke && (
+                        <span className="text-[0.6rem] italic text-txt-muted">Exclusive</span>
+                      )}
+                    </div>
+                    <h3 className="mt-2 font-display text-[1.1rem] text-ink">{template.name}</h3>
+                    {template.description && (
+                      <p className="text-xs text-ink-muted mt-1 line-clamp-2">
+                        {template.description}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Live preview */}
+          {selectedTemplate && previewUrl && (
+            <div className="pt-2">
+              <p className="mb-2 text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
+                Preview
+              </p>
+              <div
+                className={previewDevice === "mobile" ? "mx-auto max-w-[390px]" : ""}
+              >
+                <div
+                  className="overflow-hidden rounded-xl border border-border bg-paper"
+                  style={{ boxShadow: "0 12px 32px -16px rgba(11, 15, 28, 0.18)" }}
+                >
+                  <div className="flex items-center gap-3 border-b border-border bg-canvas-2 px-3 py-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="h-2.5 w-2.5 rounded-full bg-[#d9b8b0]" />
+                      <span className="h-2.5 w-2.5 rounded-full bg-[#dfc9a0]" />
+                      <span className="h-2.5 w-2.5 rounded-full bg-[#b4c7a8]" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex h-6 items-center justify-center rounded-md border border-border bg-paper px-3">
+                        <span className="font-mono text-[0.65rem] text-ink-muted truncate">
+                          {clientSlug || "client"}.talentstream.co.za/{form.slug || "campaign"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <iframe
+                    src={previewUrl}
+                    className="w-full bg-paper"
+                    style={{
+                      height: previewDevice === "mobile" ? "700px" : "600px",
+                      border: 0,
+                    }}
+                    title="Template preview"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

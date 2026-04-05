@@ -1,8 +1,9 @@
 "use client";
 
+import { TierBadge } from "@/components/admin/tier-badge";
 import Link from "next/link";
 import { useEffect, useState, FormEvent } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 
 interface Campaign {
   id: string;
@@ -12,9 +13,20 @@ interface Campaign {
   created_at: string;
 }
 
+interface OwnedTemplate {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  thumbnail_url: string | null;
+  owner_client_id: string | null;
+  is_active: boolean;
+}
+
 interface Client {
   id: string;
   name: string;
+  tier: string | null;
   contact_name: string | null;
   contact_email: string | null;
   contact_phone: string | null;
@@ -30,6 +42,7 @@ interface Client {
   is_active: boolean | null;
   created_at: string;
   campaigns: Campaign[];
+  ownedTemplates?: OwnedTemplate[];
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -42,13 +55,15 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [ownedTemplates, setOwnedTemplates] = useState<OwnedTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+  const [requestOpen, setRequestOpen] = useState(false);
 
   useEffect(() => {
     fetch(`/api/admin/clients/${id}`)
@@ -59,6 +74,19 @@ export default function ClientDetailPage() {
       .then((res) => setClient(res.data))
       .catch(() => setError("Client not found"))
       .finally(() => setLoading(false));
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    setTemplatesLoading(true);
+    fetch(`/api/admin/templates?client_id=${id}`)
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((res) => {
+        const all: OwnedTemplate[] = res.data ?? [];
+        setOwnedTemplates(all.filter((t) => t.owner_client_id === id));
+      })
+      .catch(() => setOwnedTemplates([]))
+      .finally(() => setTemplatesLoading(false));
   }, [id]);
 
   async function handleSave(e: FormEvent<HTMLFormElement>) {
@@ -145,9 +173,12 @@ export default function ClientDetailPage() {
       <div className="mb-8 rounded-xl border border-border bg-surface p-6">
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-charcoal">
-              {client.name}
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg font-semibold text-charcoal">
+                {client.name}
+              </h1>
+              <TierBadge tier={client.tier ?? "standard"} size="md" />
+            </div>
             <div className="mt-1 flex items-center gap-2 text-xs">
               <span
                 className={`inline-block h-1.5 w-1.5 rounded-full ${
@@ -368,6 +399,117 @@ export default function ClientDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Bespoke Templates */}
+      <div className="mt-8">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-charcoal">
+            Bespoke Templates
+            <span className="ml-2 font-mono text-xs font-normal text-txt-muted">
+              {ownedTemplates.length}
+            </span>
+          </h2>
+          <button
+            type="button"
+            onClick={() => setRequestOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-paper px-4 py-2 text-sm text-ink transition-colors hover:bg-cream cursor-pointer"
+          >
+            Request Bespoke Template
+          </button>
+        </div>
+
+        {templatesLoading ? (
+          <div className="rounded-xl border border-border bg-surface px-5 py-10 text-center text-sm text-txt-muted">
+            Loading templates...
+          </div>
+        ) : ownedTemplates.length === 0 ? (
+          <div className="rounded-xl border border-border bg-surface px-5 py-10 text-center text-sm text-txt-muted">
+            No bespoke templates yet.
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-border bg-surface">
+            <ul className="divide-y divide-border">
+              {ownedTemplates.map((tpl) => (
+                <li key={tpl.id} className="flex items-center gap-4 px-5 py-3">
+                  <div className="h-12 w-16 shrink-0 overflow-hidden rounded border border-border bg-cream/40">
+                    {tpl.thumbnail_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={tpl.thumbnail_url}
+                        alt={tpl.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center font-mono text-[0.6rem] text-txt-muted">
+                        no img
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-charcoal">
+                      {tpl.name}
+                    </p>
+                    {tpl.description && (
+                      <p className="truncate text-xs text-txt-muted">
+                        {tpl.description}
+                      </p>
+                    )}
+                  </div>
+                  <span
+                    className={`inline-flex items-center gap-1.5 text-xs ${
+                      tpl.is_active ? "text-txt-secondary" : "text-txt-muted"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-1.5 w-1.5 rounded-full ${
+                        tpl.is_active ? "bg-green" : "bg-red"
+                      }`}
+                    />
+                    {tpl.is_active ? "Active" : "Inactive"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {/* Request Bespoke Template modal */}
+      {requestOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/30 backdrop-blur-sm"
+          onClick={() => setRequestOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-border bg-surface p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="mb-3 text-base font-semibold text-charcoal">
+              Request a Bespoke Template
+            </h2>
+            <p className="mb-5 text-sm leading-relaxed text-txt-secondary">
+              Bespoke templates are custom-designed landing pages built
+              exclusively for your account. To commission a new bespoke
+              template, please contact your TalentStream account manager or
+              email{" "}
+              <strong className="font-medium text-charcoal">
+                design@talentstream.co.za
+              </strong>{" "}
+              with your brief. Our design team will scope the work, provide a
+              quote, and deliver the template within 3-5 business days.
+            </p>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setRequestOpen(false)}
+                className="inline-flex h-9 items-center rounded-lg bg-cobalt px-5 text-[0.8rem] font-medium text-ink transition-colors hover:bg-cobalt-deep cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -21,6 +21,7 @@ export const clients = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     slug: text("slug").notNull().unique(),
     name: text("name").notNull(),
+    tier: text("tier").notNull().default("standard"),
     contact_name: text("contact_name"),
   contact_email: text("contact_email"),
   contact_phone: text("contact_phone"),
@@ -40,6 +41,27 @@ export const clients = pgTable(
   (table) => [uniqueIndex("clients_slug_idx").on(table.slug)]
 );
 
+// ── Templates ────────────────────────────────────────────────────────
+
+export const templates = pgTable(
+  "templates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    key: text("key").notNull().unique(),
+    name: text("name").notNull(),
+    description: text("description"),
+    thumbnail_url: text("thumbnail_url"),
+    owner_client_id: uuid("owner_client_id").references(() => clients.id),
+    is_active: boolean("is_active").notNull().default(true),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("templates_key_idx").on(table.key),
+    index("templates_owner_client_id_idx").on(table.owner_client_id),
+  ]
+);
+
 // ── Campaigns ────────────────────────────────────────────────────────
 
 export const campaigns = pgTable(
@@ -56,7 +78,9 @@ export const campaigns = pgTable(
     location: text("location"),
     employment_type: text("employment_type"),
     status: text("status").notNull().default("draft"),
-    html_template: text("html_template"),
+    template_id: uuid("template_id")
+      .notNull()
+      .references(() => templates.id),
     gating_config: jsonb("gating_config").notNull(),
     scoring_rubric: jsonb("scoring_rubric").notNull(),
     campaign_start: timestamp("campaign_start"),
@@ -70,6 +94,7 @@ export const campaigns = pgTable(
     unique("campaigns_client_id_slug_unique").on(table.client_id, table.slug),
     index("campaigns_client_id_idx").on(table.client_id),
     index("campaigns_status_idx").on(table.status),
+    index("campaigns_template_id_idx").on(table.template_id),
   ]
 );
 
@@ -204,6 +229,15 @@ export const messages = pgTable(
 export const clientsRelations = relations(clients, ({ many }) => ({
   campaigns: many(campaigns),
   users: many(users),
+  ownedTemplates: many(templates),
+}));
+
+export const templatesRelations = relations(templates, ({ one, many }) => ({
+  ownerClient: one(clients, {
+    fields: [templates.owner_client_id],
+    references: [clients.id],
+  }),
+  campaigns: many(campaigns),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -228,6 +262,10 @@ export const campaignsRelations = relations(campaigns, ({ one, many }) => ({
   client: one(clients, {
     fields: [campaigns.client_id],
     references: [clients.id],
+  }),
+  template: one(templates, {
+    fields: [campaigns.template_id],
+    references: [templates.id],
   }),
   candidates: many(candidates),
 }));

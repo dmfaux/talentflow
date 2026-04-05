@@ -1,7 +1,15 @@
 import { Metadata } from "next";
 import { db } from "@/db";
-import { campaigns, clients } from "@/db/schema";
+import { campaigns, clients, templates } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { getTemplate } from "@/templates/registry";
+import type {
+  LogoBackground,
+  LogoPosition,
+  TemplateClient,
+  TemplateCampaign,
+} from "@/templates/types";
+import type { GatingQuestion } from "@/lib/gating";
 
 interface Props {
   params: Promise<{ clientSlug: string; campaignSlug: string }>;
@@ -10,16 +18,31 @@ interface Props {
 async function getCampaign(clientSlug: string, campaignSlug: string) {
   const [row] = await db
     .select({
-      id: campaigns.id,
-      slug: campaigns.slug,
+      campaign_slug: campaigns.slug,
       role_title: campaigns.role_title,
       role_description: campaigns.role_description,
+      department: campaigns.department,
+      location: campaigns.location,
+      employment_type: campaigns.employment_type,
+      salary_range_min: campaigns.salary_range_min,
+      salary_range_max: campaigns.salary_range_max,
+      gating_config: campaigns.gating_config,
       status: campaigns.status,
-      html_template: campaigns.html_template,
+      client_slug: clients.slug,
       client_name: clients.name,
+      branding_logo_url: clients.branding_logo_url,
+      logo_background: clients.logo_background,
+      logo_position: clients.logo_position,
+      brand_primary_color: clients.brand_primary_color,
+      brand_secondary_color: clients.brand_secondary_color,
+      brand_accent_color: clients.brand_accent_color,
+      brand_text_color: clients.brand_text_color,
+      template_key: templates.key,
+      template_is_active: templates.is_active,
     })
     .from(campaigns)
     .innerJoin(clients, eq(campaigns.client_id, clients.id))
+    .innerJoin(templates, eq(campaigns.template_id, templates.id))
     .where(and(eq(clients.slug, clientSlug), eq(campaigns.slug, campaignSlug)))
     .limit(1);
 
@@ -51,23 +74,72 @@ export default async function CampaignPage({ params }: Props) {
   const campaign = await getCampaign(clientSlug, campaignSlug);
 
   if (!campaign) {
-    return <CampaignError title="Campaign not found" message="The campaign you're looking for doesn't exist. Please check the URL or contact the employer for the correct link." />;
+    return (
+      <CampaignError
+        title="Campaign not found"
+        message="The campaign you're looking for doesn't exist. Please check the URL or contact the employer for the correct link."
+      />
+    );
   }
 
   if (campaign.status !== "active") {
-    return <CampaignError title="This campaign is no longer active" message="Applications for this position have closed. If you believe this is an error, please contact the employer directly." />;
+    return (
+      <CampaignError
+        title="This campaign is no longer active"
+        message="Applications for this position have closed. If you believe this is an error, please contact the employer directly."
+      />
+    );
   }
 
-  if (!campaign.html_template) {
-    return <CampaignError title="Coming soon" message="This campaign page is being set up. Please check back shortly." />;
+  if (!campaign.template_is_active) {
+    return (
+      <CampaignError
+        title="Coming soon"
+        message="This campaign page is being set up. Please check back shortly."
+      />
+    );
   }
 
-  return (
-    <div
-      className="campaign-template"
-      dangerouslySetInnerHTML={{ __html: campaign.html_template }}
-    />
-  );
+  const TemplateComponent = getTemplate(campaign.template_key);
+
+  if (!TemplateComponent) {
+    console.error(
+      `[candidate-landing] Template component not found in registry for key: "${campaign.template_key}" (client="${clientSlug}", campaign="${campaignSlug}"). The admin API should validate keys against the registry before saving.`
+    );
+    return (
+      <CampaignError
+        title="Something went wrong"
+        message="We couldn't load this campaign page. Please try again later or contact the employer."
+      />
+    );
+  }
+
+  const clientProps: TemplateClient = {
+    slug: campaign.client_slug,
+    name: campaign.client_name,
+    logo_url: campaign.branding_logo_url,
+    logo_background: (campaign.logo_background ?? "light") as LogoBackground,
+    logo_position: (campaign.logo_position ?? "top-left") as LogoPosition,
+    brand_primary_color: campaign.brand_primary_color ?? "#0b0f1c",
+    brand_secondary_color: campaign.brand_secondary_color ?? "#f3f0e8",
+    brand_accent_color: campaign.brand_accent_color,
+    brand_text_color: campaign.brand_text_color ?? "#0b0f1c",
+  };
+
+  const campaignProps: TemplateCampaign = {
+    slug: campaign.campaign_slug,
+    role_title: campaign.role_title,
+    role_description: campaign.role_description,
+    department: campaign.department,
+    location: campaign.location,
+    employment_type: campaign.employment_type,
+    salary_range_min: campaign.salary_range_min,
+    salary_range_max: campaign.salary_range_max,
+    gating_config: (campaign.gating_config ?? []) as GatingQuestion[],
+  };
+
+  // eslint-disable-next-line react-hooks/static-components
+  return <TemplateComponent client={clientProps} campaign={campaignProps} />;
 }
 
 function CampaignError({ title, message }: { title: string; message: string }) {

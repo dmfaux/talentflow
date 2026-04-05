@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
   { label: "Campaigns", href: "/campaigns", icon: "campaign" },
+  { label: "Templates", href: "/templates", icon: "template" },
   { label: "Clients", href: "/clients", icon: "client" },
   { label: "Users", href: "/users", icon: "users" },
   { label: "Settings", href: "/settings", icon: "settings" },
@@ -24,6 +25,13 @@ const ICONS: Record<string, React.ReactNode> = {
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <rect x="2" y="3" width="12" height="10" rx="1.5" />
       <path d="M5 7h6M5 9.5h4" />
+    </svg>
+  ),
+  template: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="2" width="12" height="12" rx="1.5" />
+      <path d="M2 6h12" />
+      <path d="M6 6v8" />
     </svg>
   ),
   client: (
