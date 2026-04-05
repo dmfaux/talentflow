@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+
+type TemplateStatus = "draft" | "pending" | "published" | "archived";
 
 interface Template {
   id: string;
@@ -11,10 +14,19 @@ interface Template {
   thumbnail_url: string | null;
   owner_client_id: string | null;
   owner_client_name: string | null;
-  is_active: boolean;
+  source: "builtin" | "custom";
+  status: TemplateStatus;
+  published_at: string | null;
   created_at: string;
   updated_at: string;
 }
+
+const STATUS_STYLES: Record<TemplateStatus, { label: string; dot: string; text: string }> = {
+  draft:     { label: "Draft",     dot: "bg-ink-muted", text: "text-txt-secondary" },
+  pending:   { label: "Pending",   dot: "bg-saffron",   text: "text-saffron" },
+  published: { label: "Published", dot: "bg-green",     text: "text-green" },
+  archived:  { label: "Archived",  dot: "bg-red",       text: "text-red" },
+};
 
 type FilterTab = "all" | "shared" | "bespoke";
 
@@ -30,9 +42,12 @@ function formatCreated(iso: string): string {
 }
 
 export default function TemplatesPage() {
+  const router = useRouter();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/templates")
@@ -40,6 +55,109 @@ export default function TemplatesPage() {
       .then((res) => setTemplates(res.data ?? []))
       .finally(() => setLoading(false));
   }, []);
+
+  async function createCustomTemplate() {
+    const rawName = window.prompt(
+      "Name for the new custom template?",
+      "Untitled template"
+    );
+    if (!rawName) return;
+    const name = rawName.trim();
+    if (!name) return;
+    // Derive a key from the name: lowercase, underscores, must start
+    // with a letter. Append a timestamp suffix to avoid collisions.
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    const baseKey = /^[a-z]/.test(slug) ? slug : `t_${slug}`;
+    const key = `${baseKey}_${Date.now().toString(36)}`;
+
+    setCreating(true);
+    setCreateError(null);
+    try {
+      // Starter tree matching src/lib/templates/tree-ops.ts makeStarterTree
+      const starterTree = {
+        version: 1,
+        root: {
+          id: "root",
+          type: "root",
+          bg: { kind: "color", color: { kind: "hex", value: "#ffffff" } },
+          children: [
+            {
+              id: "shell",
+              type: "container",
+              maxWidth: 720,
+              padding: { top: 3, right: 1.5, bottom: 3, left: 1.5 },
+              align: "center",
+              children: [
+                {
+                  id: "title",
+                  type: "heading",
+                  level: 1,
+                  text: { kind: "bind", field: "campaign.role_title" },
+                  typography: {
+                    family: "serif",
+                    weight: 500,
+                    size: 2.25,
+                    italic: false,
+                    lineHeight: 1.15,
+                    letterSpacing: -0.01,
+                    uppercase: false,
+                    color: { kind: "brand", token: "primary" },
+                  },
+                  align: "left",
+                  maxWidth: null,
+                },
+                {
+                  id: "form",
+                  type: "form_slot",
+                  heading: "Apply for this role",
+                  subheading: null,
+                  cardStyle: "bordered",
+                },
+              ],
+            },
+          ],
+        },
+      };
+      const res = await fetch("/api/admin/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key,
+          name,
+          source: "custom",
+          block_tree: starterTree,
+        }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        setCreateError(body.error ?? "Failed to create template");
+        return;
+      }
+      router.push(`/templates/${body.data.id}/edit`);
+    } catch {
+      setCreateError("Something went wrong. Try again.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handleClone(templateId: string) {
+    setCreateError(null);
+    const res = await fetch(`/api/admin/templates/${templateId}/clone`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      setCreateError(body.error ?? "Clone failed");
+      return;
+    }
+    router.push(`/templates/${body.data.id}/edit`);
+  }
 
   const filtered = useMemo(() => {
     if (activeTab === "all") return templates;
@@ -58,24 +176,31 @@ export default function TemplatesPage() {
             Template library available to campaigns
           </p>
         </div>
-        <Link
-          href="/templates/new"
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-cobalt px-4 text-[0.8rem] font-medium text-ink transition-colors hover:bg-cobalt-deep"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
+        <div className="flex items-center gap-2">
+          <Link
+            href="/templates/new"
+            className="inline-flex h-9 items-center rounded-lg px-3 text-[0.78rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal"
           >
-            <path d="M7 2v10M2 7h10" />
-          </svg>
-          Register Template
-        </Link>
+            Register builtin
+          </Link>
+          <button
+            type="button"
+            disabled={creating}
+            onClick={() => void createCustomTemplate()}
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-cobalt px-4 text-[0.8rem] font-medium text-ink transition-colors hover:bg-cobalt-deep disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M7 2v10M2 7h10" />
+            </svg>
+            New template
+          </button>
+        </div>
       </div>
+      {createError && (
+        <div className="mb-4 rounded-lg bg-red/10 px-3 py-2 text-xs text-red">
+          {createError}
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div className="mb-4 inline-flex rounded-lg border border-border bg-canvas-2 p-1">
@@ -113,7 +238,7 @@ export default function TemplatesPage() {
                 Owner
               </th>
               <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
-                Active
+                Status
               </th>
               <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
                 Created
@@ -146,10 +271,15 @@ export default function TemplatesPage() {
                 </td>
               </tr>
             ) : (
-              filtered.map((t) => (
+              filtered.map((t) => {
+                const editable = t.source === "custom";
+                return (
                 <tr
                   key={t.id}
-                  className="group transition-colors hover:bg-cream/60"
+                  onClick={() => {
+                    if (editable) router.push(`/templates/${t.id}/edit`);
+                  }}
+                  className={`group transition-colors hover:bg-cream/60 ${editable ? "cursor-pointer" : ""}`}
                 >
                   <td className="px-5 py-3">
                     <div className="font-display text-sm font-medium text-charcoal">
@@ -181,20 +311,34 @@ export default function TemplatesPage() {
                   <td className="px-5 py-3">
                     <span className="inline-flex items-center gap-1.5 text-xs">
                       <span
-                        className={`inline-block h-1.5 w-1.5 rounded-full ${
-                          t.is_active ? "bg-green" : "bg-red"
-                        }`}
+                        className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_STYLES[t.status].dot}`}
                       />
-                      <span className="text-txt-secondary">
-                        {t.is_active ? "Active" : "Inactive"}
+                      <span className={STATUS_STYLES[t.status].text}>
+                        {STATUS_STYLES[t.status].label}
                       </span>
                     </span>
                   </td>
                   <td className="px-5 py-3 text-xs text-txt-secondary">
-                    {formatCreated(t.created_at)}
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{formatCreated(t.created_at)}</span>
+                      {editable && (
+                        <button
+                          type="button"
+                          title="Clone to new draft"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleClone(t.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity inline-flex h-6 items-center rounded px-2 text-[0.65rem] font-medium text-txt-secondary hover:bg-cream hover:text-charcoal cursor-pointer"
+                        >
+                          Clone
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

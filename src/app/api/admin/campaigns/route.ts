@@ -96,12 +96,16 @@ export async function POST(request: NextRequest) {
     });
     if (!client) return error("Client not found", 404);
 
-    // Verify template exists and is active
+    // Verify template exists and is published (only published templates
+    // can be assigned to new campaigns).
     const template = await db.query.templates.findFirst({
-      where: and(eq(templates.id, body.template_id), eq(templates.is_active, true)),
+      where: and(
+        eq(templates.id, body.template_id),
+        eq(templates.status, "published")
+      ),
       columns: { id: true },
     });
-    if (!template) return error("Template not found or inactive", 404);
+    if (!template) return error("Template not found or not published", 404);
 
     // Check slug uniqueness per client
     const existing = await db.query.campaigns.findFirst({
@@ -124,7 +128,11 @@ export async function POST(request: NextRequest) {
         template_id: body.template_id,
         gating_config: body.gating_config,
         scoring_rubric: body.scoring_rubric,
-        campaign_start: body.campaign_start ? new Date(body.campaign_start) : null,
+        campaign_start: body.campaign_start
+          ? new Date(body.campaign_start)
+          : body.status === "active"
+            ? new Date()
+            : null,
         campaign_end: body.campaign_end ? new Date(body.campaign_end) : null,
         salary_range_min: body.salary_range_min ?? null,
         salary_range_max: body.salary_range_max ?? null,

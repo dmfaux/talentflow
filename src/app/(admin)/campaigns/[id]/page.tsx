@@ -115,8 +115,9 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
     { label: "Shortlisted", value: shortlisted, color: "bg-gold/20" },
   ];
 
+  const isDev = process.env.NODE_ENV !== "production";
   const campaignUrl =
-    process.env.NEXT_PUBLIC_APP_DOMAIN
+    !isDev && process.env.NEXT_PUBLIC_APP_DOMAIN
       ? `https://${campaign.client?.slug}.${process.env.NEXT_PUBLIC_APP_DOMAIN}/${campaign.slug}`
       : `/c/${campaign.client?.slug}/${campaign.slug}`;
 
@@ -141,7 +142,13 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
           <div className="mt-2 flex items-center gap-3 text-xs text-txt-secondary">
             <span>{campaign.client?.name ?? "\u2014"}</span>
             <span className="text-txt-muted">&middot;</span>
-            <span>{campaign.campaign_start ? daysAgo(new Date(campaign.campaign_start)) : "Not started"}</span>
+            <span>
+              {campaign.status === "draft"
+                ? "Not started"
+                : campaign.campaign_start
+                  ? daysAgo(new Date(campaign.campaign_start))
+                  : "\u2014"}
+            </span>
             <span className="text-txt-muted">&middot;</span>
             <a href={campaignUrl} target="_blank" rel="noopener noreferrer" className="font-mono text-accent hover:underline">
               {campaignUrl.replace("https://", "")}

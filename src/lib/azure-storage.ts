@@ -75,6 +75,45 @@ export async function uploadCV(
   return blockBlob.url;
 }
 
+export async function uploadTemplateThumbnail(
+  templateId: string,
+  svg: Buffer
+): Promise<string | null> {
+  if (!isConfigured()) {
+    console.warn(
+      "Azure Storage not configured — thumbnail discarded for",
+      templateId
+    );
+    return null;
+  }
+
+  const container = getContainerClient();
+  // Cache-bust the path with a short hash so old URLs don't get served.
+  const hash = Date.now().toString(36);
+  const blobPath = `templates/${templateId}/thumb-${hash}.svg`;
+  const blockBlob = container.getBlockBlobClient(blobPath);
+
+  await blockBlob.uploadData(svg, {
+    blobHTTPHeaders: {
+      blobContentType: CONTENT_TYPES[".svg"],
+      blobCacheControl: "public, max-age=3600",
+    },
+  });
+
+  return blockBlob.url;
+}
+
+export async function deleteTemplateThumbnail(
+  blobUrl: string
+): Promise<void> {
+  if (!isConfigured()) return;
+  const container = getContainerClient();
+  const containerUrl = container.url.replace(/\/$/, "");
+  const blobPath = blobUrl.replace(containerUrl + "/", "");
+  const blockBlob = container.getBlockBlobClient(blobPath);
+  await blockBlob.deleteIfExists();
+}
+
 export async function uploadClientLogo(
   clientId: string,
   file: Buffer,

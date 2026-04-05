@@ -19,6 +19,7 @@ const seedTemplates = [
       "Typography-forward design with generous whitespace. Suited to senior professional roles — finance, legal, consulting.",
     thumbnail_url: "/templates/editorial.svg",
     owner_client_id: null,
+    source: "builtin",
     is_active: true,
   },
   {
@@ -28,6 +29,7 @@ const seedTemplates = [
       "Structured, formal layout with clear hierarchy and a strong hero. Suited to banking, insurance, and large enterprise.",
     thumbnail_url: "/templates/corporate.svg",
     owner_client_id: null,
+    source: "builtin",
     is_active: true,
   },
   {
@@ -37,6 +39,7 @@ const seedTemplates = [
       "Split-screen hero with geometric accents and a floating form card. Suited to tech companies, scale-ups, and product roles.",
     thumbnail_url: "/templates/modern.svg",
     owner_client_id: null,
+    source: "builtin",
     is_active: true,
   },
 ];

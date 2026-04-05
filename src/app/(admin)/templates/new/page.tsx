@@ -20,7 +20,6 @@ export default function NewTemplatePage() {
   const [description, setDescription] = useState("");
   const [ownerClientId, setOwnerClientId] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
-  const [isActive, setIsActive] = useState(true);
 
   useEffect(() => {
     fetch("/api/admin/clients")
@@ -63,7 +62,7 @@ export default function NewTemplatePage() {
           description: description.trim() || null,
           thumbnail_url: thumbnailUrl.trim() || null,
           owner_client_id: ownerClientId || null,
-          is_active: isActive,
+          source: "builtin",
         }),
       });
 
@@ -199,20 +198,10 @@ export default function NewTemplatePage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                id="is_active"
-                type="checkbox"
-                checked={isActive}
-                onChange={(e) => setIsActive(e.target.checked)}
-                className="h-4 w-4 rounded border-border text-cobalt focus:ring-cobalt/20 cursor-pointer"
-              />
-              <label
-                htmlFor="is_active"
-                className="text-sm text-charcoal cursor-pointer"
-              >
-                Active (visible in campaign gallery)
-              </label>
+            <div className="rounded-md bg-cream/40 px-3 py-2.5 text-[0.75rem] text-txt-secondary">
+              Templates are created as <strong className="font-medium text-charcoal">draft</strong>.
+              Move to <em>pending</em> to share with the client for approval, then
+              <em> published</em> to make it selectable by campaigns.
             </div>
           </div>
         </div>

@@ -69,41 +69,46 @@ export interface LogoConfig {
 }
 
 /**
- * Wrapper style for the logo badge based on its background preference.
- * "light" = white tile, "dark" = near-black tile, "transparent" = subtle
- * tinted tile so the image still reads on unfamiliar backdrops.
+ * Wrapper style for the logo. Fixed height, flexible width up to
+ * `maxWidth`, so horizontal wordmark logos render at their natural
+ * aspect ratio. Tile chrome is only applied for `dark` backgrounds —
+ * `light` and `transparent` render the image bare so the user's own
+ * logo file (which typically has its own padding) isn't surrounded by
+ * a redundant rectangle that makes the logo appear tiny.
  */
-export function logoWrapperStyle(background: LogoBg, size: number): React.CSSProperties {
+export function logoWrapperStyle(background: LogoBg, height: number, maxWidth: number): React.CSSProperties {
   const base: React.CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
-    justifyContent: "center",
-    width: `${size}px`,
-    height: `${size}px`,
-    borderRadius: "0.625rem",
-    overflow: "hidden",
+    justifyContent: "flex-start",
+    height: `${height}px`,
+    maxWidth: `${maxWidth}px`,
     flexShrink: 0,
+    boxSizing: "border-box",
   };
-  if (background === "light") {
-    return {
-      ...base,
-      backgroundColor: "#ffffff",
-      border: "1px solid rgba(11, 15, 28, 0.08)",
-      boxShadow: "0 2px 6px -2px rgba(11, 15, 28, 0.08)",
-    };
-  }
   if (background === "dark") {
     return {
       ...base,
       backgroundColor: "#0b0f1c",
-      border: "1px solid rgba(255, 255, 255, 0.08)",
+      padding: "6px 14px",
+      borderRadius: "0.5rem",
     };
   }
-  // transparent — use a very subtle tint so the image never floats alone
+  // light OR transparent: no tile chrome, logo renders bare
+  return base;
+}
+
+/**
+ * Inline style for the `<img>` inside `logoWrapperStyle`. Fills the
+ * wrapper's height and grows its width naturally (aspect-preserving).
+ */
+export function logoImageStyle(): React.CSSProperties {
   return {
-    ...base,
-    backgroundColor: "transparent",
-    border: "1px solid rgba(11, 15, 28, 0.06)",
+    height: "100%",
+    width: "auto",
+    maxWidth: "100%",
+    objectFit: "contain",
+    display: "block",
   };
 }
 

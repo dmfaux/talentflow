@@ -7,6 +7,7 @@ import {
   hexToRgba,
   initialCircleStyle,
   joinMeta,
+  logoImageStyle,
   logoWrapperStyle,
 } from "./_shared";
 
@@ -17,7 +18,8 @@ const corporate: TemplateComponent = ({ client, campaign }) => {
   const heroSubtle = heroText === "#ffffff" ? "rgba(255,255,255,0.72)" : "rgba(11,15,28,0.62)";
   const metaParts = joinMeta([campaign.department, campaign.location, campaign.employment_type]);
   const salary = formatSalary(campaign.salary_range_min, campaign.salary_range_max);
-  const logoSize = 60;
+  const logoHeight = 88;
+  const logoMaxWidth = 360;
   const alignHeader = client.logo_position === "top-centre" ? "center" : "flex-start";
 
   const benefits = [
@@ -243,18 +245,12 @@ const corporate: TemplateComponent = ({ client, campaign }) => {
           <div className="ts-corp-hero-shell">
             <div className="ts-corp-brand-row">
               {client.logo_url ? (
-                <span style={logoWrapperStyle(client.logo_background, logoSize)}>
+                <span style={logoWrapperStyle(client.logo_background, logoHeight, logoMaxWidth)}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={client.logo_url}
-                    alt={`${client.name} logo`}
-                    width={logoSize}
-                    height={logoSize}
-                    style={{ width: "100%", height: "100%", objectFit: "contain" }}
-                  />
+                  <img src={client.logo_url} alt={`${client.name} logo`} style={logoImageStyle()} />
                 </span>
               ) : (
-                <span style={initialCircleStyle(primary, logoSize)}>{firstInitial(client.name)}</span>
+                <span style={initialCircleStyle(primary, logoHeight)}>{firstInitial(client.name)}</span>
               )}
               <span className="ts-corp-client-name">{client.name}</span>
             </div>

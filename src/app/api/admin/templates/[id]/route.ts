@@ -1,7 +1,8 @@
 import { db } from "@/db";
-import { clients, templates } from "@/db/schema";
+import { campaigns, clients, templates } from "@/db/schema";
 import { error, requireApiAuth, success } from "@/lib/api";
-import { eq } from "drizzle-orm";
+import { parseBlockTree } from "@/templates/blocks/schema";
+import { eq, sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -26,7 +27,13 @@ export async function GET(
         owner_client_id: templates.owner_client_id,
         owner_client_name: clients.name,
         owner_client_slug: clients.slug,
-        is_active: templates.is_active,
+        source: templates.source,
+        status: templates.status,
+        block_tree: templates.block_tree,
+        published_block_tree: templates.published_block_tree,
+        published_at: templates.published_at,
+        preview_token: templates.preview_token,
+        preview_token_expires_at: templates.preview_token_expires_at,
         created_at: templates.created_at,
         updated_at: templates.updated_at,
       })
@@ -37,7 +44,20 @@ export async function GET(
 
     if (!row) return error("Template not found", 404);
 
-    return success(row);
+    // Blast-radius: how many live campaigns reference this template?
+    const [counts] = await db
+      .select({
+        active: sql<number>`count(*) filter (where ${campaigns.status} = 'active')`.as("active"),
+        total: sql<number>`count(*)`.as("total"),
+      })
+      .from(campaigns)
+      .where(eq(campaigns.template_id, id));
+
+    return success({
+      ...row,
+      active_campaign_count: Number(counts?.active ?? 0),
+      total_campaign_count: Number(counts?.total ?? 0),
+    });
   } catch (err) {
     console.error("GET /api/admin/templates/[id] error:", err);
     return error("Internal server error", 500);
@@ -58,14 +78,45 @@ export async function PATCH(
     if (body.key !== undefined) {
       return error("key cannot be changed after creation");
     }
+    if (body.source !== undefined) {
+      return error("source cannot be changed after creation");
+    }
+    if (body.status !== undefined) {
+      return error(
+        "status cannot be changed here — use POST /api/admin/templates/[id]/transition"
+      );
+    }
 
     const existing = await db.query.templates.findFirst({
       where: eq(templates.id, id),
-      columns: { id: true },
+      columns: { id: true, source: true, status: true },
     });
     if (!existing) return error("Template not found", 404);
 
     const updates: Record<string, unknown> = { updated_at: new Date() };
+
+    if (body.block_tree !== undefined) {
+      if (existing.source === "builtin") {
+        return error(
+          "block_tree cannot be edited on builtin templates — their layout lives in code"
+        );
+      }
+      if (existing.status !== "draft") {
+        return error(
+          `block_tree can only be edited when status='draft' (current: '${existing.status}'). Transition to draft first.`
+        );
+      }
+      if (body.block_tree === null) {
+        return error("block_tree cannot be cleared on a custom template");
+      }
+      const parsed = parseBlockTree(body.block_tree);
+      if (!parsed.ok) {
+        return error(
+          `block_tree validation failed: ${parsed.errors.join("; ")}`
+        );
+      }
+      updates.block_tree = parsed.tree;
+    }
 
     if (body.name !== undefined) {
       if (typeof body.name !== "string" || !body.name.trim()) {
@@ -113,13 +164,6 @@ export async function PATCH(
       }
     }
 
-    if (body.is_active !== undefined) {
-      if (typeof body.is_active !== "boolean") {
-        return error("is_active must be a boolean");
-      }
-      updates.is_active = body.is_active;
-    }
-
     const [row] = await db
       .update(templates)
       .set(updates)
@@ -149,9 +193,16 @@ export async function DELETE(
     });
     if (!existing) return error("Template not found", 404);
 
+    // Soft-delete → archive. Any status can transition to archived.
+    // Clears any preview token so shared links stop working.
     const [row] = await db
       .update(templates)
-      .set({ is_active: false, updated_at: new Date() })
+      .set({
+        status: "archived",
+        preview_token: null,
+        preview_token_expires_at: null,
+        updated_at: new Date(),
+      })
       .where(eq(templates.id, id))
       .returning();
 

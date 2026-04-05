@@ -5,6 +5,7 @@ import {
   formatSalary,
   initialCircleStyle,
   joinMeta,
+  logoImageStyle,
   logoWrapperStyle,
 } from "./_shared";
 
@@ -12,7 +13,8 @@ const editorial: TemplateComponent = ({ client, campaign }) => {
   const primary = client.brand_primary_color || "#0b0f1c";
   const metaParts = joinMeta([campaign.department, campaign.location, campaign.employment_type]);
   const salary = formatSalary(campaign.salary_range_min, campaign.salary_range_max);
-  const logoSize = 44;
+  const logoHeight = 72;
+  const logoMaxWidth = 320;
   const alignRight = client.logo_position === "top-centre" ? "center" : "flex-start";
 
   // Subtle grid pattern as SVG data URL (ink lines at ~4% opacity, 32px grid).
@@ -135,18 +137,12 @@ const editorial: TemplateComponent = ({ client, campaign }) => {
           <header className="ts-ed-logo-row">
             <div className="ts-ed-logo-link">
               {client.logo_url ? (
-                <span style={logoWrapperStyle(client.logo_background, logoSize)}>
+                <span style={logoWrapperStyle(client.logo_background, logoHeight, logoMaxWidth)}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={client.logo_url}
-                    alt={`${client.name} logo`}
-                    width={logoSize}
-                    height={logoSize}
-                    style={{ width: "100%", height: "100%", objectFit: "contain" }}
-                  />
+                  <img src={client.logo_url} alt={`${client.name} logo`} style={logoImageStyle()} />
                 </span>
               ) : (
-                <span style={initialCircleStyle(primary, logoSize)}>{firstInitial(client.name)}</span>
+                <span style={initialCircleStyle(primary, logoHeight)}>{firstInitial(client.name)}</span>
               )}
               <span className="ts-ed-name">{client.name}</span>
             </div>

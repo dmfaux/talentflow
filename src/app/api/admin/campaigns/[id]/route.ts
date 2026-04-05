@@ -69,11 +69,15 @@ export async function PATCH(
       if (typeof body.template_id !== "string" || !UUID_REGEX.test(body.template_id)) {
         return error("template_id must be a valid UUID");
       }
+      // Re-assigning a campaign's template: target must be published.
       const template = await db.query.templates.findFirst({
-        where: and(eq(templates.id, body.template_id), eq(templates.is_active, true)),
+        where: and(
+          eq(templates.id, body.template_id),
+          eq(templates.status, "published")
+        ),
         columns: { id: true },
       });
-      if (!template) return error("Template not found or inactive", 404);
+      if (!template) return error("Template not found or not published", 404);
     }
 
     // Validate slug if provided

@@ -9,6 +9,8 @@ import type {
   TemplateClient,
   TemplateCampaign,
 } from "@/templates/types";
+import { BlockTreeRenderer } from "@/templates/blocks/renderer";
+import { parseBlockTree } from "@/templates/blocks/schema";
 import type { GatingQuestion } from "@/lib/gating";
 
 interface Props {
@@ -38,7 +40,9 @@ async function getCampaign(clientSlug: string, campaignSlug: string) {
       brand_accent_color: clients.brand_accent_color,
       brand_text_color: clients.brand_text_color,
       template_key: templates.key,
-      template_is_active: templates.is_active,
+      template_status: templates.status,
+      template_source: templates.source,
+      template_published_block_tree: templates.published_block_tree,
     })
     .from(campaigns)
     .innerJoin(clients, eq(campaigns.client_id, clients.id))
@@ -91,25 +95,17 @@ export default async function CampaignPage({ params }: Props) {
     );
   }
 
-  if (!campaign.template_is_active) {
+  // Only templates that have ever been published can render publicly.
+  // Archived templates keep rendering their last-published snapshot for
+  // live campaigns. Draft/pending templates show "coming soon".
+  if (
+    campaign.template_status !== "published" &&
+    campaign.template_status !== "archived"
+  ) {
     return (
       <CampaignError
         title="Coming soon"
         message="This campaign page is being set up. Please check back shortly."
-      />
-    );
-  }
-
-  const TemplateComponent = getTemplate(campaign.template_key);
-
-  if (!TemplateComponent) {
-    console.error(
-      `[candidate-landing] Template component not found in registry for key: "${campaign.template_key}" (client="${clientSlug}", campaign="${campaignSlug}"). The admin API should validate keys against the registry before saving.`
-    );
-    return (
-      <CampaignError
-        title="Something went wrong"
-        message="We couldn't load this campaign page. Please try again later or contact the employer."
       />
     );
   }
@@ -138,8 +134,58 @@ export default async function CampaignPage({ params }: Props) {
     gating_config: (campaign.gating_config ?? []) as GatingQuestion[],
   };
 
-  // eslint-disable-next-line react-hooks/static-components
-  return <TemplateComponent client={clientProps} campaign={campaignProps} />;
+  if (campaign.template_source === "builtin") {
+    const TemplateComponent = getTemplate(campaign.template_key);
+    if (!TemplateComponent) {
+      console.error(
+        `[candidate-landing] Builtin template component missing from registry for key: "${campaign.template_key}" (client="${clientSlug}", campaign="${campaignSlug}").`
+      );
+      return (
+        <CampaignError
+          title="Something went wrong"
+          message="We couldn't load this campaign page. Please try again later or contact the employer."
+        />
+      );
+    }
+    // eslint-disable-next-line react-hooks/static-components
+    return <TemplateComponent client={clientProps} campaign={campaignProps} />;
+  }
+
+  // Custom (DB-stored) template → block tree. Always read from the
+  // published snapshot, never from the working copy — this is what
+  // keeps live campaigns stable while admins edit drafts.
+  const treeToRender = campaign.template_published_block_tree;
+  if (!treeToRender) {
+    console.error(
+      `[candidate-landing] Custom template has no published_block_tree (template_key="${campaign.template_key}", client="${clientSlug}", campaign="${campaignSlug}", status="${campaign.template_status}"). Transition to published should have snapshotted the tree.`
+    );
+    return (
+      <CampaignError
+        title="Coming soon"
+        message="This campaign page is being set up. Please check back shortly."
+      />
+    );
+  }
+  const parsed = parseBlockTree(treeToRender);
+  if (!parsed.ok) {
+    console.error(
+      `[candidate-landing] Custom template published_block_tree failed validation (template_key="${campaign.template_key}", client="${clientSlug}", campaign="${campaignSlug}"):`,
+      parsed.errors
+    );
+    return (
+      <CampaignError
+        title="Something went wrong"
+        message="We couldn't load this campaign page. Please try again later or contact the employer."
+      />
+    );
+  }
+  return (
+    <BlockTreeRenderer
+      tree={parsed.tree}
+      client={clientProps}
+      campaign={campaignProps}
+    />
+  );
 }
 
 function CampaignError({ title, message }: { title: string; message: string }) {
