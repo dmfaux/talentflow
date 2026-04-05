@@ -113,12 +113,69 @@ export default function NewCampaignPage() {
   const [templatesLoading, setTemplatesLoading] = useState(false);
   const [templatesError, setTemplatesError] = useState("");
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
+  const [slugStatus, setSlugStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
+  const [slugMessage, setSlugMessage] = useState("");
+  const [slugSuggestion, setSlugSuggestion] = useState("");
 
   useEffect(() => {
     fetch("/api/admin/clients")
       .then((r) => r.json())
       .then((res) => setClients(res.data ?? []));
   }, []);
+
+  // Debounced slug validation + availability check (format + uniqueness per client)
+  useEffect(() => {
+    const slug = form.slug.trim();
+    if (!slug) {
+      setSlugStatus("idle");
+      setSlugMessage("");
+      setSlugSuggestion("");
+      return;
+    }
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+      setSlugStatus("invalid");
+      setSlugMessage("Lowercase letters, numbers, and hyphens only (no leading/trailing hyphens)");
+      setSlugSuggestion("");
+      return;
+    }
+    if (!form.client_id) {
+      // Format is valid but we can't check uniqueness without a client
+      setSlugStatus("idle");
+      setSlugMessage("");
+      setSlugSuggestion("");
+      return;
+    }
+    setSlugStatus("checking");
+    setSlugMessage("");
+    setSlugSuggestion("");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      fetch(`/api/admin/campaigns/check-slug?client_id=${encodeURIComponent(form.client_id)}&slug=${encodeURIComponent(slug)}`, {
+        signal: controller.signal,
+      })
+        .then((r) => r.json())
+        .then((res) => {
+          const data = res.data ?? {};
+          if (data.available) {
+            setSlugStatus("available");
+            setSlugMessage("");
+            setSlugSuggestion("");
+          } else {
+            setSlugStatus("taken");
+            setSlugMessage(data.error || "This slug is already taken for this client");
+            setSlugSuggestion(data.suggestion || "");
+          }
+        })
+        .catch((err) => {
+          if (err.name === "AbortError") return;
+          setSlugStatus("idle");
+        });
+    }, 400);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [form.slug, form.client_id]);
 
   // Fetch templates when entering Step 3 / client changes
   useEffect(() => {
@@ -172,6 +229,8 @@ export default function NewCampaignPage() {
       if (!form.slug.trim()) errs.slug = "Slug is required";
       else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug))
         errs.slug = "Lowercase alphanumeric and hyphens only";
+      else if (slugStatus === "taken") errs.slug = slugMessage || "This slug is already taken for this client";
+      else if (slugStatus === "checking") errs.slug = "Checking slug availability…";
     }
 
     if (s === 1) {
@@ -442,7 +501,7 @@ export default function NewCampaignPage() {
               <label htmlFor="slug" className={labelClass}>
                 Campaign Slug <span className="text-red">*</span>
               </label>
-              <div className="flex items-center gap-2">
+              <div className="relative">
                 <input
                   id="slug"
                   value={form.slug}
@@ -451,12 +510,60 @@ export default function NewCampaignPage() {
                     updateForm({ slug: e.target.value });
                   }}
                   placeholder="senior-software-engineer"
-                  className={`${inputClass} ${errors.slug ? "border-red" : ""}`}
+                  className={`${inputClass} pr-9 ${
+                    errors.slug || slugStatus === "taken" || slugStatus === "invalid"
+                      ? "border-red"
+                      : slugStatus === "available"
+                        ? "border-green"
+                        : ""
+                  }`}
                 />
+                <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                  {slugStatus === "checking" && (
+                    <svg className="h-3.5 w-3.5 animate-spin text-txt-muted" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+                      <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                    </svg>
+                  )}
+                  {slugStatus === "available" && (
+                    <svg className="h-4 w-4 text-green" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M3 8.5L6.5 12L13 4" />
+                    </svg>
+                  )}
+                  {(slugStatus === "taken" || slugStatus === "invalid") && (
+                    <svg className="h-4 w-4 text-red" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                      <circle cx="8" cy="8" r="6.5" />
+                      <path d="M8 5v3.5M8 11v.01" />
+                    </svg>
+                  )}
+                </div>
               </div>
               <p className="mt-1.5 font-mono text-[0.7rem] text-txt-muted">
                 {clients.find((c) => c.id === form.client_id)?.slug || "client"}.talentstream.co.za/{form.slug || "campaign-slug"}
               </p>
+              {slugStatus === "invalid" && !errors.slug && (
+                <p className="mt-1 text-xs text-red">{slugMessage}</p>
+              )}
+              {slugStatus === "taken" && !errors.slug && (
+                <p className="mt-1 text-xs text-red">
+                  {slugMessage}
+                  {slugSuggestion && (
+                    <>
+                      {" · "}
+                      <button
+                        type="button"
+                        onClick={() => updateForm({ slug: slugSuggestion })}
+                        className="font-medium text-accent hover:underline cursor-pointer"
+                      >
+                        Use &ldquo;{slugSuggestion}&rdquo;
+                      </button>
+                    </>
+                  )}
+                </p>
+              )}
+              {slugStatus === "available" && !errors.slug && (
+                <p className="mt-1 text-xs text-green">Available</p>
+              )}
               {errors.slug && <p className="mt-1 text-xs text-red">{errors.slug}</p>}
             </div>
 
