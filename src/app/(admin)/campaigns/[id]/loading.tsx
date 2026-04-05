@@ -1,5 +1,5 @@
 function Sk({ className }: { className: string }) {
-  return <div className={`rounded-lg bg-[#F0F0EC] animate-[pulse-subtle_1.5s_ease-in-out_infinite] ${className}`} />;
+  return <div className={`rounded-lg bg-canvas-2 animate-[pulse-subtle_1.5s_ease-in-out_infinite] ${className}`} />;
 }
 
 export default function CampaignDetailLoading() {

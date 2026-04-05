@@ -42,25 +42,47 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-cream px-4 relative overflow-hidden">
-      {/* Subtle warm radial behind card */}
-      <div className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full bg-gold/[0.06] blur-[150px]" />
+    <div className="min-h-screen flex items-center justify-center bg-canvas px-4 relative overflow-hidden">
+      {/* Grid wash */}
+      <div
+        className="pointer-events-none absolute inset-0 paper-grid"
+        aria-hidden
+      />
+      {/* Radial washes */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 50% 40% at 20% 20%, rgba(28,53,240,0.06) 0%, transparent 60%), radial-gradient(ellipse 50% 40% at 80% 80%, rgba(230,57,23,0.04) 0%, transparent 60%)",
+        }}
+        aria-hidden
+      />
 
-      <div className="relative w-full max-w-[380px]">
+      <div className="relative w-full max-w-[400px]">
+        {/* Brand above card */}
+        <Link href="/" className="mb-6 flex items-center justify-center gap-2.5 group">
+          <span className="relative w-2 h-2 rounded-full bg-vermillion pulse-dot" aria-hidden />
+          <span className="font-display text-[1.45rem] text-ink tracking-[-0.02em] leading-none">
+            Talent<span className="font-display-italic text-cobalt">Stream</span>
+          </span>
+        </Link>
+
         {/* Card */}
-        <div className="rounded-2xl border border-charcoal/[0.06] bg-warm-white p-10 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_30px_rgba(0,0,0,0.04)]">
-          {/* Brand */}
-          <div className="mb-10 text-center">
-            <h1 className="font-serif text-[2rem] italic leading-none tracking-tight text-charcoal">
-              TalentStream
+        <div className="relative rounded-2xl border border-rule bg-paper p-8 sm:p-10 shadow-[0_1px_3px_rgba(11,15,28,0.04),0_12px_40px_-12px_rgba(11,15,28,0.08)]">
+          {/* Corner accent */}
+          <div className="absolute -top-[1px] -right-[1px] w-12 h-12 pointer-events-none" aria-hidden>
+            <div className="absolute top-0 right-0 w-full h-full border-t-2 border-r-2 border-vermillion rounded-tr-2xl" />
+          </div>
+
+          <div className="mb-8">
+            <p className="eyebrow text-ink-faint mb-2">Admin access</p>
+            <h1 className="font-display text-[1.75rem] text-ink tracking-[-0.02em] leading-[1.1]">
+              Welcome <span className="font-display-italic text-cobalt">back</span>.
             </h1>
-            <p className="mt-2 text-[0.7rem] font-medium uppercase tracking-[0.25em] text-muted">
-              Admin
-            </p>
           </div>
 
           {resetJustSucceeded && (
-            <div className="mb-5 rounded-lg border border-green/20 bg-green/5 px-4 py-2.5 text-[0.8rem] text-green">
+            <div className="mb-6 rounded-lg border border-moss/25 bg-moss-soft px-4 py-3 text-[0.82rem] text-moss-deep">
               Password updated. You can now sign in.
             </div>
           )}
@@ -69,7 +91,7 @@ function LoginForm() {
             <div>
               <label
                 htmlFor="email"
-                className="mb-1.5 block text-[0.7rem] font-medium uppercase tracking-[0.15em] text-muted"
+                className="eyebrow block mb-2 text-ink-faint"
               >
                 Email
               </label>
@@ -82,14 +104,14 @@ function LoginForm() {
                 required
                 autoFocus
                 autoComplete="email"
-                className="h-11 w-full rounded-lg border border-charcoal/[0.1] bg-cream/60 px-4 text-sm text-charcoal placeholder:text-charcoal/25 outline-none transition-all duration-200 focus:border-gold/60 focus:ring-1 focus:ring-gold/30"
+                className="h-12 w-full rounded-lg border border-rule bg-canvas px-4 text-[0.92rem] text-ink placeholder:text-ink-faint outline-none transition-all duration-200 focus:border-cobalt focus:ring-2 focus:ring-cobalt/20 focus:bg-paper"
               />
             </div>
 
             <div>
               <label
                 htmlFor="password"
-                className="mb-1.5 block text-[0.7rem] font-medium uppercase tracking-[0.15em] text-muted"
+                className="eyebrow block mb-2 text-ink-faint"
               >
                 Password
               </label>
@@ -101,17 +123,20 @@ function LoginForm() {
                 placeholder="••••••••"
                 required
                 autoComplete="current-password"
-                className="h-11 w-full rounded-lg border border-charcoal/[0.1] bg-cream/60 px-4 text-sm text-charcoal placeholder:text-charcoal/25 outline-none transition-all duration-200 focus:border-gold/60 focus:ring-1 focus:ring-gold/30"
+                className="h-12 w-full rounded-lg border border-rule bg-canvas px-4 text-[0.92rem] text-ink placeholder:text-ink-faint outline-none transition-all duration-200 focus:border-cobalt focus:ring-2 focus:ring-cobalt/20 focus:bg-paper"
               />
               {error && (
-                <p className="mt-2 text-[0.78rem] text-red-600">{error}</p>
+                <p className="mt-2 text-[0.8rem] text-vermillion flex items-center gap-1.5">
+                  <span className="w-1 h-1 rounded-full bg-vermillion" />
+                  {error}
+                </p>
               )}
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="relative h-11 w-full rounded-lg bg-charcoal font-medium text-sm text-cream transition-all duration-200 hover:bg-charcoal-light disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              className="relative h-12 w-full rounded-lg bg-cobalt font-medium text-[0.92rem] text-white transition-all duration-200 hover:bg-cobalt-deep disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed shadow-[0_4px_16px_-4px_rgba(28,53,240,0.3)]"
             >
               {loading ? (
                 <span className="inline-flex items-center gap-2">
@@ -134,27 +159,26 @@ function LoginForm() {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                     />
                   </svg>
-                  Signing in...
+                  Signing in…
                 </span>
               ) : (
-                "Sign in"
+                "Sign in →"
               )}
             </button>
           </form>
 
-          <div className="mt-5 text-center">
+          <div className="mt-6 text-center">
             <Link
               href="/reset-password"
-              className="text-[0.75rem] text-muted hover:text-charcoal transition-colors"
+              className="text-[0.82rem] text-ink-muted hover:text-cobalt transition-colors link-underline"
             >
               Forgot your password?
             </Link>
           </div>
         </div>
 
-        {/* Footer */}
-        <p className="mt-6 text-center text-[0.65rem] text-muted/50">
-          Secured access only
+        <p className="mt-6 text-center font-mono text-[0.68rem] text-ink-faint tracking-[0.1em] uppercase">
+          Secured access · ZA-hosted
         </p>
       </div>
     </div>

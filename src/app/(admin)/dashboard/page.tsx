@@ -221,13 +221,13 @@ function AreaChart({
         <>
           <svg width={width} height={height} className="block">
             {/* Horizontal gridlines */}
-            <line x1={0} y1={padTop} x2={width} y2={padTop} stroke="#e8e8e4" strokeWidth="1" />
-            <line x1={0} y1={padTop + plotHeight / 2} x2={width} y2={padTop + plotHeight / 2} stroke="#e8e8e4" strokeWidth="1" strokeDasharray="2 2" />
-            <line x1={0} y1={padTop + plotHeight} x2={width} y2={padTop + plotHeight} stroke="#e8e8e4" strokeWidth="1" />
+            <line x1={0} y1={padTop} x2={width} y2={padTop} stroke="#e5dfd0" strokeWidth="1" />
+            <line x1={0} y1={padTop + plotHeight / 2} x2={width} y2={padTop + plotHeight / 2} stroke="#e5dfd0" strokeWidth="1" strokeDasharray="2 2" />
+            <line x1={0} y1={padTop + plotHeight} x2={width} y2={padTop + plotHeight} stroke="#e5dfd0" strokeWidth="1" />
 
             {/* Area fill */}
             {n > 1 && (
-              <path d={areaPath} fill="#1b4332" fillOpacity="0.08" />
+              <path d={areaPath} fill="#1c35f0" fillOpacity="0.08" />
             )}
 
             {/* Line */}
@@ -235,7 +235,7 @@ function AreaChart({
               <path
                 d={linePath}
                 fill="none"
-                stroke="#1b4332"
+                stroke="#1c35f0"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -250,7 +250,7 @@ function AreaChart({
                 cy={points[i].y}
                 r="3"
                 fill="#ffffff"
-                stroke="#1b4332"
+                stroke="#1c35f0"
                 strokeWidth="1.5"
               />
             ))}
@@ -546,34 +546,34 @@ export default function DashboardPage() {
               {
                 label: "Shortlisted",
                 value: data.status_breakdown.find((s) => s.status === "shortlisted")?.count ?? 0,
-                color: "#16a34a",
+                color: "#067340",
               },
               {
                 label: "Follow-up",
                 value: data.status_breakdown.find((s) => s.status === "follow_up")?.count ?? 0,
-                color: "#d4a843",
+                color: "#d68a0b",
               },
               {
                 label: "Scored",
                 value: data.status_breakdown.find((s) => s.status === "scored")?.count ?? 0,
-                color: "#1b4332",
+                color: "#1c35f0",
               },
               {
                 label: "Awaiting scoring",
                 value:
                   (data.status_breakdown.find((s) => s.status === "gating_passed")?.count ?? 0) +
                   (data.status_breakdown.find((s) => s.status === "scoring")?.count ?? 0),
-                color: "#2d6a4f",
+                color: "#7a87ff",
               },
               {
                 label: "Rejected",
                 value: data.status_breakdown.find((s) => s.status === "rejected")?.count ?? 0,
-                color: "#dc2626",
+                color: "#e63917",
               },
               {
                 label: "Gating failed",
                 value: data.status_breakdown.find((s) => s.status === "gating_failed")?.count ?? 0,
-                color: "#999999",
+                color: "#8e96ad",
               },
             ]}
           />

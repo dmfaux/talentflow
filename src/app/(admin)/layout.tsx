@@ -9,14 +9,15 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-cream font-sans">
+    <div className="min-h-screen bg-canvas font-sans">
       {/* Top bar */}
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-surface/80 px-6 backdrop-blur-sm">
-        <Link href="/dashboard" className="flex items-baseline gap-2">
-          <span className="font-serif text-xl italic text-charcoal">
-            TalentStream
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-rule bg-paper/85 px-6 backdrop-blur-md">
+        <Link href="/dashboard" className="flex items-center gap-2.5 group">
+          <span className="relative w-1.5 h-1.5 rounded-full bg-vermillion pulse-dot" aria-hidden />
+          <span className="font-display text-[1.15rem] text-ink tracking-[-0.02em] leading-none">
+            Talent<span className="font-display-italic text-cobalt">Stream</span>
           </span>
-          <span className="text-[0.6rem] font-medium uppercase tracking-[0.2em] text-txt-muted">
+          <span className="ml-1 eyebrow text-[0.58rem] text-ink-faint">
             Admin
           </span>
         </Link>

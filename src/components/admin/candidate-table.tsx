@@ -53,9 +53,9 @@ function initialsColor(name: string): string {
     "bg-green-light text-green",
     "bg-warning-light text-warning",
     "bg-red-light text-red",
-    "bg-[#dbeafe] text-[#2563eb]",
-    "bg-[#f3e8ff] text-[#7c3aed]",
-    "bg-[#fce7f3] text-[#db2777]",
+    "bg-cobalt-tint text-cobalt",
+    "bg-vermillion-soft text-vermillion",
+    "bg-moss-soft text-moss",
   ];
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);

@@ -58,7 +58,7 @@ export function AdminSidebar() {
   }
 
   return (
-    <aside className="sticky top-14 flex h-[calc(100vh-3.5rem)] w-52 flex-col border-r border-border bg-surface">
+    <aside className="sticky top-14 flex h-[calc(100vh-3.5rem)] w-52 flex-col border-r border-rule bg-paper">
       <nav className="flex-1 px-3 pt-4">
         <ul className="space-y-0.5">
           {NAV_ITEMS.map((item) => {
@@ -67,16 +67,19 @@ export function AdminSidebar() {
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-[0.8rem] font-medium transition-colors ${
+                  className={`relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[0.8rem] font-medium transition-colors ${
                     active
-                      ? "bg-accent text-white"
-                      : "text-txt-secondary hover:bg-cream hover:text-charcoal"
+                      ? "bg-cobalt text-white shadow-[0_4px_12px_-4px_rgba(28,53,240,0.35)]"
+                      : "text-ink-muted hover:bg-canvas hover:text-ink"
                   }`}
                 >
-                  <span className={active ? "text-gold" : "text-txt-muted"}>
+                  <span className={active ? "text-white/90" : "text-ink-faint"}>
                     {ICONS[item.icon]}
                   </span>
                   {item.label}
+                  {active && (
+                    <span className="absolute right-3 w-1 h-1 rounded-full bg-vermillion" aria-hidden />
+                  )}
                 </Link>
               </li>
             );
@@ -84,10 +87,10 @@ export function AdminSidebar() {
         </ul>
       </nav>
 
-      <div className="border-t border-border p-3">
+      <div className="border-t border-rule p-3">
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[0.8rem] font-medium text-txt-muted transition-colors hover:bg-red-light hover:text-red cursor-pointer"
+          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-[0.8rem] font-medium text-ink-faint transition-colors hover:bg-vermillion-soft hover:text-vermillion cursor-pointer"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M6 2H4a2 2 0 00-2 2v8a2 2 0 002 2h2M10.5 11.5L14 8l-3.5-3.5M14 8H6" />

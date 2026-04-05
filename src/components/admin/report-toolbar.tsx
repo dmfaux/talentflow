@@ -26,7 +26,7 @@ export function ReportToolbar() {
       >
         {copied ? (
           <>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#16a34a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7.5L6 10l5-6" /></svg>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#067340" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7.5L6 10l5-6" /></svg>
             Copied
           </>
         ) : (

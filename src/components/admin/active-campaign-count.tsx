@@ -13,10 +13,10 @@ export function ActiveCampaignCount() {
   }, []);
 
   return (
-    <div className="flex items-center gap-2 text-xs text-txt-secondary">
-      <span className="inline-block h-1.5 w-1.5 rounded-full bg-green" />
-      <span className="font-mono">
-        {count === null ? "..." : `${count} active campaign${count !== 1 ? "s" : ""}`}
+    <div className="flex items-center gap-2 text-[0.72rem] text-ink-muted">
+      <span className="inline-block h-1.5 w-1.5 rounded-full bg-moss pulse-dot" />
+      <span className="font-mono tracking-tight">
+        {count === null ? "…" : `${count} active campaign${count !== 1 ? "s" : ""}`}
       </span>
     </div>
   );
