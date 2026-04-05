@@ -56,7 +56,7 @@ export async function handleDataAccessRequest(email: string) {
     with: {
       campaign: {
         columns: { role_title: true, slug: true },
-        with: { client: { columns: { name: true } } },
+        with: { client: { columns: { name: true, slug: true } } },
       },
       messages: {
         columns: { channel: true, direction: true, content: true, created_at: true },
@@ -74,6 +74,7 @@ export async function handleDataAccessRequest(email: string) {
         role_title: r.campaign.role_title,
         slug: r.campaign.slug,
         client_name: r.campaign.client?.name ?? null,
+        client_slug: r.campaign.client?.slug ?? null,
       },
       personal_data: {
         name: r.name,

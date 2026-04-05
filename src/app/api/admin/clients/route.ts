@@ -1,7 +1,8 @@
 import { db } from "@/db";
 import { clients } from "@/db/schema";
 import { error, requireApiAuth, success } from "@/lib/api";
-import { asc } from "drizzle-orm";
+import { slugify, validateSlug } from "@/lib/slug";
+import { asc, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
 export async function GET() {
@@ -31,9 +32,20 @@ export async function POST(request: NextRequest) {
       return error("name is required");
     }
 
+    const slug = body.slug ? String(body.slug).trim() : slugify(body.name);
+    const slugCheck = validateSlug(slug);
+    if (!slugCheck.valid) return error(slugCheck.error!);
+
+    const slugTaken = await db.query.clients.findFirst({
+      where: eq(clients.slug, slug),
+      columns: { id: true },
+    });
+    if (slugTaken) return error("This slug is already taken");
+
     const [row] = await db
       .insert(clients)
       .values({
+        slug,
         name: body.name.trim(),
         contact_name: body.contact_name ?? null,
         contact_email: body.contact_email ?? null,

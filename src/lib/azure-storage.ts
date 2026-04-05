@@ -46,6 +46,7 @@ function getExtension(filename: string): string {
 }
 
 export async function uploadCV(
+  clientSlug: string,
   campaignSlug: string,
   candidateId: string,
   file: Buffer,
@@ -58,7 +59,7 @@ export async function uploadCV(
 
   const container = getContainerClient();
   const ext = getExtension(filename);
-  const blobPath = `cvs/${campaignSlug}/${candidateId}/${filename}`;
+  const blobPath = `cvs/${clientSlug}/${campaignSlug}/${candidateId}/${filename}`;
   const blockBlob = container.getBlockBlobClient(blobPath);
 
   await blockBlob.uploadData(file, {

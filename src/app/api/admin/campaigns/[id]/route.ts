@@ -1,7 +1,8 @@
 import { db } from "@/db";
 import { campaigns, candidates } from "@/db/schema";
 import { error, requireApiAuth, success } from "@/lib/api";
-import { eq, sql } from "drizzle-orm";
+import { validateSlug } from "@/lib/slug";
+import { and, eq, sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
 export async function GET(
@@ -57,22 +58,26 @@ export async function PATCH(
     // Check campaign exists
     const existing = await db.query.campaigns.findFirst({
       where: eq(campaigns.id, id),
-      columns: { id: true, status: true },
+      columns: { id: true, slug: true, status: true, client_id: true, html_template: true },
     });
     if (!existing) return error("Campaign not found", 404);
 
     // Validate slug if provided
     if (body.slug !== undefined) {
-      const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-      if (!slugRegex.test(body.slug)) {
-        return error("slug must be lowercase alphanumeric with hyphens only");
+      // Block slug change if template exists
+      if (existing.html_template && body.slug !== existing.slug) {
+        return error("Cannot change slug after an HTML template has been set. Clear the template first.");
       }
+
+      const slugCheck = validateSlug(body.slug);
+      if (!slugCheck.valid) return error(slugCheck.error!);
+
       const slugTaken = await db.query.campaigns.findFirst({
-        where: eq(campaigns.slug, body.slug),
+        where: and(eq(campaigns.client_id, existing.client_id), eq(campaigns.slug, body.slug)),
         columns: { id: true },
       });
       if (slugTaken && slugTaken.id !== id) {
-        return error("slug is already taken");
+        return error("slug is already taken for this client");
       }
     }
 

@@ -2,13 +2,12 @@ import { Metadata } from "next";
 import { db } from "@/db";
 import { campaigns, clients } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { notFound } from "next/navigation";
 
 interface Props {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ clientSlug: string; campaignSlug: string }>;
 }
 
-async function getCampaign(slug: string) {
+async function getCampaign(clientSlug: string, campaignSlug: string) {
   const [row] = await db
     .select({
       id: campaigns.id,
@@ -20,16 +19,16 @@ async function getCampaign(slug: string) {
       client_name: clients.name,
     })
     .from(campaigns)
-    .leftJoin(clients, eq(campaigns.client_id, clients.id))
-    .where(eq(campaigns.slug, slug))
+    .innerJoin(clients, eq(campaigns.client_id, clients.id))
+    .where(and(eq(clients.slug, clientSlug), eq(campaigns.slug, campaignSlug)))
     .limit(1);
 
   return row ?? null;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params;
-  const campaign = await getCampaign(slug);
+  const { clientSlug, campaignSlug } = await params;
+  const campaign = await getCampaign(clientSlug, campaignSlug);
 
   if (!campaign || campaign.status !== "active") {
     return { title: "Campaign Not Available" };
@@ -48,8 +47,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function CampaignPage({ params }: Props) {
-  const { slug } = await params;
-  const campaign = await getCampaign(slug);
+  const { clientSlug, campaignSlug } = await params;
+  const campaign = await getCampaign(clientSlug, campaignSlug);
 
   if (!campaign) {
     return <CampaignError title="Campaign not found" message="The campaign you're looking for doesn't exist. Please check the URL or contact the employer for the correct link." />;

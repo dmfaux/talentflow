@@ -8,25 +8,31 @@ import {
   real,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
 // ── Clients ──────────────────────────────────────────────────────────
 
-export const clients = pgTable("clients", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
-  contact_name: text("contact_name"),
+export const clients = pgTable(
+  "clients",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: text("slug").notNull().unique(),
+    name: text("name").notNull(),
+    contact_name: text("contact_name"),
   contact_email: text("contact_email"),
   contact_phone: text("contact_phone"),
   billing_email: text("billing_email"),
   branding_logo_url: text("branding_logo_url"),
   notes: text("notes"),
-  is_active: boolean("is_active").default(true),
-  created_at: timestamp("created_at").defaultNow().notNull(),
-  updated_at: timestamp("updated_at").defaultNow().notNull(),
-});
+    is_active: boolean("is_active").default(true),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("clients_slug_idx").on(table.slug)]
+);
 
 // ── Campaigns ────────────────────────────────────────────────────────
 
@@ -37,7 +43,7 @@ export const campaigns = pgTable(
     client_id: uuid("client_id")
       .notNull()
       .references(() => clients.id),
-    slug: text("slug").notNull().unique(),
+    slug: text("slug").notNull(),
     role_title: text("role_title").notNull(),
     role_description: text("role_description"),
     department: text("department"),
@@ -55,6 +61,7 @@ export const campaigns = pgTable(
     updated_at: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
+    unique("campaigns_client_id_slug_unique").on(table.client_id, table.slug),
     index("campaigns_client_id_idx").on(table.client_id),
     index("campaigns_status_idx").on(table.status),
   ]

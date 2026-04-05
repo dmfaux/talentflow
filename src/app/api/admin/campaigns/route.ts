@@ -1,10 +1,9 @@
 import { db } from "@/db";
 import { campaigns, clients } from "@/db/schema";
 import { error, requireApiAuth, success } from "@/lib/api";
+import { validateSlug } from "@/lib/slug";
 import { and, desc, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
-
-const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export async function GET(request: NextRequest) {
   const authError = await requireApiAuth();
@@ -24,6 +23,7 @@ export async function GET(request: NextRequest) {
         id: campaigns.id,
         client_id: campaigns.client_id,
         client_name: clients.name,
+        client_slug: clients.slug,
         slug: campaigns.slug,
         role_title: campaigns.role_title,
         department: campaigns.department,
@@ -64,9 +64,8 @@ export async function POST(request: NextRequest) {
     if (body.scoring_rubric === undefined) return error("scoring_rubric is required");
 
     // Slug validation
-    if (!SLUG_REGEX.test(body.slug)) {
-      return error("slug must be lowercase alphanumeric with hyphens only");
-    }
+    const slugCheck = validateSlug(body.slug);
+    if (!slugCheck.valid) return error(slugCheck.error!);
 
     // gating_config must be an array
     if (!Array.isArray(body.gating_config)) {
@@ -89,12 +88,12 @@ export async function POST(request: NextRequest) {
     });
     if (!client) return error("Client not found", 404);
 
-    // Check slug uniqueness
+    // Check slug uniqueness per client
     const existing = await db.query.campaigns.findFirst({
-      where: eq(campaigns.slug, body.slug),
+      where: and(eq(campaigns.client_id, body.client_id), eq(campaigns.slug, body.slug)),
       columns: { id: true },
     });
-    if (existing) return error("slug is already taken");
+    if (existing) return error("slug is already taken for this client");
 
     const [row] = await db
       .insert(campaigns)

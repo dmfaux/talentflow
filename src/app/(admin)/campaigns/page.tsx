@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 interface Campaign {
   id: string;
   client_name: string | null;
+  client_slug: string | null;
   slug: string;
   role_title: string;
   department: string | null;
@@ -158,7 +159,7 @@ export default function CampaignsPage() {
                     {daysRemaining(campaign.campaign_end)}
                   </span>
                   <span className="font-mono text-[0.65rem] text-txt-muted">
-                    {campaign.slug}
+                    {campaign.client_slug}/{campaign.slug}
                   </span>
                 </div>
               </div>

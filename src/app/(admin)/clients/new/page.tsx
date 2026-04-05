@@ -4,11 +4,37 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
+function slugify(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
 export default function NewClientPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [slug, setSlug] = useState("");
+  const [slugManual, setSlugManual] = useState(false);
+  const [slugChecking, setSlugChecking] = useState(false);
+
+  function handleNameChange(value: string) {
+    if (!slugManual) setSlug(slugify(value));
+  }
+
+  async function checkSlug(value: string) {
+    if (!value || value.length < 2) return;
+    setSlugChecking(true);
+    setFieldErrors((prev) => ({ ...prev, slug: "" }));
+    try {
+      const res = await fetch(`/api/admin/clients/check-slug?slug=${encodeURIComponent(value)}`);
+      const { data } = await res.json();
+      if (!data.available) {
+        setFieldErrors((prev) => ({ ...prev, slug: data.error || "This slug is already taken" }));
+      }
+    } finally {
+      setSlugChecking(false);
+    }
+  }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -22,6 +48,10 @@ export default function NewClientPage() {
       setFieldErrors({ name: "Client name is required" });
       return;
     }
+    if (!slug) {
+      setFieldErrors({ slug: "Subdomain slug is required" });
+      return;
+    }
 
     setLoading(true);
     try {
@@ -30,6 +60,7 @@ export default function NewClientPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
+          slug,
           contact_name: (form.get("contact_name") as string) || null,
           contact_email: (form.get("contact_email") as string) || null,
           contact_phone: (form.get("contact_phone") as string) || null,
@@ -92,10 +123,33 @@ export default function NewClientPage() {
               required
               autoFocus
               placeholder="Acme Corp"
+              onChange={(e) => handleNameChange(e.target.value)}
               className={`${inputClass} ${fieldErrors.name ? "border-red focus:border-red focus:ring-red/20" : ""}`}
             />
             {fieldErrors.name && (
               <p className="mt-1 text-xs text-red">{fieldErrors.name}</p>
+            )}
+          </div>
+
+          {/* Slug */}
+          <div>
+            <label htmlFor="slug" className={labelClass}>
+              Subdomain <span className="text-red">*</span>
+            </label>
+            <input
+              id="slug"
+              value={slug}
+              onChange={(e) => { setSlugManual(true); setSlug(e.target.value); }}
+              onBlur={(e) => checkSlug(e.target.value)}
+              placeholder="acme-corp"
+              className={`${inputClass} ${fieldErrors.slug ? "border-red focus:border-red focus:ring-red/20" : ""}`}
+            />
+            <p className="mt-1.5 font-mono text-[0.7rem] text-txt-muted">
+              {slug || "slug"}.talentstream.co.za
+              {slugChecking && <span className="ml-2 text-txt-muted">checking...</span>}
+            </p>
+            {fieldErrors.slug && (
+              <p className="mt-1 text-xs text-red">{fieldErrors.slug}</p>
             )}
           </div>
 

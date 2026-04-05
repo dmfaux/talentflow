@@ -22,12 +22,12 @@ function json(body: unknown, status = 200) {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: Promise<{ clientSlug: string; campaignSlug: string }> }
 ) {
   try {
-    const { slug } = await params;
+    const { clientSlug, campaignSlug } = await params;
 
-    // Look up campaign with client
+    // Look up campaign via client slug + campaign slug
     const [campaign] = await db
       .select({
         id: campaigns.id,
@@ -37,8 +37,8 @@ export async function POST(
         client_name: clients.name,
       })
       .from(campaigns)
-      .leftJoin(clients, eq(campaigns.client_id, clients.id))
-      .where(eq(campaigns.slug, slug))
+      .innerJoin(clients, eq(campaigns.client_id, clients.id))
+      .where(and(eq(clients.slug, clientSlug), eq(campaigns.slug, campaignSlug)))
       .limit(1);
 
     if (!campaign || campaign.status !== "active") {
@@ -65,28 +65,18 @@ export async function POST(
       popiaConsent = formData.get("popia_consent") === "true" || formData.get("popia_consent") === "on";
       source = (formData.get("source") as string) || undefined;
 
-      // Parse answers from JSON string or individual fields
       const answersRaw = formData.get("answers");
       if (answersRaw && typeof answersRaw === "string") {
-        try {
-          answers = JSON.parse(answersRaw);
-        } catch {
-          // Fall through to field-by-field parsing
-        }
+        try { answers = JSON.parse(answersRaw); } catch { /* field-by-field fallback */ }
       }
       if (Object.keys(answers).length === 0) {
         for (const [key, value] of formData.entries()) {
-          if (key.startsWith("answer_")) {
-            answers[key.replace("answer_", "")] = value as string;
-          }
+          if (key.startsWith("answer_")) answers[key.replace("answer_", "")] = value as string;
         }
       }
 
-      // CV file (optional)
       const file = formData.get("cv");
-      if (file && file instanceof File && file.size > 0) {
-        cvFile = file;
-      }
+      if (file && file instanceof File && file.size > 0) cvFile = file;
     } else {
       const body = await request.json();
       name = body.name;
@@ -96,66 +86,37 @@ export async function POST(
       popiaConsent = !!body.popia_consent;
       answers = body.answers ?? {};
       source = body.source || undefined;
-      // JSON submissions cannot include files — CV can be uploaded separately
     }
 
     // Validation
-    if (!name || typeof name !== "string" || !name.trim()) {
-      return json({ error: "Name is required" }, 400);
-    }
-    if (!email || typeof email !== "string" || !EMAIL_RE.test(email.trim())) {
-      return json({ error: "A valid email address is required" }, 400);
-    }
-    if (!popiaConsent) {
-      return json({ error: "POPIA consent is required to process your application" }, 400);
-    }
+    if (!name || typeof name !== "string" || !name.trim()) return json({ error: "Name is required" }, 400);
+    if (!email || typeof email !== "string" || !EMAIL_RE.test(email.trim())) return json({ error: "A valid email address is required" }, 400);
+    if (!popiaConsent) return json({ error: "POPIA consent is required to process your application" }, 400);
 
-    // Validate CV if provided
     if (cvFile) {
-      if (cvFile.size > MAX_CV_SIZE) {
-        return json({ error: "CV file must be under 10MB" }, 400);
-      }
-      const ext = cvFile.name.lastIndexOf(".") >= 0
-        ? cvFile.name.slice(cvFile.name.lastIndexOf(".")).toLowerCase()
-        : "";
-      if (!ALLOWED_CV_EXTENSIONS.includes(ext)) {
-        return json({ error: "CV must be a PDF, DOC, or DOCX file" }, 400);
-      }
+      if (cvFile.size > MAX_CV_SIZE) return json({ error: "CV file must be under 10MB" }, 400);
+      const ext = cvFile.name.lastIndexOf(".") >= 0 ? cvFile.name.slice(cvFile.name.lastIndexOf(".")).toLowerCase() : "";
+      if (!ALLOWED_CV_EXTENSIONS.includes(ext)) return json({ error: "CV must be a PDF, DOC, or DOCX file" }, 400);
     }
 
     const trimmedEmail = email.trim().toLowerCase();
 
-    // Check for source from utm_source in referer if not already set
     if (!source) {
       const referer = request.headers.get("referer");
       if (referer) {
-        try {
-          const refUrl = new URL(referer);
-          source = refUrl.searchParams.get("utm_source") ?? undefined;
-        } catch {
-          // ignore malformed referer
-        }
+        try { source = new URL(referer).searchParams.get("utm_source") ?? undefined; } catch { /* ignore */ }
       }
     }
 
-    // Check duplicate
     const existing = await db.query.candidates.findFirst({
-      where: and(
-        eq(candidates.campaign_id, campaign.id),
-        eq(candidates.email, trimmedEmail)
-      ),
+      where: and(eq(candidates.campaign_id, campaign.id), eq(candidates.email, trimmedEmail)),
       columns: { id: true },
     });
+    if (existing) return json({ error: "You have already applied for this role" }, 409);
 
-    if (existing) {
-      return json({ error: "You have already applied for this role" }, 409);
-    }
-
-    // Evaluate gating
     const gatingConfig = campaign.gating_config as GatingQuestion[];
     const gatingPassed = evaluateGating(answers, gatingConfig);
 
-    // Create candidate
     const now = new Date();
     const purgeAt = new Date(now);
     purgeAt.setMonth(purgeAt.getMonth() + 12);
@@ -179,63 +140,26 @@ export async function POST(
     const clientName = campaign.client_name ?? "the company";
     const candidateId = newCandidate.id;
 
-    // Upload CV if provided and gating passed
     if (cvFile && gatingPassed) {
       const buffer = Buffer.from(await cvFile.arrayBuffer());
-      const blobUrl = await uploadCV(slug, candidateId, buffer, cvFile.name);
-
+      const blobUrl = await uploadCV(clientSlug, campaignSlug, candidateId, buffer, cvFile.name);
       if (blobUrl) {
-        await db
-          .update(candidates)
-          .set({ cv_url: blobUrl, updated_at: new Date() })
-          .where(eq(candidates.id, candidateId));
-
-        // Fire-and-forget: extract text and score
-        processNewCandidate(candidateId).catch((err) =>
-          console.error("Background processing failed:", err)
-        );
+        await db.update(candidates).set({ cv_url: blobUrl, updated_at: new Date() }).where(eq(candidates.id, candidateId));
+        processNewCandidate(candidateId).catch((err) => console.error("Background processing failed:", err));
       }
     }
 
-    // Fire-and-forget emails
-    sendCandidateEmail(
-      trimmedEmail,
-      `Application received — ${roleTitle}`,
-      applicationReceivedEmail(candidateName, roleTitle, clientName),
-      candidateId
-    ).catch((err) => console.error("Email send failed:", err));
+    sendCandidateEmail(trimmedEmail, `Application received — ${roleTitle}`, applicationReceivedEmail(candidateName, roleTitle, clientName), candidateId).catch((err) => console.error("Email send failed:", err));
 
     if (gatingPassed) {
-      sendCandidateEmail(
-        trimmedEmail,
-        `Good news — ${roleTitle}`,
-        gatingPassedEmail(candidateName, roleTitle, clientName),
-        candidateId
-      ).catch((err) => console.error("Email send failed:", err));
-
-      return json({
-        success: true,
-        passed: true,
-        candidate_id: candidateId,
-        message: "Thank you for applying! Your application has been received and will be reviewed shortly.",
-      }, 201);
+      sendCandidateEmail(trimmedEmail, `Good news — ${roleTitle}`, gatingPassedEmail(candidateName, roleTitle, clientName), candidateId).catch((err) => console.error("Email send failed:", err));
+      return json({ success: true, passed: true, candidate_id: candidateId, message: "Thank you for applying! Your application has been received and will be reviewed shortly." }, 201);
     }
 
-    sendCandidateEmail(
-      trimmedEmail,
-      `Application update — ${roleTitle}`,
-      gatingFailedEmail(candidateName, roleTitle, clientName),
-      candidateId
-    ).catch((err) => console.error("Email send failed:", err));
-
-    return json({
-      success: true,
-      passed: false,
-      candidate_id: candidateId,
-      message: "Thank you for your interest. Unfortunately, your profile does not meet the minimum requirements for this role at this time.",
-    }, 201);
+    sendCandidateEmail(trimmedEmail, `Application update — ${roleTitle}`, gatingFailedEmail(candidateName, roleTitle, clientName), candidateId).catch((err) => console.error("Email send failed:", err));
+    return json({ success: true, passed: false, candidate_id: candidateId, message: "Thank you for your interest. Unfortunately, your profile does not meet the minimum requirements for this role at this time." }, 201);
   } catch (err) {
-    console.error("POST /api/apply/[slug] error:", err);
+    console.error("POST /api/apply error:", err);
     return json({ error: "Internal server error" }, 500);
   }
 }

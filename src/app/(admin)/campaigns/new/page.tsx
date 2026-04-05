@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 
 interface Client {
   id: string;
+  slug: string;
   name: string;
 }
 
@@ -240,8 +241,10 @@ export default function NewCampaignPage() {
   // ── AI Prompt builder ─────────────────────────────────────────────
 
   function buildLandingPagePrompt(): string {
-    const slug = form.slug || "{slug}";
-    const clientName = clients.find((c) => c.id === form.client_id)?.name ?? "{Client Name}";
+    const slug = form.slug || "{campaignSlug}";
+    const selectedClient = clients.find((c) => c.id === form.client_id);
+    const clientSlug = selectedClient?.slug || "{clientSlug}";
+    const clientName = selectedClient?.name ?? "{Client Name}";
     const questionsBlock = form.gating_config
       .map((q, i) => {
         const optionsList = q.options
@@ -264,7 +267,7 @@ ${form.salary_range_min || form.salary_range_max ? `- **Salary Range:** R${form.
 
 ## Form Requirements
 The page must contain an application form that POSTs to:
-\`/api/apply/${slug}\`
+\`/api/apply/${clientSlug}/${slug}\`
 
 The form must submit as **multipart/form-data** using JavaScript (FormData object with fetch). This is because the form includes an optional CV file upload. On success, show a thank-you message inline. On error, show the error message from the JSON response.
 
@@ -295,7 +298,7 @@ ${form.gating_config.map((q) => `formData.append("answer_${q.id}", selectedValue
 // Append CV file if selected:
 if (cvInput.files[0]) formData.append("cv", cvInput.files[0]);
 
-const res = await fetch("/api/apply/${slug}", { method: "POST", body: formData });
+const res = await fetch("/api/apply/${clientSlug}/${slug}", { method: "POST", body: formData });
 const data = await res.json();
 \`\`\`
 
@@ -509,7 +512,7 @@ For all error states, keep the form visible so the candidate can correct and ret
 
             <div>
               <label htmlFor="slug" className={labelClass}>
-                Subdomain Slug <span className="text-red">*</span>
+                Campaign Slug <span className="text-red">*</span>
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -524,7 +527,7 @@ For all error states, keep the form visible so the candidate can correct and ret
                 />
               </div>
               <p className="mt-1.5 font-mono text-[0.7rem] text-txt-muted">
-                {form.slug || "slug"}.talentstream.co.za
+                {clients.find((c) => c.id === form.client_id)?.slug || "client"}.talentstream.co.za/{form.slug || "campaign-slug"}
               </p>
               {errors.slug && <p className="mt-1 text-xs text-red">{errors.slug}</p>}
             </div>
@@ -774,7 +777,7 @@ For all error states, keep the form visible so the candidate can correct and ret
             <div className="flex items-center gap-2 rounded-lg bg-cream px-4 py-2.5">
               <span className="text-[0.7rem] text-txt-muted">Form endpoint:</span>
               <code className="font-mono text-[0.72rem] font-medium text-accent">
-                /api/apply/{form.slug || "{slug}"}
+                /api/apply/{clients.find((c) => c.id === form.client_id)?.slug || "{clientSlug}"}/{form.slug || "{campaignSlug}"}
               </code>
             </div>
 

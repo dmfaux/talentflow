@@ -117,8 +117,8 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
 
   const campaignUrl =
     process.env.NEXT_PUBLIC_APP_DOMAIN
-      ? `https://${campaign.slug}.${process.env.NEXT_PUBLIC_APP_DOMAIN}`
-      : `/c/${campaign.slug}`;
+      ? `https://${campaign.client?.slug}.${process.env.NEXT_PUBLIC_APP_DOMAIN}/${campaign.slug}`
+      : `/c/${campaign.client?.slug}/${campaign.slug}`;
 
   return (
     <div>
