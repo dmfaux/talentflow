@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { PromptModal } from "@/components/admin/template-editor/modal";
 
 type TemplateStatus = "draft" | "pending" | "published" | "archived";
 
@@ -48,6 +49,7 @@ export default function TemplatesPage() {
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [promptOpen, setPromptOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/templates")
@@ -56,14 +58,7 @@ export default function TemplatesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function createCustomTemplate() {
-    const rawName = window.prompt(
-      "Name for the new custom template?",
-      "Untitled template"
-    );
-    if (!rawName) return;
-    const name = rawName.trim();
-    if (!name) return;
+  async function createCustomTemplate(name: string) {
     // Derive a key from the name: lowercase, underscores, must start
     // with a letter. Append a timestamp suffix to avoid collisions.
     const slug = name
@@ -136,6 +131,7 @@ export default function TemplatesPage() {
         setCreateError(body.error ?? "Failed to create template");
         return;
       }
+      setPromptOpen(false);
       router.push(`/templates/${body.data.id}/edit`);
     } catch {
       setCreateError("Something went wrong. Try again.");
@@ -186,7 +182,10 @@ export default function TemplatesPage() {
           <button
             type="button"
             disabled={creating}
-            onClick={() => void createCustomTemplate()}
+            onClick={() => {
+              setCreateError(null);
+              setPromptOpen(true);
+            }}
             className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-cobalt px-4 text-[0.8rem] font-medium text-ink transition-colors hover:bg-cobalt-deep disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -343,6 +342,20 @@ export default function TemplatesPage() {
           </tbody>
         </table>
       </div>
+
+      <PromptModal
+        open={promptOpen}
+        onClose={() => {
+          if (!creating) setPromptOpen(false);
+        }}
+        onSubmit={(name) => void createCustomTemplate(name)}
+        title="New custom template"
+        label="Template name"
+        placeholder="Untitled template"
+        defaultValue="Untitled template"
+        confirmLabel="Create"
+        busy={creating}
+      />
     </div>
   );
 }
