@@ -16,6 +16,31 @@ const FROM =
 
 // ── Send email ───────────────────────────────────────────────────────
 
+export async function sendTransactionalEmail(
+  to: string,
+  subject: string,
+  htmlBody: string
+): Promise<string | null> {
+  try {
+    const { data, error } = await getClient().emails.send({
+      from: FROM,
+      to,
+      subject,
+      html: htmlBody,
+    });
+
+    if (error) {
+      console.error("sendTransactionalEmail error:", error);
+      return null;
+    }
+
+    return data?.id ?? null;
+  } catch (err) {
+    console.error("sendTransactionalEmail exception:", err);
+    return null;
+  }
+}
+
 export async function sendCandidateEmail(
   to: string,
   subject: string,
@@ -113,6 +138,31 @@ export function gatingPassedEmail(
     </p>
     <p style="margin:0;font-size:15px;color:#666;line-height:1.6;">
       We'll be in touch with the outcome shortly. Thank you for your patience.
+    </p>
+  `);
+}
+
+export function passwordResetEmail(
+  firstName: string,
+  resetUrl: string
+): string {
+  return wrapTemplate(`
+    <h2 style="margin:0 0 16px;font-size:20px;color:#1B4332;font-weight:normal;font-style:italic;">
+      Reset your password
+    </h2>
+    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
+      Hi ${firstName},
+    </p>
+    <p style="margin:0 0 16px;font-size:15px;color:#1a1a1a;line-height:1.6;">
+      We received a request to reset your TalentStream password. Click the button below to choose a new one. This link will expire in 1 hour.
+    </p>
+    <p style="margin:0 0 24px;">
+      <a href="${resetUrl}" style="display:inline-block;background:#0c0c0e;color:#fafaf7;text-decoration:none;padding:12px 20px;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:500;">
+        Reset password
+      </a>
+    </p>
+    <p style="margin:0;font-size:13px;color:#666;line-height:1.6;">
+      If you didn't request this, you can safely ignore this email — your password won't change.
     </p>
   `);
 }

@@ -128,6 +128,50 @@ export const scoringLogs = pgTable(
   ]
 );
 
+// ── Users ────────────────────────────────────────────────────────────
+
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    client_id: uuid("client_id")
+      .notNull()
+      .references(() => clients.id),
+    first_name: text("first_name").notNull(),
+    last_name: text("last_name").notNull(),
+    email: text("email").notNull(),
+    password_hash: text("password_hash").notNull(),
+    security_group: text("security_group").notNull(),
+    is_active: boolean("is_active").default(true).notNull(),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("users_email_idx").on(table.email),
+    index("users_client_id_idx").on(table.client_id),
+  ]
+);
+
+// ── Password reset tokens ────────────────────────────────────────────
+
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    user_id: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    token_hash: text("token_hash").notNull(),
+    expires_at: timestamp("expires_at").notNull(),
+    used_at: timestamp("used_at"),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("password_reset_tokens_hash_idx").on(table.token_hash),
+    index("password_reset_tokens_user_id_idx").on(table.user_id),
+  ]
+);
+
 // ── Messages ─────────────────────────────────────────────────────────
 
 export const messages = pgTable(
@@ -153,7 +197,26 @@ export const messages = pgTable(
 
 export const clientsRelations = relations(clients, ({ many }) => ({
   campaigns: many(campaigns),
+  users: many(users),
 }));
+
+export const usersRelations = relations(users, ({ one, many }) => ({
+  client: one(clients, {
+    fields: [users.client_id],
+    references: [clients.id],
+  }),
+  passwordResetTokens: many(passwordResetTokens),
+}));
+
+export const passwordResetTokensRelations = relations(
+  passwordResetTokens,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [passwordResetTokens.user_id],
+      references: [users.id],
+    }),
+  })
+);
 
 export const campaignsRelations = relations(campaigns, ({ one, many }) => ({
   client: one(clients, {

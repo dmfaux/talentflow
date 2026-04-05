@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { verifyToken, COOKIE_NAME } from "./auth";
+import { verifyToken, getSession, COOKIE_NAME, SessionPayload } from "./auth";
 
 export function success(data: unknown, status = 200) {
   return NextResponse.json({ data }, { status });
@@ -17,4 +17,14 @@ export async function requireApiAuth(): Promise<NextResponse | null> {
     return error("Unauthorized", 401);
   }
   return null;
+}
+
+export async function getApiSession(): Promise<
+  { session: SessionPayload; response: null } | { session: null; response: NextResponse }
+> {
+  const session = await getSession();
+  if (!session) {
+    return { session: null, response: error("Unauthorized", 401) };
+  }
+  return { session, response: null };
 }

@@ -66,6 +66,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Password reset flow is public (includes token subpaths)
+  if (pathname === "/reset-password" || pathname.startsWith("/reset-password/")) {
+    return NextResponse.next();
+  }
+
   // Protect admin routes
   const token = request.cookies.get(COOKIE_NAME)?.value;
   if (!token || !(await isValidToken(token))) {
