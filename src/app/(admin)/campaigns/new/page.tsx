@@ -582,17 +582,7 @@ For all error states, keep the form visible so the candidate can correct and ret
         {/* ── Step 1: Gating Questions ─────────────────────────── */}
         {step === 1 && (
           <div className="space-y-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-charcoal">Gating Questions</h2>
-              <button
-                onClick={addQuestion}
-                disabled={form.gating_config.length >= 5}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-cream px-3 text-[0.75rem] font-medium text-txt-secondary transition-colors hover:bg-border cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 2v8M2 6h8" /></svg>
-                Add Question
-              </button>
-            </div>
+            <h2 className="text-base font-semibold text-charcoal">Gating Questions</h2>
             <p className="text-xs text-txt-muted">Add 3–5 screening questions. Candidates must match the pass criteria to proceed.</p>
             {errors.gating && <p className="text-xs text-red">{errors.gating}</p>}
 
@@ -664,6 +654,15 @@ For all error states, keep the form visible so the candidate can correct and ret
                 </div>
               </div>
             ))}
+
+            <button
+              onClick={addQuestion}
+              disabled={form.gating_config.length >= 5}
+              className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-transparent px-3 text-[0.75rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:border-txt-muted cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-border"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 2v8M2 6h8" /></svg>
+              {form.gating_config.length >= 5 ? "Maximum 5 questions" : "Add Question"}
+            </button>
           </div>
         )}
 
