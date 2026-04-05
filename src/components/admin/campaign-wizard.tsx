@@ -78,6 +78,10 @@ interface Template {
 
 const STEPS = ["Basics", "Gating Questions", "Scoring Rubric", "Landing Page", "Review"] as const;
 const EMPLOYMENT_TYPES = ["Permanent", "Contract", "Temporary", "Freelance"];
+// Hard cap on gating option text. Long answers get truncated inside
+// <select> dropdowns on the candidate form (especially on mobile), so
+// we block them at authoring time.
+const GATING_OPTION_MAX_LENGTH = 80;
 
 const INITIAL: FormData = {
   client_id: "",
@@ -700,30 +704,51 @@ export function CampaignWizard({
                   <label className={labelClass}>Options</label>
                   {errors[`q_${qIdx}_options`] && <p className="mb-1 text-xs text-red">{errors[`q_${qIdx}_options`]}</p>}
                   <div className="space-y-2">
-                    {q.options.map((opt, oIdx) => (
-                      <div key={oIdx} className="flex items-center gap-2">
-                        <input
-                          value={opt.value}
-                          onChange={(e) => updateOption(qIdx, oIdx, e.target.value)}
-                          placeholder={`Option ${oIdx + 1}`}
-                          className={`${smallInputClass} flex-1`}
-                        />
-                        <label className="flex items-center gap-1.5 text-[0.7rem] text-txt-secondary whitespace-nowrap cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={q.pass_criteria.includes(opt.value) && opt.value !== ""}
-                            onChange={() => opt.value && togglePassCriteria(qIdx, opt.value)}
-                            className="accent-accent"
-                          />
-                          Pass
-                        </label>
-                        {q.options.length > 2 && (
-                          <button onClick={() => removeOption(qIdx, oIdx)} className="p-1 text-txt-muted hover:text-red cursor-pointer">
-                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" /></svg>
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                    {q.options.map((opt, oIdx) => {
+                      // Surface a counter once the user gets within
+                      // 15 chars of the cap, so the limit isn't a
+                      // silent hit at 80.
+                      const showCounter =
+                        opt.value.length >= GATING_OPTION_MAX_LENGTH - 15;
+                      return (
+                        <div key={oIdx} className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <input
+                              value={opt.value}
+                              onChange={(e) => updateOption(qIdx, oIdx, e.target.value)}
+                              placeholder={`Option ${oIdx + 1}`}
+                              maxLength={GATING_OPTION_MAX_LENGTH}
+                              className={`${smallInputClass} ${showCounter ? "pr-14" : ""}`}
+                            />
+                            {showCounter && (
+                              <span
+                                className={`pointer-events-none absolute inset-y-0 right-2.5 flex items-center font-mono text-[0.65rem] ${
+                                  opt.value.length >= GATING_OPTION_MAX_LENGTH
+                                    ? "text-red"
+                                    : "text-txt-muted"
+                                }`}
+                              >
+                                {opt.value.length}/{GATING_OPTION_MAX_LENGTH}
+                              </span>
+                            )}
+                          </div>
+                          <label className="flex items-center gap-1.5 text-[0.7rem] text-txt-secondary whitespace-nowrap cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={q.pass_criteria.includes(opt.value) && opt.value !== ""}
+                              onChange={() => opt.value && togglePassCriteria(qIdx, opt.value)}
+                              className="accent-accent"
+                            />
+                            Pass
+                          </label>
+                          {q.options.length > 2 && (
+                            <button onClick={() => removeOption(qIdx, oIdx)} className="p-1 text-txt-muted hover:text-red cursor-pointer">
+                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" /></svg>
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                   {errors[`q_${qIdx}_pass`] && <p className="mt-1 text-xs text-red">{errors[`q_${qIdx}_pass`]}</p>}
                   <button
