@@ -91,6 +91,12 @@ const CLIENTS = [
     contact_phone: "+27 11 721 5000", billing_email: "ap.tech@standardbank.co.za",
     notes: "Core banking platform rewrite. Multiple senior roles.",
   },
+  {
+    slug: "adcorp-group", name: "Adcorp Group",
+    contact_name: "Ayesha Patel", contact_email: "ayesha.patel@adcorpgroup.com",
+    contact_phone: "+27 11 721 5000", billing_email: "ap.tech@adcorp-group.com",
+    notes: "Core banking platform rewrite. Multiple senior roles.",
+  },
 ] as const;
 
 const ROLES = [
