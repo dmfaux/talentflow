@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { PromptModal } from "@/components/admin/template-editor/modal";
 
 type TemplateStatus = "draft" | "pending" | "published" | "archived";
 
@@ -15,7 +14,6 @@ interface Template {
   thumbnail_url: string | null;
   owner_client_id: string | null;
   owner_client_name: string | null;
-  source: "builtin" | "custom";
   status: TemplateStatus;
   published_at: string | null;
   created_at: string;
@@ -47,9 +45,7 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
-  const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [promptOpen, setPromptOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/templates")
@@ -57,88 +53,6 @@ export default function TemplatesPage() {
       .then((res) => setTemplates(res.data ?? []))
       .finally(() => setLoading(false));
   }, []);
-
-  async function createCustomTemplate(name: string) {
-    // Derive a key from the name: lowercase, underscores, must start
-    // with a letter. Append a timestamp suffix to avoid collisions.
-    const slug = name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "");
-    const baseKey = /^[a-z]/.test(slug) ? slug : `t_${slug}`;
-    const key = `${baseKey}_${Date.now().toString(36)}`;
-
-    setCreating(true);
-    setCreateError(null);
-    try {
-      // Starter tree matching src/lib/templates/tree-ops.ts makeStarterTree
-      const starterTree = {
-        version: 1,
-        root: {
-          id: "root",
-          type: "root",
-          bg: { kind: "color", color: { kind: "hex", value: "#ffffff" } },
-          children: [
-            {
-              id: "shell",
-              type: "container",
-              maxWidth: 720,
-              padding: { top: 3, right: 1.5, bottom: 3, left: 1.5 },
-              align: "center",
-              children: [
-                {
-                  id: "title",
-                  type: "heading",
-                  level: 1,
-                  text: { kind: "bind", field: "campaign.role_title" },
-                  typography: {
-                    family: "serif",
-                    weight: 500,
-                    size: 2.25,
-                    italic: false,
-                    lineHeight: 1.15,
-                    letterSpacing: -0.01,
-                    uppercase: false,
-                    color: { kind: "brand", token: "primary" },
-                  },
-                  align: "left",
-                  maxWidth: null,
-                },
-                {
-                  id: "form",
-                  type: "form_slot",
-                  heading: "Apply for this role",
-                  subheading: null,
-                  cardStyle: "bordered",
-                },
-              ],
-            },
-          ],
-        },
-      };
-      const res = await fetch("/api/admin/templates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          key,
-          name,
-          source: "custom",
-          block_tree: starterTree,
-        }),
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        setCreateError(body.error ?? "Failed to create template");
-        return;
-      }
-      setPromptOpen(false);
-      router.push(`/templates/${body.data.id}/edit`);
-    } catch {
-      setCreateError("Something went wrong. Try again.");
-    } finally {
-      setCreating(false);
-    }
-  }
 
   async function handleClone(templateId: string) {
     setCreateError(null);
@@ -174,25 +88,14 @@ export default function TemplatesPage() {
         </div>
         <div className="flex items-center gap-2">
           <Link
-            href="/templates/new"
-            className="inline-flex h-9 items-center rounded-lg px-3 text-[0.78rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal"
-          >
-            Register builtin
-          </Link>
-          <button
-            type="button"
-            disabled={creating}
-            onClick={() => {
-              setCreateError(null);
-              setPromptOpen(true);
-            }}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-cobalt px-4 text-[0.8rem] font-medium text-ink transition-colors hover:bg-cobalt-deep disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            href="/templates/new-custom"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-cobalt px-4 text-[0.8rem] font-medium text-ink transition-colors hover:bg-cobalt-deep cursor-pointer"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M7 2v10M2 7h10" />
             </svg>
             New template
-          </button>
+          </Link>
         </div>
       </div>
       {createError && (
@@ -260,25 +163,21 @@ export default function TemplatesPage() {
                   colSpan={5}
                   className="px-5 py-10 text-center text-sm text-txt-muted"
                 >
-                  No templates registered yet.{" "}
+                  No templates yet.{" "}
                   <Link
-                    href="/templates/new"
+                    href="/templates/new-custom"
                     className="text-cobalt hover:underline"
                   >
-                    Register one
+                    Create one
                   </Link>
                 </td>
               </tr>
             ) : (
-              filtered.map((t) => {
-                const editable = t.source === "custom";
-                return (
+              filtered.map((t) => (
                 <tr
                   key={t.id}
-                  onClick={() => {
-                    if (editable) router.push(`/templates/${t.id}/edit`);
-                  }}
-                  className={`group transition-colors hover:bg-cream/60 ${editable ? "cursor-pointer" : ""}`}
+                  onClick={() => router.push(`/templates/${t.id}/edit`)}
+                  className="group cursor-pointer transition-colors hover:bg-cream/60"
                 >
                   <td className="px-5 py-3">
                     <div className="font-display text-sm font-medium text-charcoal">
@@ -320,8 +219,7 @@ export default function TemplatesPage() {
                   <td className="px-5 py-3 text-xs text-txt-secondary">
                     <div className="flex items-center justify-between gap-2">
                       <span>{formatCreated(t.created_at)}</span>
-                      {editable && (
-                        <button
+                      <button
                           type="button"
                           title="Clone to new draft"
                           onClick={(e) => {
@@ -332,30 +230,15 @@ export default function TemplatesPage() {
                         >
                           Clone
                         </button>
-                      )}
                     </div>
                   </td>
                 </tr>
-                );
-              })
+              ))
             )}
           </tbody>
         </table>
       </div>
 
-      <PromptModal
-        open={promptOpen}
-        onClose={() => {
-          if (!creating) setPromptOpen(false);
-        }}
-        onSubmit={(name) => void createCustomTemplate(name)}
-        title="New custom template"
-        label="Template name"
-        placeholder="Untitled template"
-        defaultValue="Untitled template"
-        confirmLabel="Create"
-        busy={creating}
-      />
     </div>
   );
 }

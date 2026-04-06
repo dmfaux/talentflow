@@ -12,7 +12,6 @@ function slugifyToKey(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
-  // Ensure it starts with a letter.
   return base.match(/^[a-z]/) ? base : `t_${base}`;
 }
 
@@ -34,39 +33,26 @@ export async function POST(
         key: true,
         name: true,
         description: true,
-        source: true,
-        block_tree: true,
-        published_block_tree: true,
+        html_template: true,
+        published_html_template: true,
         owner_client_id: true,
         thumbnail_url: true,
       },
     });
     if (!source) return error("Template not found", 404);
 
-    // Phase 2 limitation: cloning a builtin means starting from an
-    // empty block_tree, which isn't useful. Defer builtin→custom
-    // materialisation to a later phase.
-    if (source.source === "builtin") {
-      return error(
-        "Cannot clone a builtin template yet — builtins don't have an editable block_tree to copy from"
-      );
+    // Prefer the published snapshot if present; otherwise the draft.
+    const htmlToClone = source.published_html_template ?? source.html_template;
+    if (!htmlToClone) {
+      return error("Source template has no html_template to clone");
     }
 
-    // Prefer the published snapshot if present (the live version);
-    // otherwise the in-progress draft.
-    const treeToClone = source.published_block_tree ?? source.block_tree;
-    if (!treeToClone) {
-      return error("Source template has no block_tree to clone");
-    }
-
-    // New name/key. If user provided a name, use it; else append " (copy)".
     const rawName =
       typeof body.name === "string" && body.name.trim()
         ? body.name.trim()
         : `${source.name} (copy)`;
     if (rawName.length > 200) return error("name is too long");
 
-    // Find an available key by suffixing _copy, _copy_2, _copy_3...
     const baseKey = slugifyToKey(rawName);
     if (!KEY_REGEX.test(baseKey) || baseKey.length > 63) {
       return error(
@@ -85,20 +71,16 @@ export async function POST(
       n++;
     }
 
-    // Deep-clone block_tree — structuredClone keeps the JSON shape intact.
-    const clonedTree = structuredClone(treeToClone);
-
     const [row] = await db
       .insert(templates)
       .values({
         key: newKey,
         name: rawName,
         description: source.description,
-        thumbnail_url: null, // will be regenerated on publish
+        thumbnail_url: null,
         owner_client_id: source.owner_client_id,
-        source: "custom",
-        block_tree: clonedTree,
-        status: "draft", // always starts as draft
+        html_template: htmlToClone,
+        status: "draft",
       })
       .returning();
 

@@ -1,8 +1,7 @@
 import { db } from "@/db";
 import { clients, templates } from "@/db/schema";
 import { error, getApiSession, requireApiAuth, success } from "@/lib/api";
-import { templateExists } from "@/templates/registry";
-import { parseBlockTree } from "@/templates/blocks/schema";
+import { validateHtmlTemplate } from "@/lib/templates/slots";
 import { isTemplateStatus } from "@/lib/templates/transitions";
 import { logTemplateStatusChange } from "@/lib/templates/log";
 import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
@@ -24,7 +23,6 @@ export async function GET(request: NextRequest) {
     const conditions = [];
 
     if (clientId) {
-      // Campaign picker — only published templates are selectable.
       if (!UUID_REGEX.test(clientId)) {
         return error("client_id must be a valid uuid");
       }
@@ -42,7 +40,6 @@ export async function GET(request: NextRequest) {
     }
 
     if (statusParam) {
-      // Support comma-separated list: ?status=draft,pending
       const wanted = statusParam.split(",").map((s) => s.trim());
       if (!wanted.every(isTemplateStatus)) {
         return error(
@@ -68,7 +65,6 @@ export async function GET(request: NextRequest) {
         thumbnail_url: templates.thumbnail_url,
         owner_client_id: templates.owner_client_id,
         owner_client_name: clients.name,
-        source: templates.source,
         status: templates.status,
         published_at: templates.published_at,
         created_at: templates.created_at,
@@ -112,29 +108,19 @@ export async function POST(request: NextRequest) {
     });
     if (keyTaken) return error("A template with this key already exists");
 
-    // Validate source. 'builtin' requires a registered code component;
-    // 'custom' requires a valid block_tree.
-    const source =
-      body.source === "builtin" ? "builtin" : "custom";
-
-    if (source === "builtin" && !templateExists(key)) {
-      return error(
-        "Builtin template key not registered in the codebase. A developer must add the component to src/templates/registry.ts before registering it here."
-      );
-    }
-
-    let blockTree: unknown = null;
-    if (source === "custom") {
-      if (body.block_tree === undefined || body.block_tree === null) {
-        return error("block_tree is required for custom templates");
+    // Validate html_template
+    let htmlTemplate: string | null = null;
+    if (body.html_template !== undefined && body.html_template !== null) {
+      if (typeof body.html_template !== "string") {
+        return error("html_template must be a string");
       }
-      const parsed = parseBlockTree(body.block_tree);
-      if (!parsed.ok) {
+      const validated = validateHtmlTemplate(body.html_template);
+      if (!validated.ok) {
         return error(
-          `block_tree validation failed: ${parsed.errors.join("; ")}`
+          `html_template validation failed: ${validated.errors.join("; ")}`
         );
       }
-      blockTree = parsed.tree;
+      htmlTemplate = body.html_template;
     }
 
     // Validate name
@@ -163,8 +149,6 @@ export async function POST(request: NextRequest) {
       ownerClientId = body.owner_client_id;
     }
 
-    // Always created as 'draft'. Status changes go through the
-    // transition endpoint (POST /api/admin/templates/[id]/transition).
     const [row] = await db
       .insert(templates)
       .values({
@@ -173,8 +157,7 @@ export async function POST(request: NextRequest) {
         description: body.description?.trim() || null,
         thumbnail_url: body.thumbnail_url?.trim() || null,
         owner_client_id: ownerClientId,
-        source,
-        block_tree: blockTree,
+        html_template: htmlTemplate,
         status: "draft",
       })
       .returning();

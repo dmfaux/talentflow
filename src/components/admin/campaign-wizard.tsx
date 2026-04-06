@@ -1134,18 +1134,43 @@ function TemplateGalleryStep({
 
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
-  const previewUrl = (() => {
-    if (!selectedTemplate || !clientId) return "";
-    const params = new URLSearchParams();
-    params.set("clientId", clientId);
-    params.set("roleTitle", form.role_title || "Sample Role");
-    params.set("department", form.department);
-    params.set("location", form.location);
-    params.set("employmentType", form.employment_type);
-    if (form.salary_range_min) params.set("salaryMin", form.salary_range_min);
-    if (form.salary_range_max) params.set("salaryMax", form.salary_range_max);
-    params.set("gating", JSON.stringify(form.gating_config));
-    return `/preview/template/${selectedTemplate.key}?${params.toString()}`;
+  // Fetch the selected template's published HTML for preview
+  // Fetch published HTML for the selected template's live preview
+  const [rawTemplateHtml, setRawTemplateHtml] = useState<string | null>(null);
+  useEffect(() => {
+    if (!selectedTemplate) return;
+    let cancelled = false;
+    fetch(`/api/admin/templates/${selectedTemplate.id}`)
+      .then((r) => r.json())
+      .then((res) => {
+        if (!cancelled) setRawTemplateHtml(res.data?.published_html_template ?? null);
+      })
+      .catch(() => { if (!cancelled) setRawTemplateHtml(null); });
+    return () => { cancelled = true; };
+  }, [selectedTemplate]);
+
+  // Process the raw HTML with current form data for preview
+  const previewHtml = (() => {
+    if (!rawTemplateHtml || !selectedTemplate) return null;
+    let processed = rawTemplateHtml;
+    const replacements: Record<string, string> = {
+      "client.name": clientSlug ?? "Company",
+      "campaign.role_title": form.role_title || "Sample Role",
+      "campaign.role_description": "",
+      "campaign.department": form.department,
+      "campaign.location": form.location,
+      "campaign.employment_type": form.employment_type,
+      "campaign.salary_range_min": form.salary_range_min,
+      "campaign.salary_range_max": form.salary_range_max,
+    };
+    for (const [key, val] of Object.entries(replacements)) {
+      processed = processed.replaceAll(`{{${key}}}`, val || "");
+    }
+    processed = processed.replace(
+      /<div\s+id\s*=\s*["']application-form["']\s*>\s*<\/div>/i,
+      '<div style="padding:2rem;background:#f9f9f9;border:1px dashed #ccc;border-radius:0.75rem;text-align:center;color:#888;font-family:sans-serif"><p style="margin:0 0 0.5rem;font-size:0.9rem;font-weight:600">Application Form</p><p style="margin:0;font-size:0.78rem">Interactive form will appear here at runtime.</p></div>'
+    );
+    return processed;
   })();
 
   return (
@@ -1242,7 +1267,7 @@ function TemplateGalleryStep({
           </div>
 
           {/* Live preview */}
-          {selectedTemplate && previewUrl && (
+          {selectedTemplate && previewHtml && (
             <div className="pt-2">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <p className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
@@ -1297,7 +1322,8 @@ function TemplateGalleryStep({
                     </div>
                   </div>
                   <iframe
-                    src={previewUrl}
+                    srcDoc={previewHtml}
+                    sandbox=""
                     className="w-full bg-paper"
                     style={{
                       height: previewDevice === "mobile" ? "700px" : "600px",

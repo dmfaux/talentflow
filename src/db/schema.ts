@@ -52,22 +52,21 @@ export const templates = pgTable(
     description: text("description"),
     thumbnail_url: text("thumbnail_url"),
     owner_client_id: uuid("owner_client_id").references(() => clients.id),
-    // 'builtin' → renders via src/templates/registry.ts (editorial/corporate/modern).
-    // 'custom' → renders via block_tree JSON through BlockTreeRenderer.
-    source: text("source").notNull().default("custom"),
     // Lifecycle: 'draft' | 'pending' | 'published' | 'archived'.
     // - draft: editable working copy, not selectable by campaigns.
     // - pending: locked, awaiting client approval (shareable via preview_token).
     // - published: selectable by new campaigns, rendered on public landing.
     // - archived: not selectable for new campaigns; existing campaigns
-    //   continue rendering from published_block_tree.
+    //   continue rendering from published_html_template.
     status: text("status").notNull().default("draft"),
-    // Draft/working-copy tree. Edited via PATCH. Validated on write.
-    block_tree: jsonb("block_tree"),
-    // Snapshot of block_tree taken at publish time. Live campaigns
-    // always render from this column — never from `block_tree` — so
+    // Draft/working-copy HTML. Edited via PATCH. Validated on write.
+    // Contains mustache-style {{slots}} and a <div id="application-form">
+    // mount point for the React ApplicationForm portal.
+    html_template: text("html_template"),
+    // Snapshot of html_template taken at publish time. Live campaigns
+    // always render from this column — never from `html_template` — so
     // draft edits don't affect running campaigns.
-    published_block_tree: jsonb("published_block_tree"),
+    published_html_template: text("published_html_template"),
     // Timestamp of most recent publish (any transition ending at 'published').
     published_at: timestamp("published_at"),
     // Unauthenticated shareable token for client review while status='pending'.
@@ -79,7 +78,6 @@ export const templates = pgTable(
   (table) => [
     uniqueIndex("templates_key_idx").on(table.key),
     index("templates_owner_client_id_idx").on(table.owner_client_id),
-    index("templates_source_idx").on(table.source),
     index("templates_status_idx").on(table.status),
     uniqueIndex("templates_preview_token_idx").on(table.preview_token),
   ]

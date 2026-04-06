@@ -1,20 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Block, BlockTree } from "@/templates/blocks/schema";
-import { BlockPanel } from "@/components/admin/template-editor/block-panels";
+import { useParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ConfirmModal } from "@/components/admin/template-editor/modal";
-import {
-  addBlock,
-  findBlock,
-  generateBlockId,
-  makeDefaultBlock,
-  moveBlock,
-  removeBlock,
-  updateBlock,
-} from "@/lib/templates/tree-ops";
+import { buildTemplatePrompt, type BrandColors } from "@/lib/templates/prompt-builder";
+import { validateHtmlTemplate, replaceSlots, type SlotData } from "@/lib/templates/slots";
 
 type TemplateStatus = "draft" | "pending" | "published" | "archived";
 
@@ -23,12 +14,15 @@ interface Template {
   key: string;
   name: string;
   description: string | null;
-  source: "builtin" | "custom";
   status: TemplateStatus;
-  block_tree: unknown;
+  html_template: string | null;
+  published_html_template: string | null;
   preview_token: string | null;
   preview_token_expires_at: string | null;
   thumbnail_url: string | null;
+  owner_client_id: string | null;
+  owner_client_name: string | null;
+  owner_client_slug: string | null;
   active_campaign_count: number;
   total_campaign_count: number;
 }
@@ -38,865 +32,508 @@ interface HistoryEntry {
   from_status: string | null;
   to_status: string;
   changed_at: string;
-  changed_by_first_name: string | null;
-  changed_by_last_name: string | null;
-  changed_by_email: string | null;
 }
 
-type SaveState = "idle" | "saving" | "saved" | "error";
-
-// Block types that can be added inside a container. Root and
-// container can be added manually but in MVP we keep the root fixed
-// and only allow adding leaf/content blocks inside existing containers.
-const ADDABLE_BLOCK_TYPES: Array<{ value: Block["type"]; label: string }> = [
-  { value: "logo_header", label: "Logo header" },
-  { value: "eyebrow", label: "Eyebrow" },
-  { value: "heading", label: "Heading" },
-  { value: "meta_strip", label: "Meta strip" },
-  { value: "salary_badge", label: "Salary badge" },
-  { value: "rich_text", label: "Rich text" },
-  { value: "form_slot", label: "Application form" },
-  { value: "divider", label: "Divider" },
-  { value: "spacer", label: "Spacer" },
-  { value: "footer", label: "Footer" },
-];
-
-const STATUS_COLOR: Record<TemplateStatus, string> = {
-  draft: "bg-ink-muted",
-  pending: "bg-saffron",
-  published: "bg-green",
-  archived: "bg-red",
+const SAMPLE_SLOT_DATA: SlotData = {
+  client: { name: "Acme Corp" },
+  campaign: {
+    role_title: "Senior Software Engineer",
+    role_description: "We are looking for an experienced engineer to join our growing team.",
+    department: "Engineering",
+    location: "Cape Town",
+    employment_type: "Permanent",
+    salary_range_min: 650000,
+    salary_range_max: 900000,
+  },
 };
 
-export default function TemplateEditor() {
-  const params = useParams<{ id: string }>();
-  const router = useRouter();
-  const id = params.id;
+const FORM_PLACEHOLDER_HTML = `<div style="padding:2rem;background:#f9f9f9;border:1px dashed #ccc;border-radius:0.75rem;text-align:center;color:#888;font-family:sans-serif">
+  <p style="margin:0 0 0.5rem;font-size:0.9rem;font-weight:600">Application Form</p>
+  <p style="margin:0;font-size:0.78rem">This area will contain the interactive application form at runtime.</p>
+</div>`;
+
+const STATUS_LABELS: Record<TemplateStatus, string> = {
+  draft: "Draft",
+  pending: "Pending Review",
+  published: "Published",
+  archived: "Archived",
+};
+
+const TRANSITION_OPTIONS: Record<
+  TemplateStatus,
+  { to: TemplateStatus; label: string; variant: "primary" | "danger" }[]
+> = {
+  draft: [
+    { to: "pending", label: "Submit for review", variant: "primary" },
+    { to: "archived", label: "Archive", variant: "danger" },
+  ],
+  pending: [
+    { to: "published", label: "Approve & publish", variant: "primary" },
+    { to: "draft", label: "Back to draft", variant: "primary" },
+    { to: "archived", label: "Archive", variant: "danger" },
+  ],
+  published: [
+    { to: "draft", label: "Revert to draft", variant: "primary" },
+    { to: "archived", label: "Archive", variant: "danger" },
+  ],
+  archived: [{ to: "draft", label: "Revive as draft", variant: "primary" }],
+};
+
+export default function TemplateEditPage() {
+  const { id } = useParams<{ id: string }>();
 
   const [template, setTemplate] = useState<Template | null>(null);
-  const [tree, setTree] = useState<BlockTree | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [transitionError, setTransitionError] = useState<string | null>(null);
-  const [pendingTransition, setPendingTransition] =
-    useState<TemplateStatus | null>(null);
-  const [transitionBusy, setTransitionBusy] = useState(false);
-  const [cloning, setCloning] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [history, setHistory] = useState<HistoryEntry[] | null>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const iframeReady = useRef(false);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
 
-  // ── Load template ─────────────────────────────────────────────────
+  // Edit state
+  const [nameEdit, setNameEdit] = useState("");
+  const [descEdit, setDescEdit] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
-  useEffect(() => {
+  // Regeneration state
+  const [brief, setBrief] = useState("");
+  const [pastedHtml, setPastedHtml] = useState("");
+  const [htmlValidation, setHtmlValidation] = useState<
+    { kind: "empty" } | { kind: "ok" } | { kind: "errors"; errors: string[] }
+  >({ kind: "empty" });
+  const [replacing, setReplacing] = useState(false);
+  const [replaceError, setReplaceError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Transition state
+  const [transitionTarget, setTransitionTarget] = useState<{
+    to: TemplateStatus;
+    label: string;
+    variant: "primary" | "danger";
+  } | null>(null);
+  const [transitioning, setTransitioning] = useState(false);
+
+  // Preview
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
+
+  // Fetch template + history
+  const fetchData = useCallback(() => {
     fetch(`/api/admin/templates/${id}`)
       .then((r) => r.json())
       .then((res) => {
-        if (res.error) {
-          setLoadError(res.error);
-          return;
+        if (res.data) {
+          setTemplate(res.data);
+          setNameEdit(res.data.name);
+          setDescEdit(res.data.description ?? "");
+          setBrief(res.data.description ?? "");
         }
-        const t: Template = res.data;
-        setTemplate(t);
-        if (t.source !== "custom") {
-          setLoadError(
-            "Builtin templates cannot be edited — their layout lives in code."
-          );
-          return;
-        }
-        if (!t.block_tree) {
-          setLoadError(
-            "This template has no block_tree. Recreate it from the templates list."
-          );
-          return;
-        }
-        setTree(t.block_tree as BlockTree);
       })
-      .catch(() => setLoadError("Failed to load template"));
+      .finally(() => setLoading(false));
+    fetch(`/api/admin/templates/${id}/history`)
+      .then((r) => r.json())
+      .then((res) => setHistory(res.data ?? []));
   }, [id]);
 
-  // ── iframe handshake + tree posting ───────────────────────────────
+  useEffect(fetchData, [fetchData]);
 
+  // Debounced HTML validation
   useEffect(() => {
-    const handler = (e: MessageEvent) => {
-      if (e.source !== iframeRef.current?.contentWindow) return;
-      if (e.origin !== window.location.origin) return;
-      const msg = e.data as { type: string };
-      if (msg?.type === "ready") {
-        iframeReady.current = true;
-        postTree();
-      }
-    };
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const trimmed = pastedHtml.trim();
+    if (!trimmed) {
+      setHtmlValidation({ kind: "empty" });
+      return;
+    }
+    const t = setTimeout(() => {
+      const result = validateHtmlTemplate(trimmed);
+      setHtmlValidation(result.ok ? { kind: "ok" } : { kind: "errors", errors: result.errors });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [pastedHtml]);
 
-  const postTree = useCallback(() => {
-    const iframe = iframeRef.current;
-    if (!iframe || !iframeReady.current || !tree) return;
-    iframe.contentWindow?.postMessage(
-      { type: "tree", tree },
-      window.location.origin
+  // Build preview HTML with sample data
+  const previewHtml = useMemo(() => {
+    const raw = template?.html_template ?? template?.published_html_template;
+    if (!raw) return null;
+    let html = replaceSlots(raw, SAMPLE_SLOT_DATA);
+    // Replace the form mount div with a placeholder for preview
+    html = html.replace(
+      /<div\s+id\s*=\s*["']application-form["']\s*>\s*<\/div>/i,
+      FORM_PLACEHOLDER_HTML
     );
-  }, [tree]);
+    return html;
+  }, [template]);
 
-  useEffect(() => {
-    postTree();
-  }, [tree, postTree]);
+  // Generate prompt for regeneration
+  const brandColors: BrandColors | null = null; // Bespoke brand colors could be fetched but for now omit
+  const prompt = useMemo(
+    () =>
+      buildTemplatePrompt({
+        name: nameEdit || "(unnamed)",
+        brief: brief || "(no brief)",
+        brandColors,
+      }),
+    [nameEdit, brief, brandColors]
+  );
 
-  // ── Debounced save ────────────────────────────────────────────────
+  async function handleCopy() {
+    await navigator.clipboard.writeText(prompt);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
-  useEffect(() => {
-    if (!tree || !template) return;
-    if (template.status !== "draft") return; // API rejects block_tree edits on non-draft
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      setSaveState("saving");
-      fetch(`/api/admin/templates/${id}`, {
+  // Save metadata (name, description)
+  async function handleSaveMeta() {
+    if (!template || template.status !== "draft") return;
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      const res = await fetch(`/api/admin/templates/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ block_tree: tree }),
-      })
-        .then((r) => r.json())
-        .then((res) => {
-          if (res.error) setSaveState("error");
-          else setSaveState("saved");
-        })
-        .catch(() => setSaveState("error"));
-    }, 600);
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    };
-  }, [tree, id, template]);
-
-  // ── Tree operations bound to UI ───────────────────────────────────
-
-  const handleBlockChange = useCallback(
-    (next: Block) => {
-      setTree((prev) =>
-        prev ? updateBlock(prev, next.id, () => next) : prev
-      );
-    },
-    []
-  );
-
-  const handleAddBlock = useCallback(
-    (parentId: string, type: Block["type"]) => {
-      setTree((prev) => {
-        if (!prev) return prev;
-        const newId = generateBlockId(type, prev);
-        return addBlock(prev, parentId, makeDefaultBlock(type, newId));
+        body: JSON.stringify({
+          name: nameEdit.trim(),
+          description: descEdit.trim() || null,
+        }),
       });
-    },
-    []
-  );
-
-  const handleRemoveBlock = useCallback((id: string) => {
-    setTree((prev) => (prev ? removeBlock(prev, id) : prev));
-    setSelectedId((curr) => (curr === id ? null : curr));
-  }, []);
-
-  const handleMoveBlock = useCallback((id: string, delta: -1 | 1) => {
-    setTree((prev) => (prev ? moveBlock(prev, id, delta) : prev));
-  }, []);
-
-  // ── Status transitions ────────────────────────────────────────────
-
-  const executeTransition = useCallback(
-    async (to: TemplateStatus) => {
-      setTransitionError(null);
-      setTransitionBusy(true);
-      try {
-        const res = await fetch(
-          `/api/admin/templates/${id}/transition`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ to }),
-          }
-        );
-        const body = await res.json();
-        if (!res.ok) {
-          setTransitionError(body.error ?? "Transition failed");
-          return;
-        }
-        // Merge returned row — preserves active_campaign_count which
-        // the transition response doesn't include.
-        setTemplate((prev) =>
-          prev ? { ...prev, ...body.data } : body.data
-        );
-        setPendingTransition(null);
-        // Invalidate history cache so the next open refetches.
-        setHistory(null);
-      } finally {
-        setTransitionBusy(false);
+      if (res.ok) {
+        setSaveMsg("Saved");
+        setTimeout(() => setSaveMsg(null), 2000);
+        fetchData();
       }
-    },
-    [id]
-  );
+    } finally {
+      setSaving(false);
+    }
+  }
 
-  const handleClone = useCallback(async () => {
-    setCloning(true);
+  // Replace HTML
+  async function handleReplace() {
+    if (!template || template.status !== "draft") return;
+    const trimmed = pastedHtml.trim();
+    const result = validateHtmlTemplate(trimmed);
+    if (!result.ok) {
+      setReplaceError(result.errors.join("; "));
+      return;
+    }
+    setReplacing(true);
+    setReplaceError(null);
     try {
-      const res = await fetch(`/api/admin/templates/${id}/clone`, {
-        method: "POST",
+      const res = await fetch(`/api/admin/templates/${id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ html_template: trimmed }),
       });
       const body = await res.json();
       if (!res.ok) {
-        setTransitionError(body.error ?? "Clone failed");
+        setReplaceError(body.error ?? "Failed to update");
         return;
       }
-      router.push(`/templates/${body.data.id}/edit`);
-    } finally {
-      setCloning(false);
-    }
-  }, [id, router]);
-
-  const handleCopyLink = useCallback(async () => {
-    if (!template?.preview_token) return;
-    const url = `${window.location.origin}/preview/template/pending/${template.preview_token}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2000);
+      setPastedHtml("");
+      fetchData();
     } catch {
-      // Clipboard API can fail in insecure contexts; fall through.
+      setReplaceError("Something went wrong");
+    } finally {
+      setReplacing(false);
     }
-  }, [template?.preview_token]);
-
-  const handleOpenHistory = useCallback(async () => {
-    setHistoryOpen(true);
-    if (history !== null) return;
-    const res = await fetch(`/api/admin/templates/${id}/history`);
-    const body = await res.json();
-    if (res.ok) setHistory(body.data);
-  }, [id, history]);
-
-  // ── Flattened tree for rendering ──────────────────────────────────
-
-  interface FlatRow {
-    block: Block;
-    depth: number;
-    parentId: string | null;
-    canMoveUp: boolean;
-    canMoveDown: boolean;
   }
 
-  const flatRows = useMemo<FlatRow[]>(() => {
-    if (!tree) return [];
-    const rows: FlatRow[] = [];
-    const goByRoot = (b: Block, depth: number, parentId: string | null) => {
-      let siblingIndex = 0;
-      let siblingCount = 1;
-      if (parentId) {
-        const p = findBlock(tree, parentId);
-        if (p && (p.type === "root" || p.type === "container")) {
-          siblingIndex = p.children.findIndex((c) => c.id === b.id);
-          siblingCount = p.children.length;
-        }
-      }
-      rows.push({
-        block: b,
-        depth,
-        parentId,
-        canMoveUp: siblingIndex > 0,
-        canMoveDown: siblingIndex < siblingCount - 1,
+  // Status transition
+  async function handleTransition() {
+    if (!transitionTarget || !template) return;
+    setTransitioning(true);
+    try {
+      const res = await fetch(`/api/admin/templates/${id}/transition`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: transitionTarget.to }),
       });
-      if (b.type === "root" || b.type === "container") {
-        for (const c of b.children) goByRoot(c, depth + 1, b.id);
+      const body = await res.json();
+      if (!res.ok) {
+        alert(body.error ?? "Transition failed");
+        return;
       }
-    };
-    goByRoot(tree.root, 0, null);
-    return rows;
-  }, [tree]);
+      setTransitionTarget(null);
+      fetchData();
+    } finally {
+      setTransitioning(false);
+    }
+  }
 
-  const selectedBlock = useMemo(() => {
-    if (!tree || !selectedId) return null;
-    return findBlock(tree, selectedId);
-  }, [tree, selectedId]);
-
-  // ── UI states ─────────────────────────────────────────────────────
-
-  if (loadError) {
+  if (loading) {
     return (
-      <div className="mx-auto max-w-2xl py-12 text-center">
-        <p className="text-sm text-red mb-4">{loadError}</p>
-        <Link href="/templates" className="text-xs text-cobalt hover:underline">
-          ← Back to templates
+      <div className="flex items-center justify-center py-20 text-sm text-txt-muted">
+        Loading template...
+      </div>
+    );
+  }
+
+  if (!template) {
+    return (
+      <div className="py-20 text-center">
+        <p className="text-sm text-txt-muted">Template not found.</p>
+        <Link href="/templates" className="mt-2 text-sm text-cobalt hover:underline">
+          Back to templates
         </Link>
       </div>
     );
   }
 
-  if (!template || !tree) {
-    return (
-      <div className="py-16 text-center text-sm text-txt-muted">Loading…</div>
-    );
-  }
-
   const isDraft = template.status === "draft";
+  const transitions = TRANSITION_OPTIONS[template.status];
+  const iframeWidth = previewDevice === "mobile" ? "375px" : "100%";
 
   return (
-    <div className="-mx-6 -my-6 flex h-[calc(100vh-theme(spacing.16))] flex-col">
+    <div className="pb-16">
       {/* Header */}
-      <header className="flex h-14 items-center justify-between border-b border-border bg-surface px-5">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/templates"
-            className="text-[0.8rem] text-txt-muted hover:text-charcoal transition-colors"
-          >
-            ← Templates
-          </Link>
-          <span className="text-txt-muted">/</span>
-          <span className="text-[0.85rem] font-medium text-charcoal">
-            {template.name}
-          </span>
-          <span className="inline-flex items-center gap-1.5 text-[0.7rem]">
-            <span className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_COLOR[template.status]}`} />
-            <span className="text-txt-secondary capitalize">{template.status}</span>
-          </span>
-          {isDraft && (
-            <span className="text-[0.7rem] text-txt-muted ml-2">
-              {saveState === "saving" && "Saving…"}
-              {saveState === "saved" && "Saved"}
-              {saveState === "error" && (
-                <span className="text-red">Save failed</span>
+      <div className="mb-6">
+        <Link
+          href="/templates"
+          className="mb-3 inline-flex items-center gap-1 text-[0.72rem] text-txt-muted transition-colors hover:text-charcoal"
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+            <path d="M7.5 2.5L4 6l3.5 3.5" />
+          </svg>
+          Templates
+        </Link>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-display text-xl text-charcoal">{template.name}</h1>
+            <div className="mt-1 flex items-center gap-3 text-[0.75rem] text-txt-secondary">
+              <span className="font-mono">{template.key}</span>
+              <span className="inline-flex items-center gap-1">
+                <span className={`inline-block h-1.5 w-1.5 rounded-full ${
+                  template.status === "published" ? "bg-green" :
+                  template.status === "pending" ? "bg-saffron" :
+                  template.status === "archived" ? "bg-red" : "bg-ink-muted"
+                }`} />
+                {STATUS_LABELS[template.status]}
+              </span>
+              {template.active_campaign_count > 0 && (
+                <span>{template.active_campaign_count} active campaign{template.active_campaign_count !== 1 ? "s" : ""}</span>
               )}
-            </span>
-          )}
-        </div>
-        <div className="relative flex items-center gap-2">
-          {transitionError && (
-            <span className="text-[0.7rem] text-red mr-2">
-              {transitionError}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={handleOpenHistory}
-            className="inline-flex h-8 items-center rounded-md px-2.5 text-[0.72rem] text-txt-secondary hover:bg-cream hover:text-charcoal cursor-pointer"
-          >
-            History
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleClone()}
-            disabled={cloning}
-            className="inline-flex h-8 items-center rounded-md px-2.5 text-[0.72rem] text-txt-secondary hover:bg-cream hover:text-charcoal disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-          >
-            {cloning ? "Cloning…" : "Clone"}
-          </button>
-          <TransitionButtons
-            status={template.status}
-            onRequest={setPendingTransition}
-            previewToken={template.preview_token}
-            linkCopied={linkCopied}
-            onCopyLink={handleCopyLink}
-          />
-          {historyOpen && (
-            <HistoryPanel
-              entries={history}
-              onClose={() => setHistoryOpen(false)}
-            />
-          )}
-        </div>
-      </header>
-
-      <ConfirmModal
-        open={pendingTransition !== null}
-        onClose={() => setPendingTransition(null)}
-        onConfirm={() =>
-          pendingTransition && void executeTransition(pendingTransition)
-        }
-        busy={transitionBusy}
-        title={modalTitle(pendingTransition)}
-        body={modalBody(pendingTransition, template)}
-        confirmLabel={modalConfirmLabel(pendingTransition)}
-        variant={pendingTransition === "archived" ? "danger" : "primary"}
-      />
-
-      {/* Body */}
-      <div className="flex min-h-0 flex-1">
-        {/* Left panel: tree + properties */}
-        <aside className="flex w-[380px] flex-col border-r border-border">
-          <div className="overflow-auto border-b border-border bg-surface">
-            <TreeView
-              rows={flatRows}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onAdd={handleAddBlock}
-              onRemove={handleRemoveBlock}
-              onMove={handleMoveBlock}
-              canEdit={isDraft}
-            />
-          </div>
-          <div className="flex-1 overflow-auto bg-cream/20 p-4">
-            {selectedBlock ? (
-              <>
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="font-mono text-[0.65rem] uppercase tracking-[0.12em] text-ink-muted">
-                    {selectedBlock.type} · {selectedBlock.id}
-                  </span>
-                </div>
-                <fieldset disabled={!isDraft} className="disabled:opacity-60">
-                  <BlockPanel block={selectedBlock} onChange={handleBlockChange} />
-                </fieldset>
-              </>
-            ) : (
-              <p className="text-[0.78rem] text-txt-muted">
-                Select a block to edit its properties.
-              </p>
-            )}
-          </div>
-        </aside>
-
-        {/* Right panel: iframe */}
-        <main className="flex-1 overflow-hidden bg-canvas-2">
-          <iframe
-            ref={iframeRef}
-            src="/preview/template/editor"
-            title="Template preview"
-            className="h-full w-full border-0 bg-paper"
-          />
-        </main>
-      </div>
-    </div>
-  );
-}
-
-// ── Tree view ───────────────────────────────────────────────────────
-
-function TreeView({
-  rows,
-  selectedId,
-  onSelect,
-  onAdd,
-  onRemove,
-  onMove,
-  canEdit,
-}: {
-  rows: Array<{
-    block: Block;
-    depth: number;
-    parentId: string | null;
-    canMoveUp: boolean;
-    canMoveDown: boolean;
-  }>;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  onAdd: (parentId: string, type: Block["type"]) => void;
-  onRemove: (id: string) => void;
-  onMove: (id: string, delta: -1 | 1) => void;
-  canEdit: boolean;
-}) {
-  return (
-    <ul className="py-1.5 text-[0.78rem]">
-      {rows.map(({ block, depth, canMoveUp, canMoveDown }) => {
-        const isContainer = block.type === "root" || block.type === "container";
-        const isSelected = selectedId === block.id;
-        return (
-          <li key={block.id}>
-            <div
-              className={`group flex items-center gap-1 pr-2 py-1 cursor-pointer ${
-                isSelected ? "bg-cobalt/10" : "hover:bg-cream/60"
-              }`}
-              style={{ paddingLeft: `${0.75 + depth * 0.875}rem` }}
-              onClick={() => onSelect(block.id)}
-            >
-              <span className="font-mono text-[0.62rem] uppercase tracking-[0.08em] text-ink-muted">
-                {block.type}
-              </span>
-              <span className="ml-1.5 truncate text-[0.72rem] text-txt-secondary">
-                {blockSummary(block)}
-              </span>
-              <span className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                {canEdit && block.type !== "root" && (
-                  <>
-                    <IconButton
-                      title="Move up"
-                      disabled={!canMoveUp}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onMove(block.id, -1);
-                      }}
-                    >↑</IconButton>
-                    <IconButton
-                      title="Move down"
-                      disabled={!canMoveDown}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onMove(block.id, 1);
-                      }}
-                    >↓</IconButton>
-                    <IconButton
-                      title="Delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm(`Delete ${block.type}?`)) onRemove(block.id);
-                      }}
-                    >×</IconButton>
-                  </>
-                )}
-              </span>
             </div>
-            {canEdit && isContainer && (
-              <div
-                className="pb-1"
-                style={{ paddingLeft: `${1.5 + depth * 0.875}rem` }}
+          </div>
+          <div className="flex items-center gap-2">
+            {transitions.map((t) => (
+              <button
+                key={t.to}
+                type="button"
+                onClick={() => setTransitionTarget(t)}
+                className={`inline-flex h-9 items-center rounded-lg px-4 text-[0.78rem] font-medium transition-colors cursor-pointer ${
+                  t.variant === "danger"
+                    ? "text-red hover:bg-red/10"
+                    : "bg-cobalt text-ink hover:bg-cobalt-deep"
+                }`}
               >
-                <AddBlockPicker
-                  onAdd={(type) => onAdd(block.id, type)}
-                />
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[1fr_380px] gap-6">
+        {/* Left: Preview */}
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
+              Preview
+            </h2>
+            <div className="inline-flex rounded-md border border-border">
+              {(["desktop", "mobile"] as const).map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setPreviewDevice(d)}
+                  className={`px-3 py-1 text-[0.68rem] font-medium capitalize transition-colors cursor-pointer ${
+                    previewDevice === d
+                      ? "bg-charcoal text-paper"
+                      : "text-txt-muted hover:text-charcoal"
+                  } ${d === "desktop" ? "rounded-l-md" : "rounded-r-md"}`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-border bg-paper">
+            {previewHtml ? (
+              <iframe
+                srcDoc={previewHtml}
+                title="Template preview"
+                sandbox=""
+                className="h-[600px] border-0 transition-all"
+                style={{ width: iframeWidth, margin: previewDevice === "mobile" ? "0 auto" : undefined, display: "block" }}
+              />
+            ) : (
+              <div className="flex h-[400px] items-center justify-center text-sm text-txt-muted">
+                No HTML template yet. Use the regeneration section to create one.
               </div>
             )}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function IconButton({
-  children,
-  onClick,
-  title,
-  disabled = false,
-}: {
-  children: React.ReactNode;
-  onClick: (e: React.MouseEvent) => void;
-  title: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      disabled={disabled}
-      onClick={onClick}
-      className="flex h-5 w-5 items-center justify-center rounded text-[0.85rem] text-ink-muted hover:bg-ink/10 hover:text-charcoal disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-    >
-      {children}
-    </button>
-  );
-}
-
-function AddBlockPicker({
-  onAdd,
-}: {
-  onAdd: (type: Block["type"]) => void;
-}) {
-  return (
-    <select
-      value=""
-      onChange={(e) => {
-        const t = e.target.value as Block["type"];
-        if (t) onAdd(t);
-        e.target.value = "";
-      }}
-      className="h-6 rounded border border-dashed border-border bg-transparent px-1.5 text-[0.68rem] text-txt-muted hover:border-cobalt hover:text-cobalt cursor-pointer"
-    >
-      <option value="">+ Add block…</option>
-      {ADDABLE_BLOCK_TYPES.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function blockSummary(block: Block): string {
-  switch (block.type) {
-    case "root":
-      return block.bg.kind === "color" ? `bg ${block.bg.color.kind === "hex" ? block.bg.color.value : block.bg.color.token}` : "";
-    case "container":
-      return `max ${block.maxWidth}px`;
-    case "heading":
-      return block.text.kind === "static" ? block.text.value : block.text.field;
-    case "eyebrow":
-    case "rich_text":
-      return block.text.kind === "static" ? block.text.value : block.text.field;
-    case "meta_strip":
-      return block.fields.map((f) => f.replace("campaign.", "")).join(" · ");
-    case "salary_badge":
-      return block.style;
-    case "form_slot":
-      return block.heading ?? "";
-    case "footer":
-      return block.text;
-    case "divider":
-      return `${block.thickness}px`;
-    case "spacer":
-      return `${block.height}rem`;
-    case "logo_header":
-      return `${block.logoHeight}px`;
-  }
-}
-
-// ── Status transition buttons ──────────────────────────────────────
-
-function TransitionButtons({
-  status,
-  onRequest,
-  previewToken,
-  linkCopied,
-  onCopyLink,
-}: {
-  status: TemplateStatus;
-  onRequest: (to: TemplateStatus) => void;
-  previewToken: string | null;
-  linkCopied: boolean;
-  onCopyLink: () => void;
-}) {
-  const btn =
-    "inline-flex h-8 items-center rounded-md px-3 text-[0.75rem] font-medium transition-colors cursor-pointer";
-  const primary = `${btn} bg-cobalt text-ink hover:bg-cobalt-deep`;
-  const secondary = `${btn} text-txt-secondary hover:bg-cream hover:text-charcoal`;
-  const danger = `${btn} text-red hover:bg-red/10`;
-
-  if (status === "draft") {
-    return (
-      <>
-        <button onClick={() => onRequest("archived")} className={danger}>
-          Archive
-        </button>
-        <button onClick={() => onRequest("pending")} className={primary}>
-          Submit for review
-        </button>
-      </>
-    );
-  }
-  if (status === "pending") {
-    return (
-      <>
-        {previewToken && (
-          <>
-            <a
-              href={`/preview/template/pending/${previewToken}`}
-              target="_blank"
-              rel="noreferrer"
-              className={secondary}
-            >
-              Open preview ↗
-            </a>
-            <button
-              type="button"
-              onClick={onCopyLink}
-              className={secondary}
-              title="Copy preview link to clipboard"
-            >
-              {linkCopied ? "Copied!" : "Copy link"}
-            </button>
-          </>
-        )}
-        <button onClick={() => onRequest("draft")} className={secondary}>
-          Send back to draft
-        </button>
-        <button onClick={() => onRequest("archived")} className={danger}>
-          Archive
-        </button>
-        <button onClick={() => onRequest("published")} className={primary}>
-          Approve &amp; publish
-        </button>
-      </>
-    );
-  }
-  if (status === "published") {
-    return (
-      <>
-        <button onClick={() => onRequest("archived")} className={danger}>
-          Archive
-        </button>
-        <button onClick={() => onRequest("draft")} className={primary}>
-          Edit (→ draft)
-        </button>
-      </>
-    );
-  }
-  // archived
-  return (
-    <button onClick={() => onRequest("draft")} className={primary}>
-      Revive (→ draft)
-    </button>
-  );
-}
-
-// ── Modal copy helpers ─────────────────────────────────────────────
-
-function modalTitle(to: TemplateStatus | null): string {
-  switch (to) {
-    case "pending":
-      return "Submit for client review?";
-    case "published":
-      return "Publish template?";
-    case "archived":
-      return "Archive this template?";
-    case "draft":
-      return "Move back to draft?";
-    default:
-      return "";
-  }
-}
-
-function modalConfirmLabel(to: TemplateStatus | null): string {
-  switch (to) {
-    case "pending":
-      return "Submit for review";
-    case "published":
-      return "Publish";
-    case "archived":
-      return "Archive";
-    case "draft":
-      return "Move to draft";
-    default:
-      return "Confirm";
-  }
-}
-
-function modalBody(
-  to: TemplateStatus | null,
-  template: Template | null
-): React.ReactNode {
-  if (!template || !to) return null;
-  const activeCount = template.active_campaign_count;
-  switch (to) {
-    case "pending":
-      return (
-        <>
-          A new preview link will be generated and valid for 14 days. While
-          pending, the template cannot be edited or selected by new campaigns.
-        </>
-      );
-    case "published":
-      return (
-        <>
-          The current block tree will be snapshotted and served to all live
-          campaigns. A new thumbnail will be generated automatically.
-        </>
-      );
-    case "archived":
-      return (
-        <>
-          Archiving prevents new campaigns from selecting this template.
-          {activeCount > 0 ? (
-            <>
-              {" "}
-              <strong>{activeCount} active campaign{activeCount === 1 ? "" : "s"}</strong>{" "}
-              currently use this template and will continue rendering the
-              last-published snapshot.
-            </>
-          ) : (
-            <> No live campaigns are using this template.</>
-          )}
-        </>
-      );
-    case "draft":
-      if (template.status === "published") {
-        return activeCount > 0 ? (
-          <>
-            Moving to draft lets you edit the block tree.{" "}
-            <strong>{activeCount} active campaign{activeCount === 1 ? "" : "s"}</strong>{" "}
-            will keep rendering the last-published snapshot — your edits
-            won&apos;t affect them until you publish again.
-          </>
-        ) : (
-          <>
-            Moving to draft lets you edit the block tree. No live campaigns
-            will be affected.
-          </>
-        );
-      }
-      return <>This will clear the preview token and move the template back to draft.</>;
-    default:
-      return null;
-  }
-}
-
-// ── History panel ──────────────────────────────────────────────────
-
-function HistoryPanel({
-  entries,
-  onClose,
-}: {
-  entries: HistoryEntry[] | null;
-  onClose: () => void;
-}) {
-  return (
-    <>
-      <div
-        className="fixed inset-0 z-40"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div className="absolute right-0 top-10 z-50 w-[320px] rounded-lg border border-border bg-surface shadow-lg">
-        <div className="flex items-center justify-between border-b border-border px-3 py-2">
-          <span className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-ink-muted">
-            History
-          </span>
-          <button
-            onClick={onClose}
-            className="h-5 w-5 rounded text-ink-muted hover:bg-cream hover:text-charcoal cursor-pointer"
-            aria-label="Close"
-          >
-            ×
-          </button>
+          </div>
         </div>
-        <ul className="max-h-[400px] overflow-auto py-1 text-[0.78rem]">
-          {entries === null ? (
-            <li className="px-3 py-3 text-txt-muted">Loading…</li>
-          ) : entries.length === 0 ? (
-            <li className="px-3 py-3 text-txt-muted">No history.</li>
-          ) : (
-            entries.map((e) => {
-              const who = formatUser(e);
-              const when = new Date(e.changed_at);
-              return (
-                <li
-                  key={e.id}
-                  className="border-b border-border/50 px-3 py-2 last:border-b-0"
-                >
-                  <div className="font-mono text-[0.68rem] uppercase tracking-[0.08em] text-ink-muted">
-                    {e.from_status ?? "—"} → {e.to_status}
-                  </div>
-                  <div className="mt-0.5 text-txt-secondary">
-                    {who} · {relativeTime(when)}
-                  </div>
-                </li>
-              );
-            })
+
+        {/* Right: Sidebar */}
+        <div className="space-y-6">
+          {/* Metadata */}
+          {isDraft && (
+            <section className="rounded-xl border border-border bg-surface p-5">
+              <h3 className="mb-3 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
+                Details
+              </h3>
+              <label className="mb-1 block text-[0.68rem] font-medium uppercase tracking-[0.08em] text-txt-secondary">
+                Name
+              </label>
+              <input
+                type="text"
+                value={nameEdit}
+                onChange={(e) => setNameEdit(e.target.value)}
+                className="mb-3 h-8 w-full rounded-md border border-border bg-paper px-2.5 text-[0.8rem] text-charcoal focus:border-cobalt focus:outline-none focus:ring-2 focus:ring-cobalt/20"
+              />
+              <label className="mb-1 block text-[0.68rem] font-medium uppercase tracking-[0.08em] text-txt-secondary">
+                Description
+              </label>
+              <textarea
+                value={descEdit}
+                onChange={(e) => setDescEdit(e.target.value)}
+                rows={3}
+                className="mb-3 w-full rounded-md border border-border bg-paper px-2.5 py-1.5 text-[0.8rem] text-charcoal focus:border-cobalt focus:outline-none focus:ring-2 focus:ring-cobalt/20"
+              />
+              <button
+                type="button"
+                onClick={handleSaveMeta}
+                disabled={saving}
+                className="inline-flex h-8 items-center rounded-lg bg-cobalt px-3 text-[0.72rem] font-medium text-ink transition-colors hover:bg-cobalt-deep disabled:opacity-50 cursor-pointer"
+              >
+                {saving ? "Saving..." : saveMsg ?? "Save details"}
+              </button>
+            </section>
           )}
-        </ul>
+
+          {/* Regeneration */}
+          {isDraft && (
+            <section className="rounded-xl border border-border bg-surface p-5">
+              <h3 className="mb-3 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
+                {template.html_template ? "Replace HTML" : "Generate HTML"}
+              </h3>
+              <label className="mb-1 block text-[0.68rem] font-medium uppercase tracking-[0.08em] text-txt-secondary">
+                Design brief
+              </label>
+              <textarea
+                value={brief}
+                onChange={(e) => setBrief(e.target.value)}
+                rows={3}
+                placeholder="Describe the template style..."
+                className="mb-2 w-full rounded-md border border-border bg-paper px-2.5 py-1.5 text-[0.8rem] text-charcoal placeholder:text-txt-muted focus:border-cobalt focus:outline-none focus:ring-2 focus:ring-cobalt/20"
+              />
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="mb-4 inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-paper px-2.5 text-[0.68rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer"
+              >
+                {copied ? (
+                  <>
+                    <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="#067340" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7.5L6 10l5-6" /></svg>
+                    Copied prompt
+                  </>
+                ) : (
+                  <>
+                    <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="5" y="5" width="7" height="7" rx="1" />
+                      <path d="M9 5V3a1 1 0 00-1-1H3a1 1 0 00-1 1v5a1 1 0 001 1h2" />
+                    </svg>
+                    Copy prompt for AI
+                  </>
+                )}
+              </button>
+
+              <label className="mb-1 block text-[0.68rem] font-medium uppercase tracking-[0.08em] text-txt-secondary">
+                Paste HTML result
+              </label>
+              {htmlValidation.kind === "errors" && (
+                <div className="mb-2 rounded-md border border-red/30 bg-red/5 px-3 py-2 text-[0.7rem] text-red">
+                  {htmlValidation.errors.map((e, i) => (
+                    <div key={i} className="break-words">{e}</div>
+                  ))}
+                </div>
+              )}
+              <textarea
+                value={pastedHtml}
+                onChange={(e) => setPastedHtml(e.target.value)}
+                rows={6}
+                placeholder="<!DOCTYPE html>..."
+                spellCheck={false}
+                className={`mb-2 w-full rounded-md border bg-paper px-2.5 py-1.5 font-mono text-[0.7rem] leading-relaxed text-charcoal placeholder:text-txt-muted focus:outline-none focus:ring-2 ${
+                  htmlValidation.kind === "errors"
+                    ? "border-red/50 focus:ring-red/20"
+                    : "border-border focus:ring-cobalt/20"
+                }`}
+              />
+              {htmlValidation.kind === "ok" && (
+                <p className="mb-2 inline-flex items-center gap-1 text-[0.68rem] text-green">
+                  <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7.5L6 10l5-6" /></svg>
+                  Valid HTML
+                </p>
+              )}
+              {replaceError && (
+                <div className="mb-2 rounded-md border border-red/30 bg-red/5 px-3 py-2 text-[0.7rem] text-red">
+                  {replaceError}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handleReplace}
+                disabled={htmlValidation.kind !== "ok" || replacing}
+                className="inline-flex h-8 items-center rounded-lg bg-cobalt px-3 text-[0.72rem] font-medium text-ink transition-colors hover:bg-cobalt-deep disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              >
+                {replacing ? "Replacing..." : "Replace HTML"}
+              </button>
+            </section>
+          )}
+
+          {/* History */}
+          {history.length > 0 && (
+            <section className="rounded-xl border border-border bg-surface p-5">
+              <h3 className="mb-3 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
+                History
+              </h3>
+              <ul className="space-y-2">
+                {history.slice(0, 10).map((h) => (
+                  <li key={h.id} className="text-[0.72rem] text-txt-secondary">
+                    <span className="font-medium text-charcoal">
+                      {h.from_status ? `${h.from_status} → ${h.to_status}` : `Created as ${h.to_status}`}
+                    </span>
+                    <span className="ml-2 text-txt-muted">
+                      {new Date(h.changed_at).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
       </div>
-    </>
+
+      {/* Transition confirmation modal */}
+      <ConfirmModal
+        open={!!transitionTarget}
+        onClose={() => !transitioning && setTransitionTarget(null)}
+        onConfirm={handleTransition}
+        title={transitionTarget?.label ?? ""}
+        body={
+          transitionTarget?.to === "published"
+            ? "This will snapshot the current HTML and make it available to campaigns. Existing live campaigns will update to this version."
+            : transitionTarget?.to === "pending"
+              ? "This will lock the template for review and generate a 14-day preview link."
+              : transitionTarget?.to === "draft"
+                ? "This will move the template back to draft for editing. Live campaigns will continue rendering the last published version."
+                : "This will archive the template. It will no longer be selectable for new campaigns."
+        }
+        confirmLabel={transitionTarget?.label ?? "Confirm"}
+        variant={transitionTarget?.variant ?? "primary"}
+        busy={transitioning}
+      />
+    </div>
   );
-}
-
-function formatUser(e: HistoryEntry): string {
-  if (e.changed_by_first_name || e.changed_by_last_name) {
-    return `${e.changed_by_first_name ?? ""} ${e.changed_by_last_name ?? ""}`.trim();
-  }
-  if (e.changed_by_email) return e.changed_by_email;
-  return "system";
-}
-
-function relativeTime(d: Date): string {
-  const ms = Date.now() - d.getTime();
-  const sec = Math.floor(ms / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  if (day < 30) return `${day}d ago`;
-  const month = Math.floor(day / 30);
-  if (month < 12) return `${month}mo ago`;
-  return `${Math.floor(month / 12)}y ago`;
 }

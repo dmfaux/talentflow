@@ -2,7 +2,7 @@
 //
 // Defines the lifecycle transitions for `templates.status`, with per-
 // transition guards and the side-effects that must accompany each
-// transition (tree snapshots, preview tokens, timestamps).
+// transition (HTML snapshots, preview tokens, timestamps).
 //
 // State model:
 //   draft → pending → published → archived
@@ -10,13 +10,13 @@
 //                  ↑   draft
 //                  archived → draft (revive)
 //
-// Key invariant: live campaigns render from `published_block_tree`,
+// Key invariant: live campaigns render from `published_html_template`,
 // which is only updated on transitions INTO `published`. Therefore
 // taking a published template back to draft does NOT disturb live
 // campaigns — they continue rendering the snapshot.
 
 import { randomBytes } from "crypto";
-import { parseBlockTree } from "@/templates/blocks/schema";
+import { validateHtmlTemplate } from "./slots";
 
 export type TemplateStatus = "draft" | "pending" | "published" | "archived";
 
@@ -60,10 +60,9 @@ export function allowedTransitionsFrom(
 
 export interface TransitionInput {
   status: TemplateStatus;
-  source: "builtin" | "custom";
   name: string;
-  block_tree: unknown; // validated fresh on publishing guards
-  published_block_tree: unknown;
+  html_template: string | null;
+  published_html_template: string | null;
 }
 
 // ── Patch the state machine emits ──────────────────────────────────
@@ -71,11 +70,10 @@ export interface TransitionInput {
 export interface TransitionPatch {
   status: TemplateStatus;
   updated_at: Date;
-  // Present only when the transition needs to change these fields.
   preview_token?: string | null;
   preview_token_expires_at?: Date | null;
   published_at?: Date | null;
-  published_block_tree?: unknown;
+  published_html_template?: string | null;
 }
 
 export type TransitionResult =
@@ -84,7 +82,6 @@ export type TransitionResult =
 
 // ── Token generation ───────────────────────────────────────────────
 
-// 24 bytes → 32 base64url chars. Unguessable; collision risk ≈ 2⁻¹⁹².
 function generatePreviewToken(): string {
   return randomBytes(24).toString("base64url");
 }
@@ -109,21 +106,21 @@ export function computeTransition(
   const now = new Date();
   const patch: TransitionPatch = { status: to, updated_at: now };
 
-  // Pre-publish / pre-review guards: the block_tree must be a valid
-  // tree before a custom template can be shown externally (pending)
-  // or go live (published).
-  if ((to === "pending" || to === "published") && input.source === "custom") {
-    if (!input.block_tree) {
+  // Pre-publish / pre-review guards: the html_template must be valid
+  // before a template can be shown externally (pending) or go live
+  // (published).
+  if (to === "pending" || to === "published") {
+    if (!input.html_template) {
       return {
         ok: false,
-        error: `block_tree is required on a custom template before transitioning to "${to}"`,
+        error: `html_template is required before transitioning to "${to}"`,
       };
     }
-    const parsed = parseBlockTree(input.block_tree);
-    if (!parsed.ok) {
+    const validated = validateHtmlTemplate(input.html_template);
+    if (!validated.ok) {
       return {
         ok: false,
-        error: `block_tree failed validation: ${parsed.errors.join("; ")}`,
+        error: `html_template validation failed: ${validated.errors.join("; ")}`,
       };
     }
   }
@@ -134,26 +131,18 @@ export function computeTransition(
 
   // Side-effects per transition.
   if (to === "pending") {
-    // Fresh token on every entry into pending.
     patch.preview_token = generatePreviewToken();
     patch.preview_token_expires_at = new Date(
       now.getTime() + PREVIEW_TOKEN_TTL_MS
     );
   } else {
-    // Any exit from pending (or re-publish after a reject cycle) clears
-    // the token so the old shared link stops working.
     patch.preview_token = null;
     patch.preview_token_expires_at = null;
   }
 
   if (to === "published") {
     patch.published_at = now;
-    // Snapshot current working copy as the live render target. For
-    // builtins block_tree is NULL; published_block_tree stays NULL
-    // (candidate page uses the code registry for builtins).
-    if (input.source === "custom") {
-      patch.published_block_tree = input.block_tree;
-    }
+    patch.published_html_template = input.html_template;
   }
 
   return { ok: true, patch };

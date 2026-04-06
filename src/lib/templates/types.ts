@@ -1,3 +1,5 @@
+// ── Shared types for the HTML template system ──────────────────────
+
 import type { GatingQuestion } from "@/lib/gating";
 
 export type LogoBackground = "light" | "dark" | "transparent";
@@ -26,10 +28,3 @@ export interface TemplateCampaign {
   salary_range_max: number | null;
   gating_config: GatingQuestion[];
 }
-
-export interface TemplateProps {
-  client: TemplateClient;
-  campaign: TemplateCampaign;
-}
-
-export type TemplateComponent = React.FC<TemplateProps>;

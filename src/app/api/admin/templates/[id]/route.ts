@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { campaigns, clients, templates } from "@/db/schema";
 import { error, requireApiAuth, success } from "@/lib/api";
-import { parseBlockTree } from "@/templates/blocks/schema";
+import { validateHtmlTemplate } from "@/lib/templates/slots";
 import { eq, sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
@@ -27,10 +27,9 @@ export async function GET(
         owner_client_id: templates.owner_client_id,
         owner_client_name: clients.name,
         owner_client_slug: clients.slug,
-        source: templates.source,
         status: templates.status,
-        block_tree: templates.block_tree,
-        published_block_tree: templates.published_block_tree,
+        html_template: templates.html_template,
+        published_html_template: templates.published_html_template,
         published_at: templates.published_at,
         preview_token: templates.preview_token,
         preview_token_expires_at: templates.preview_token_expires_at,
@@ -44,7 +43,6 @@ export async function GET(
 
     if (!row) return error("Template not found", 404);
 
-    // Blast-radius: how many live campaigns reference this template?
     const [counts] = await db
       .select({
         active: sql<number>`count(*) filter (where ${campaigns.status} = 'active')`.as("active"),
@@ -78,9 +76,6 @@ export async function PATCH(
     if (body.key !== undefined) {
       return error("key cannot be changed after creation");
     }
-    if (body.source !== undefined) {
-      return error("source cannot be changed after creation");
-    }
     if (body.status !== undefined) {
       return error(
         "status cannot be changed here — use POST /api/admin/templates/[id]/transition"
@@ -89,33 +84,31 @@ export async function PATCH(
 
     const existing = await db.query.templates.findFirst({
       where: eq(templates.id, id),
-      columns: { id: true, source: true, status: true },
+      columns: { id: true, status: true },
     });
     if (!existing) return error("Template not found", 404);
 
     const updates: Record<string, unknown> = { updated_at: new Date() };
 
-    if (body.block_tree !== undefined) {
-      if (existing.source === "builtin") {
-        return error(
-          "block_tree cannot be edited on builtin templates — their layout lives in code"
-        );
-      }
+    if (body.html_template !== undefined) {
       if (existing.status !== "draft") {
         return error(
-          `block_tree can only be edited when status='draft' (current: '${existing.status}'). Transition to draft first.`
+          `html_template can only be edited when status='draft' (current: '${existing.status}'). Transition to draft first.`
         );
       }
-      if (body.block_tree === null) {
-        return error("block_tree cannot be cleared on a custom template");
+      if (body.html_template === null) {
+        return error("html_template cannot be cleared");
       }
-      const parsed = parseBlockTree(body.block_tree);
-      if (!parsed.ok) {
+      if (typeof body.html_template !== "string") {
+        return error("html_template must be a string");
+      }
+      const validated = validateHtmlTemplate(body.html_template);
+      if (!validated.ok) {
         return error(
-          `block_tree validation failed: ${parsed.errors.join("; ")}`
+          `html_template validation failed: ${validated.errors.join("; ")}`
         );
       }
-      updates.block_tree = parsed.tree;
+      updates.html_template = body.html_template;
     }
 
     if (body.name !== undefined) {
@@ -193,8 +186,6 @@ export async function DELETE(
     });
     if (!existing) return error("Template not found", 404);
 
-    // Soft-delete → archive. Any status can transition to archived.
-    // Clears any preview token so shared links stop working.
     const [row] = await db
       .update(templates)
       .set({
