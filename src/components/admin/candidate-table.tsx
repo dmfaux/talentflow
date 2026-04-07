@@ -40,7 +40,7 @@ const CONFIDENCE_STYLES: Record<string, string> = {
   low: "bg-red-light text-red",
 };
 
-const STATUSES = ["all", "gating_passed", "scored", "follow_up", "shortlisted", "rejected"] as const;
+const STATUSES = ["all", "gating_passed", "scored", "shortlisted", "rejected"] as const;
 const SORT_OPTIONS = [
   { value: "score_desc", label: "Score (high to low)" },
   { value: "score_asc", label: "Score (low to high)" },

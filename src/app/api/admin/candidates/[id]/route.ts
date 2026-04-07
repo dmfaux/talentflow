@@ -51,8 +51,8 @@ export async function PATCH(
     const updates: Record<string, unknown> = { updated_at: new Date() };
 
     if (body.status !== undefined) updates.status = body.status;
+    if (body.rejection_reason !== undefined) updates.rejection_reason = body.rejection_reason;
     if (body.shortlist_notes !== undefined) updates.shortlist_notes = body.shortlist_notes;
-    if (body.follow_up_notes !== undefined) updates.follow_up_notes = body.follow_up_notes;
 
     const [row] = await db
       .update(candidates)

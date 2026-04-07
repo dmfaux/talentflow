@@ -97,6 +97,7 @@ export const candidates = pgTable(
     ai_confidence: text("ai_confidence"),
     ai_flags: jsonb("ai_flags"),
     status: text("status").notNull().default("new"),
+    rejection_reason: text("rejection_reason"),
     follow_up_notes: text("follow_up_notes"),
     shortlist_notes: text("shortlist_notes"),
     source: text("source"),

@@ -137,6 +137,18 @@ export default async function CandidateDetailPage({ params }: Props) {
               </>
             )}
           </div>
+          {candidate.status === "rejected" && candidate.rejection_reason && (
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-red/20 bg-red-light px-3.5 py-2.5">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round" className="mt-0.5 shrink-0">
+                <circle cx="8" cy="8" r="6.5" />
+                <path d="M8 5v3.5M8 10.5v.5" />
+              </svg>
+              <div>
+                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-red">Rejection Reason</p>
+                <p className="mt-0.5 text-sm text-charcoal">{candidate.rejection_reason}</p>
+              </div>
+            </div>
+          )}
         </div>
         <CandidateActions
           candidateId={candidate.id}
@@ -408,7 +420,6 @@ export default async function CandidateDetailPage({ params }: Props) {
           <CandidateNotes
             candidateId={candidate.id}
             initialShortlistNotes={candidate.shortlist_notes ?? ""}
-            initialFollowUpNotes={candidate.follow_up_notes ?? ""}
           />
 
           {/* Audit Log */}

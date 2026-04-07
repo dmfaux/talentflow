@@ -594,11 +594,6 @@ export default function DashboardPage() {
                 color: "#067340",
               },
               {
-                label: "Follow-up",
-                value: data.status_breakdown.find((s) => s.status === "follow_up")?.count ?? 0,
-                color: "#d68a0b",
-              },
-              {
                 label: "Scored",
                 value: data.status_breakdown.find((s) => s.status === "scored")?.count ?? 0,
                 color: "#5e38ff",

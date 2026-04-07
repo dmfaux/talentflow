@@ -57,8 +57,8 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
   const totalApplied = Object.values(counts).reduce((a, b) => a + b, 0);
   const passedGating =
     (counts.gating_passed ?? 0) + (counts.scoring ?? 0) + (counts.scored ?? 0) +
-    (counts.follow_up ?? 0) + (counts.shortlisted ?? 0);
-  const aiScored = (counts.scored ?? 0) + (counts.follow_up ?? 0) + (counts.shortlisted ?? 0);
+    (counts.shortlisted ?? 0);
+  const aiScored = (counts.scored ?? 0) + (counts.shortlisted ?? 0);
   const shortlisted = counts.shortlisted ?? 0;
 
   const [topScoreRow] = await db

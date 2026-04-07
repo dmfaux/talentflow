@@ -5,16 +5,13 @@ import { useState, useRef } from "react";
 interface Props {
   candidateId: string;
   initialShortlistNotes: string;
-  initialFollowUpNotes: string;
 }
 
 export function CandidateNotes({
   candidateId,
   initialShortlistNotes,
-  initialFollowUpNotes,
 }: Props) {
   const [shortlist, setShortlist] = useState(initialShortlistNotes);
-  const [followUp, setFollowUp] = useState(initialFollowUpNotes);
   const [saving, setSaving] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
@@ -59,19 +56,6 @@ export function CandidateNotes({
         />
       </div>
 
-      <div>
-        <label className={labelClass}>
-          <span>Follow-up Notes</span>
-        </label>
-        <textarea
-          rows={3}
-          value={followUp}
-          onChange={(e) => setFollowUp(e.target.value)}
-          onBlur={() => save("follow_up_notes", followUp)}
-          placeholder="Notes from follow-up conversations..."
-          className={textareaClass}
-        />
-      </div>
     </div>
   );
 }
