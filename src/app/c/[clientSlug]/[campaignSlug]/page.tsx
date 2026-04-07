@@ -120,10 +120,10 @@ export default async function CampaignPage({ params }: Props) {
         gating_config: (campaign.gating_config ?? []) as GatingQuestion[],
       }}
       brandColours={{
-        primary: campaign.brand_primary_color ?? "#0b0f1c",
-        secondary: campaign.brand_secondary_color ?? "#f3f0e8",
+        primary: campaign.brand_primary_color ?? "#11123c",
+        secondary: campaign.brand_secondary_color ?? "#f0f3f7",
         accent: campaign.brand_accent_color,
-        text: campaign.brand_text_color ?? "#0b0f1c",
+        text: campaign.brand_text_color ?? "#11123c",
       }}
     />
   );

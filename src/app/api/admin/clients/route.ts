@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
         brand_primary_color: normalisedColors.brand_primary_color,
         brand_secondary_color: normalisedColors.brand_secondary_color,
         brand_accent_color: normalisedColors.brand_accent_color,
-        brand_text_color: normalisedColors.brand_text_color ?? "#0b0f1c",
+        brand_text_color: normalisedColors.brand_text_color ?? "#11123c",
         logo_background: body.logo_background ?? "light",
         logo_position: body.logo_position ?? "top-left",
         notes: body.notes ?? null,

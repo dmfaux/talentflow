@@ -401,11 +401,11 @@ function BrandingDisplay({ client }: { client: Client }) {
     logoBg === "transparent"
       ? {
           backgroundImage:
-            "linear-gradient(45deg, #e5dfd0 25%, transparent 25%), linear-gradient(-45deg, #e5dfd0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5dfd0 75%), linear-gradient(-45deg, transparent 75%, #e5dfd0 75%)",
+            "linear-gradient(45deg, #d1dce6 25%, transparent 25%), linear-gradient(-45deg, #d1dce6 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d1dce6 75%), linear-gradient(-45deg, transparent 75%, #d1dce6 75%)",
           backgroundSize: "12px 12px",
           backgroundPosition: "0 0, 0 6px, 6px -6px, -6px 0",
         }
-      : { backgroundColor: logoBg === "light" ? "#ffffff" : "#0b0f1c" };
+      : { backgroundColor: logoBg === "light" ? "#ffffff" : "#11123c" };
 
   return (
     <div className="mb-8 rounded-xl border border-border bg-surface p-6">
@@ -458,7 +458,7 @@ function BrandingDisplay({ client }: { client: Client }) {
                       ? {}
                       : {
                           backgroundImage:
-                            "linear-gradient(45deg, #e5dfd0 25%, transparent 25%), linear-gradient(-45deg, #e5dfd0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5dfd0 75%), linear-gradient(-45deg, transparent 75%, #e5dfd0 75%)",
+                            "linear-gradient(45deg, #d1dce6 25%, transparent 25%), linear-gradient(-45deg, #d1dce6 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d1dce6 75%), linear-gradient(-45deg, transparent 75%, #d1dce6 75%)",
                           backgroundSize: "8px 8px",
                           backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0",
                         }),

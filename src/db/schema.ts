@@ -30,7 +30,7 @@ export const clients = pgTable(
   brand_primary_color: text("brand_primary_color"),
   brand_secondary_color: text("brand_secondary_color"),
   brand_accent_color: text("brand_accent_color"),
-  brand_text_color: text("brand_text_color").default("#0b0f1c"),
+  brand_text_color: text("brand_text_color").default("#11123c"),
   logo_background: text("logo_background").default("light"),
   logo_position: text("logo_position").default("top-left"),
   notes: text("notes"),

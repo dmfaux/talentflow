@@ -8,8 +8,8 @@ interface Props {
 }
 
 export function ApplicationFormError({ message, brandColours, retryable, onRetry }: Props) {
-  const primary = brandColours.primary || "#0b0f1c";
-  const text = brandColours.text || "#0b0f1c";
+  const primary = brandColours.primary || "#11123c";
+  const text = brandColours.text || "#11123c";
   const errorRed = "#c02616";
 
   return (
@@ -58,7 +58,7 @@ export function ApplicationFormError({ message, brandColours, retryable, onRetry
         style={{
           fontSize: "0.95rem",
           lineHeight: 1.6,
-          color: "rgba(11, 15, 28, 0.72)",
+          color: "rgba(17, 18, 60, 0.72)",
           maxWidth: "28rem",
           margin: "0 auto 1.25rem",
         }}

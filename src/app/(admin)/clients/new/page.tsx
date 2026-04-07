@@ -30,7 +30,7 @@ const TIER_OPTIONS: Array<{
     helper:
       "Includes one bespoke template. Pay per campaign at a reduced rate.",
     badgeClass: "",
-    badgeStyle: { backgroundColor: "#fff2c2", color: "#c29100" },
+    badgeStyle: { backgroundColor: "#ede8ff", color: "#4520d4" },
   },
   {
     value: "enterprise",
@@ -50,10 +50,10 @@ const INITIAL_BRANDING: BrandingValues = {
   logo_url: null,
   logo_background: "light",
   logo_position: "top-left",
-  brand_primary_color: "#0b0f1c",
-  brand_secondary_color: "#f3f0e8",
+  brand_primary_color: "#11123c",
+  brand_secondary_color: "#f0f3f7",
   brand_accent_color: "",
-  brand_text_color: "#0b0f1c",
+  brand_text_color: "#11123c",
 };
 
 export default function NewClientPage() {

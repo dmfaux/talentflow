@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f3f0e8;
-  --foreground: #0b0f1c;
+  --background: #f0f3f7;
+  --foreground: #11123c;
 }
 
 @theme inline {
@@ -10,50 +10,50 @@
   --color-foreground: var(--foreground);
 
   /* ── Surface & canvas ── */
-  --color-cream: #f3f0e8;
-  --color-canvas: #f3f0e8;
-  --color-canvas-2: #ebe6d7;
-  --color-warm-white: #f3f0e8;
+  --color-cream: #f0f3f7;
+  --color-canvas: #f0f3f7;
+  --color-canvas-2: #e1e7ef;
+  --color-warm-white: #f0f3f7;
   --color-surface: #ffffff;
   --color-paper: #ffffff;
-  --color-border: #e5dfd0;
-  --color-border-strong: #c8c0a7;
-  --color-rule: #e5dfd0;
-  --color-rule-strong: #c8c0a7;
+  --color-border: #d1dce6;
+  --color-border-strong: #9fb5c4;
+  --color-rule: #d1dce6;
+  --color-rule-strong: #9fb5c4;
 
   /* ── Ink / text ── */
-  --color-ink: #0b0f1c;
-  --color-ink-soft: #1a2033;
-  --color-ink-muted: #58607a;
-  --color-ink-faint: #8e96ad;
-  --color-charcoal: #0b0f1c;
-  --color-charcoal-light: #1a2033;
-  --color-txt-primary: #0b0f1c;
-  --color-txt-secondary: #58607a;
-  --color-txt-muted: #8e96ad;
+  --color-ink: #11123c;
+  --color-ink-soft: #2f3941;
+  --color-ink-muted: #5a6b7a;
+  --color-ink-faint: #9fb5c4;
+  --color-charcoal: #11123c;
+  --color-charcoal-light: #2f3941;
+  --color-txt-primary: #11123c;
+  --color-txt-secondary: #2f3941;
+  --color-txt-muted: #9fb5c4;
 
   /* ── Purposeful colours ── */
   /* Cobalt — primary action, brand, trust */
-  --color-cobalt: #ffc800;
-  --color-cobalt-deep: #c29100;
-  --color-cobalt-tint: #fff2c2;
-  --color-accent: #ffc800;
-  --color-accent-light: #c29100;
-  --color-accent-tint: #fff2c2;
+  --color-cobalt: #5e38ff;
+  --color-cobalt-deep: #4520d4;
+  --color-cobalt-tint: #ede8ff;
+  --color-accent: #5e38ff;
+  --color-accent-light: #4520d4;
+  --color-accent-tint: #ede8ff;
 
   /* Vermillion — editorial accent, urgency, emphasis */
-  --color-vermillion: #e63917;
-  --color-vermillion-deep: #b8260a;
-  --color-vermillion-soft: #ffe0da;
-  --color-gold: #e63917;
-  --color-gold-light: #ff6347;
+  --color-vermillion: #05dbd6;
+  --color-vermillion-deep: #04b0ac;
+  --color-vermillion-soft: #d4f7f6;
+  --color-gold: #05dbd6;
+  --color-gold-light: #3ce8e4;
 
   /* Moss — success, shortlisted, positive signal */
-  --color-moss: #067340;
-  --color-moss-deep: #04562f;
-  --color-moss-soft: #d3ecd9;
-  --color-green: #067340;
-  --color-green-light: #d3ecd9;
+  --color-moss: #0a8a5a;
+  --color-moss-deep: #066b44;
+  --color-moss-soft: #d0f0de;
+  --color-green: #0a8a5a;
+  --color-green-light: #d0f0de;
 
   /* Saffron — warning, pending, follow-up */
   --color-saffron: #d68a0b;
@@ -211,15 +211,15 @@ body {
 /* ─── Hero grid overlay ─── */
 .hero-grid {
   background-image:
-    linear-gradient(rgba(11, 15, 28, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(11, 15, 28, 0.04) 1px, transparent 1px);
+    linear-gradient(rgba(17, 18, 60, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 18, 60, 0.04) 1px, transparent 1px);
   background-size: 72px 72px;
 }
 
 .paper-grid {
   background-image:
-    linear-gradient(rgba(11, 15, 28, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(11, 15, 28, 0.025) 1px, transparent 1px);
+    linear-gradient(rgba(17, 18, 60, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 18, 60, 0.025) 1px, transparent 1px);
   background-size: 32px 32px;
 }
 
@@ -231,7 +231,7 @@ body {
   pointer-events: none;
   opacity: 0.035;
   mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.04 0 0 0 0 0.06 0 0 0 0 0.11 0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.07 0 0 0 0 0.07 0 0 0 0 0.24 0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
 /* ─── Magnetic button lift ─── */
@@ -269,7 +269,7 @@ body {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 200, 0, 0.08) 50%,
+    rgba(94, 56, 255, 0.08) 50%,
     transparent 100%
   );
   background-size: 200% 100%;
@@ -305,8 +305,8 @@ html {
 
 /* ─── Selection ─── */
 ::selection {
-  background: #ffc800;
-  color: #0b0f1c;
+  background: #5e38ff;
+  color: #ffffff;
 }
 
 /* ─── Reduce motion ─── */

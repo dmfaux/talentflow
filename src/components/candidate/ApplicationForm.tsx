@@ -65,7 +65,7 @@ function relativeLuminance({ r, g, b }: { r: number; g: number; b: number }): nu
 function buttonTextColour(bg: string): string {
   const rgb = hexToRgb(bg);
   if (!rgb) return "#ffffff";
-  return relativeLuminance(rgb) > 0.55 ? "#0b0f1c" : "#ffffff";
+  return relativeLuminance(rgb) > 0.55 ? "#11123c" : "#ffffff";
 }
 
 function formatBytes(bytes: number): string {
@@ -109,10 +109,10 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
   const [result, setResult] = useState<SubmissionResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const primaryColour = brandColours.primary || "#0b0f1c";
+  const primaryColour = brandColours.primary || "#11123c";
   const primaryButtonText = buttonTextColour(primaryColour);
   const accentColour = brandColours.accent || primaryColour;
-  const textColour = brandColours.text || "#0b0f1c";
+  const textColour = brandColours.text || "#11123c";
 
   const setField = <K extends keyof FormFields>(key: K, value: FormFields[K]) => {
     setFields((prev) => ({ ...prev, [key]: value }));
@@ -318,7 +318,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
 
   // ── Shared input styles (inline, brand-adaptable) ────────────────
 
-  const fieldBorder = "rgba(11, 15, 28, 0.15)";
+  const fieldBorder = "rgba(17, 18, 60, 0.15)";
   const fieldBorderFocus = primaryColour;
   const errorRed = "#c02616";
 
@@ -328,7 +328,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
     fontWeight: 600,
     textTransform: "uppercase",
     letterSpacing: "0.1em",
-    color: "rgba(11, 15, 28, 0.62)",
+    color: "rgba(17, 18, 60, 0.62)",
     marginBottom: "0.5rem",
     fontFamily: "var(--font-instrument-sans), system-ui, sans-serif",
   };
@@ -389,7 +389,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
       <p
         style={{
           fontSize: "0.9rem",
-          color: "rgba(11, 15, 28, 0.62)",
+          color: "rgba(17, 18, 60, 0.62)",
           marginBottom: "1.75rem",
           lineHeight: 1.55,
         }}
@@ -495,7 +495,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
           marginBottom: "1.5rem",
           cursor: "pointer",
           fontSize: "0.85rem",
-          color: "rgba(11, 15, 28, 0.72)",
+          color: "rgba(17, 18, 60, 0.72)",
           lineHeight: 1.5,
         }}
       >
@@ -527,7 +527,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
               fontWeight: 600,
               textTransform: "uppercase",
               letterSpacing: "0.12em",
-              color: "rgba(11, 15, 28, 0.62)",
+              color: "rgba(17, 18, 60, 0.62)",
             }}
           >
             Screening Questions
@@ -636,7 +636,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
               padding: "1.75rem 1rem",
               border: `1.5px dashed ${dragActive ? primaryColour : fieldErrors.cv ? errorRed : fieldBorder}`,
               borderRadius: "0.625rem",
-              backgroundColor: dragActive ? `${primaryColour}08` : "rgba(11, 15, 28, 0.02)",
+              backgroundColor: dragActive ? `${primaryColour}08` : "rgba(17, 18, 60, 0.02)",
               cursor: "pointer",
               textAlign: "center",
               transition: "border-color 150ms ease, background-color 150ms ease",
@@ -647,7 +647,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
               height="28"
               viewBox="0 0 28 28"
               fill="none"
-              stroke={dragActive ? primaryColour : "rgba(11, 15, 28, 0.45)"}
+              stroke={dragActive ? primaryColour : "rgba(17, 18, 60, 0.45)"}
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -661,7 +661,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
               <span style={{ fontSize: "0.9rem", fontWeight: 500, color: textColour }}>
                 {dragActive ? "Drop your CV here" : "Click or drag your CV here"}
               </span>
-              <p style={{ marginTop: "0.25rem", fontSize: "0.75rem", color: "rgba(11, 15, 28, 0.55)" }}>
+              <p style={{ marginTop: "0.25rem", fontSize: "0.75rem", color: "rgba(17, 18, 60, 0.55)" }}>
                 PDF, DOC, or DOCX · Maximum 10MB
               </p>
             </div>
@@ -719,7 +719,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
               >
                 {cvFile.name}
               </div>
-              <div style={{ fontSize: "0.75rem", color: "rgba(11, 15, 28, 0.55)" }}>
+              <div style={{ fontSize: "0.75rem", color: "rgba(17, 18, 60, 0.55)" }}>
                 {formatBytes(cvFile.size)}
               </div>
             </div>
@@ -731,7 +731,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
                 padding: "0.5rem",
                 border: "none",
                 background: "transparent",
-                color: "rgba(11, 15, 28, 0.55)",
+                color: "rgba(17, 18, 60, 0.55)",
                 cursor: "pointer",
                 borderRadius: "0.375rem",
                 display: "flex",
@@ -739,7 +739,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
                 justifyContent: "center",
               }}
               onMouseEnter={(e) => (e.currentTarget.style.color = errorRed)}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(11, 15, 28, 0.55)")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(17, 18, 60, 0.55)")}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
                 <path d="M4 4l8 8M12 4l-8 8" />
@@ -764,7 +764,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
             padding: "0.875rem 1rem",
             border: `1px solid ${fieldErrors.popia_consent ? errorRed : fieldBorder}`,
             borderRadius: "0.625rem",
-            backgroundColor: "rgba(11, 15, 28, 0.02)",
+            backgroundColor: "rgba(17, 18, 60, 0.02)",
             cursor: "pointer",
           }}
         >
@@ -799,7 +799,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
               id="ts-popia-text"
               style={{
                 fontSize: "0.78rem",
-                color: "rgba(11, 15, 28, 0.68)",
+                color: "rgba(17, 18, 60, 0.68)",
                 lineHeight: 1.5,
               }}
             >
