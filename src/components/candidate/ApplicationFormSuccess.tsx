@@ -20,19 +20,17 @@ function relativeLuminance({ r, g, b }: { r: number; g: number; b: number }): nu
 }
 
 interface Props {
-  passed: boolean;
   message: string;
   brandColours: BrandColours;
   clientName?: string;
 }
 
-export function ApplicationFormSuccess({ passed, message, brandColours, clientName }: Props) {
+export function ApplicationFormSuccess({ message, brandColours, clientName }: Props) {
   const primary = brandColours.primary || "#0b0f1c";
-  const accent = brandColours.accent || primary;
   const text = brandColours.text || "#0b0f1c";
 
-  const iconColour = passed ? "#067340" : accent;
-  const iconBg = passed ? "#d3ecd9" : `${accent}1a`;
+  const iconColour = "#067340";
+  const iconBg = "#d3ecd9";
 
   const primaryRgb = hexToRgb(primary);
   const primaryButtonText = primaryRgb && relativeLuminance(primaryRgb) > 0.55 ? "#0b0f1c" : "#ffffff";
@@ -61,16 +59,9 @@ export function ApplicationFormSuccess({ passed, message, brandColours, clientNa
         }}
         aria-hidden="true"
       >
-        {passed ? (
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={iconColour} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 13l4 4L19 7" />
-          </svg>
-        ) : (
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={iconColour} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 8v4M12 16h.01" />
-          </svg>
-        )}
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={iconColour} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 13l4 4L19 7" />
+        </svg>
       </div>
 
       <h2
@@ -83,7 +74,7 @@ export function ApplicationFormSuccess({ passed, message, brandColours, clientNa
           letterSpacing: "-0.01em",
         }}
       >
-        {passed ? "Application received" : "Thank you for your interest"}
+        Application received
       </h2>
 
       <p
@@ -98,28 +89,26 @@ export function ApplicationFormSuccess({ passed, message, brandColours, clientNa
         {message}
       </p>
 
-      {passed && (
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            padding: "0.5rem 0.875rem",
-            borderRadius: "999px",
-            backgroundColor: "#d3ecd9",
-            color: "#04562f",
-            fontSize: "0.78rem",
-            fontWeight: 500,
-            fontFamily: "var(--font-jetbrains-mono), monospace",
-            letterSpacing: "0.02em",
-          }}
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-            <path d="M2.5 6.5L5 9l4.5-6" />
-          </svg>
-          CV uploaded successfully
-        </div>
-      )}
+      <div
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          padding: "0.5rem 0.875rem",
+          borderRadius: "999px",
+          backgroundColor: "#d3ecd9",
+          color: "#04562f",
+          fontSize: "0.78rem",
+          fontWeight: 500,
+          fontFamily: "var(--font-jetbrains-mono), monospace",
+          letterSpacing: "0.02em",
+        }}
+      >
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+          <path d="M2.5 6.5L5 9l4.5-6" />
+        </svg>
+        CV uploaded successfully
+      </div>
 
       {clientName && (
         <p

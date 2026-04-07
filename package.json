@@ -13,10 +13,12 @@
     "db:seed:admin": "tsx src/db/seed-admin.ts",
     "db:seed-templates": "tsx scripts/seed-templates.ts",
     "db:studio": "drizzle-kit studio",
-    "storage:init": "tsx scripts/init-storage.ts"
+    "storage:init": "tsx scripts/init-storage.ts",
+    "jobs:poll": "while true; do curl -s -X POST http://localhost:3000/api/jobs/process; sleep 10; done"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
+    "@azure/service-bus": "^7.9.0",
     "@azure/storage-blob": "^12.31.0",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/noto-serif": "^5.2.9",

@@ -86,7 +86,7 @@ interface FormFields {
 }
 
 type SubmissionResult =
-  | { kind: "success"; passed: boolean; message: string }
+  | { kind: "success"; message: string }
   | { kind: "failure"; message: string; retryable: boolean };
 
 // ── Component ────────────────────────────────────────────────────────
@@ -246,7 +246,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
       const data = await res.json().catch(() => ({}));
 
       if (res.ok && data.success) {
-        setResult({ kind: "success", passed: !!data.passed, message: data.message || "Thank you for applying." });
+        setResult({ kind: "success", message: data.message || "Thank you for applying." });
         return;
       }
 
@@ -299,7 +299,6 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
   if (result?.kind === "success") {
     return (
       <ApplicationFormSuccess
-        passed={result.passed}
         message={result.message}
         brandColours={brandColours}
         clientName={clientName}

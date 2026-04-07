@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { campaigns, candidates, clients } from "@/db/schema";
 import { uploadCV } from "@/lib/azure-storage";
-import { processNewCandidate } from "@/lib/process-candidate";
+import { getQueue } from "@/lib/queue";
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -52,7 +52,10 @@ export async function POST(
 
     if (blobUrl) {
       await db.update(candidates).set({ cv_url: blobUrl, updated_at: new Date() }).where(eq(candidates.id, candidateId));
-      processNewCandidate(candidateId).catch((err) => console.error("Background processing failed:", err));
+      await getQueue().enqueue(
+        { type: "candidate-processing", candidateId },
+        { deduplicationId: `process-${candidateId}` }
+      );
     }
 
     return json({ success: true, url: blobUrl, stored: !!blobUrl }, 201);

@@ -353,3 +353,27 @@ export const messagesRelations = relations(messages, ({ one }) => ({
     references: [candidates.id],
   }),
 }));
+
+// ── Jobs (queue) ────────────────────────────────────────────────────
+
+export const jobs = pgTable(
+  "jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    type: text("type").notNull(),
+    payload: jsonb("payload").notNull(),
+    status: text("status").notNull().default("pending"),
+    deliver_at: timestamp("deliver_at").defaultNow().notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    max_attempts: integer("max_attempts").notNull().default(3),
+    last_error: text("last_error"),
+    locked_until: timestamp("locked_until"),
+    deduplication_id: text("deduplication_id"),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    completed_at: timestamp("completed_at"),
+  },
+  (table) => [
+    index("jobs_poll_idx").on(table.status, table.deliver_at),
+    uniqueIndex("jobs_dedup_idx").on(table.deduplication_id),
+  ]
+);

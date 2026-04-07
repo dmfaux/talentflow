@@ -1,14 +1,9 @@
 import { db } from "@/db";
 import { campaigns, candidates, clients } from "@/db/schema";
 import { uploadCV } from "@/lib/azure-storage";
-import {
-  applicationReceivedEmail,
-  gatingFailedEmail,
-  gatingPassedEmail,
-  sendCandidateEmail,
-} from "@/lib/email";
+import { applicationReceivedEmail, sendCandidateEmail } from "@/lib/email";
 import { evaluateGating, GatingQuestion } from "@/lib/gating";
-import { processNewCandidate } from "@/lib/process-candidate";
+import { getQueue } from "@/lib/queue";
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -140,24 +135,35 @@ export async function POST(
     const clientName = campaign.client_name ?? "the company";
     const candidateId = newCandidate.id;
 
-    if (cvFile && gatingPassed) {
+    if (cvFile) {
       const buffer = Buffer.from(await cvFile.arrayBuffer());
       const blobUrl = await uploadCV(clientSlug, campaignSlug, candidateId, buffer, cvFile.name);
       if (blobUrl) {
         await db.update(candidates).set({ cv_url: blobUrl, updated_at: new Date() }).where(eq(candidates.id, candidateId));
-        processNewCandidate(candidateId).catch((err) => console.error("Background processing failed:", err));
       }
     }
 
+    // Immediate confirmation email (fire-and-forget is acceptable here)
     sendCandidateEmail(trimmedEmail, `Application received — ${roleTitle}`, applicationReceivedEmail(candidateName, roleTitle, clientName), candidateId).catch((err) => console.error("Email send failed:", err));
 
+    const queue = getQueue();
+
     if (gatingPassed) {
-      sendCandidateEmail(trimmedEmail, `Good news — ${roleTitle}`, gatingPassedEmail(candidateName, roleTitle, clientName), candidateId).catch((err) => console.error("Email send failed:", err));
-      return json({ success: true, passed: true, candidate_id: candidateId, message: "Thank you for applying! Your application has been received and will be reviewed shortly." }, 201);
+      // Queue CV processing for immediate pickup
+      await queue.enqueue(
+        { type: "candidate-processing", candidateId },
+        { deduplicationId: `process-${candidateId}` }
+      );
+    } else {
+      // Queue soft rejection email — delivered after 24 hours
+      const deliverAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await queue.enqueue(
+        { type: "send-email", candidateId, emailKind: "gating_failed" },
+        { deliverAt, deduplicationId: `reject-email-${candidateId}` }
+      );
     }
 
-    sendCandidateEmail(trimmedEmail, `Application update — ${roleTitle}`, gatingFailedEmail(candidateName, roleTitle, clientName), candidateId).catch((err) => console.error("Email send failed:", err));
-    return json({ success: true, passed: false, candidate_id: candidateId, message: "Thank you for your interest. Unfortunately, your profile does not meet the minimum requirements for this role at this time." }, 201);
+    return json({ success: true, candidate_id: candidateId, message: "Thank you for applying! Your application has been received and will be reviewed shortly." }, 201);
   } catch (err) {
     console.error("POST /api/apply error:", err);
     return json({ error: "Internal server error" }, 500);
