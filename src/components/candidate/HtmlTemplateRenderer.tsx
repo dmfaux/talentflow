@@ -1,7 +1,7 @@
 "use client";
 
-import { createPortal } from "react-dom";
-import { useEffect, useRef, useState } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { useEffect, useRef, useMemo } from "react";
 import {
   ApplicationForm,
   type BrandColours,
@@ -16,6 +16,29 @@ interface Props {
   brandColours: BrandColours;
 }
 
+/**
+ * Extract <style> blocks and body content from a full HTML document so the
+ * template can be embedded inside the Next.js page without nested document
+ * tags.
+ */
+function extractBodyContent(html: string): string {
+  const styles: string[] = [];
+  const styleRe = /<style[^>]*>[\s\S]*?<\/style\s*>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = styleRe.exec(html)) !== null) styles.push(m[0]);
+
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body\s*>/i);
+  if (bodyMatch) return styles.join("\n") + "\n" + bodyMatch[1];
+
+  // Fallback for HTML that's already just body content
+  return html
+    .replace(/<!DOCTYPE[^>]*>/i, "")
+    .replace(/<\/?html[^>]*>/gi, "")
+    .replace(/<head[^>]*>[\s\S]*?<\/head\s*>/i, "")
+    .replace(/<\/?body[^>]*>/gi, "")
+    .trim();
+}
+
 export function HtmlTemplateRenderer({
   html,
   clientSlug,
@@ -24,30 +47,44 @@ export function HtmlTemplateRenderer({
   brandColours,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [formMount, setFormMount] = useState<HTMLElement | null>(null);
+  const formRootRef = useRef<Root | null>(null);
+
+  const safeHtml = useMemo(() => extractBodyContent(html), [html]);
+
+  // Store latest props in refs so the effect doesn't re-run on every render
+  const propsRef = useRef({ clientSlug, clientName, campaign, brandColours });
+  propsRef.current = { clientSlug, clientName, campaign, brandColours };
 
   useEffect(() => {
-    if (containerRef.current) {
-      const el = containerRef.current.querySelector<HTMLElement>(
-        "#application-form"
-      );
-      setFormMount(el);
-    }
-  }, [html]);
+    const container = containerRef.current;
+    if (!container) return;
 
-  return (
-    <>
-      <div ref={containerRef} dangerouslySetInnerHTML={{ __html: html }} />
-      {formMount &&
-        createPortal(
-          <ApplicationForm
-            clientSlug={clientSlug}
-            clientName={clientName}
-            campaign={campaign}
-            brandColours={brandColours}
-          />,
-          formMount
-        )}
-    </>
-  );
+    // Set innerHTML ourselves — React never touches this div's children.
+    container.innerHTML = safeHtml;
+
+    const mount = container.querySelector<HTMLElement>("#application-form");
+    if (!mount) return;
+
+    // Create an independent React root inside the mount point.
+    const root = createRoot(mount);
+    formRootRef.current = root;
+
+    const p = propsRef.current;
+    root.render(
+      <ApplicationForm
+        clientSlug={p.clientSlug}
+        clientName={p.clientName}
+        campaign={p.campaign}
+        brandColours={p.brandColours}
+      />
+    );
+
+    return () => {
+      root.unmount();
+      formRootRef.current = null;
+    };
+  }, [safeHtml]);
+
+  // No dangerouslySetInnerHTML — we fully manage innerHTML in the effect.
+  return <div ref={containerRef} suppressHydrationWarning />;
 }
