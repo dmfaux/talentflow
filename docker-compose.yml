@@ -22,6 +22,13 @@ services:
     volumes:
       - azurite-data:/data
 
+  mailpit:
+    image: axllent/mailpit
+    container_name: talentstream-mailpit
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+
 volumes:
   pgdata:
   azurite-data:

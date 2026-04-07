@@ -1,14 +1,59 @@
-import { Resend } from "resend";
 import { db } from "@/db";
 import { messages } from "@/db/schema";
 
-let resendClient: Resend | null = null;
+// ── Transport abstraction ───────────────────────────────────────────
 
-function getClient(): Resend {
-  if (!resendClient) {
-    resendClient = new Resend(process.env.RESEND_API_KEY);
+interface SendResult {
+  id: string | null;
+  error: unknown | null;
+}
+
+interface EmailTransport {
+  send(
+    from: string,
+    to: string,
+    subject: string,
+    html: string
+  ): Promise<SendResult>;
+}
+
+let _transport: EmailTransport | null = null;
+
+function getTransport(): EmailTransport {
+  if (!_transport) {
+    if (process.env.EMAIL_PROVIDER === "resend") {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { Resend } = require("resend");
+      const client = new Resend(process.env.RESEND_API_KEY);
+      _transport = {
+        async send(from, to, subject, html) {
+          const { data, error } = await client.emails.send({
+            from,
+            to,
+            subject,
+            html,
+          });
+          return { id: data?.id ?? null, error };
+        },
+      };
+    } else {
+      // Default: SMTP (Mailpit in dev)
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const nodemailer = require("nodemailer");
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST ?? "localhost",
+        port: Number(process.env.SMTP_PORT ?? 1025),
+        secure: false,
+      });
+      _transport = {
+        async send(from, to, subject, html) {
+          const info = await transporter.sendMail({ from, to, subject, html });
+          return { id: info.messageId ?? null, error: null };
+        },
+      };
+    }
   }
-  return resendClient;
+  return _transport;
 }
 
 const FROM =
@@ -22,19 +67,14 @@ export async function sendTransactionalEmail(
   htmlBody: string
 ): Promise<string | null> {
   try {
-    const { data, error } = await getClient().emails.send({
-      from: FROM,
-      to,
-      subject,
-      html: htmlBody,
-    });
+    const { id, error } = await getTransport().send(FROM, to, subject, htmlBody);
 
     if (error) {
       console.error("sendTransactionalEmail error:", error);
       return null;
     }
 
-    return data?.id ?? null;
+    return id;
   } catch (err) {
     console.error("sendTransactionalEmail exception:", err);
     return null;
@@ -48,18 +88,11 @@ export async function sendCandidateEmail(
   candidateId: string
 ): Promise<string | null> {
   try {
-    const { data, error } = await getClient().emails.send({
-      from: FROM,
-      to,
-      subject,
-      html: htmlBody,
-    });
+    const { id, error } = await getTransport().send(FROM, to, subject, htmlBody);
 
     if (error) {
       console.error("sendCandidateEmail error:", error);
     }
-
-    const externalId = data?.id ?? null;
 
     await db.insert(messages).values({
       candidate_id: candidateId,
@@ -67,10 +100,10 @@ export async function sendCandidateEmail(
       direction: "outbound",
       content: subject,
       status: error ? "failed" : "sent",
-      external_id: externalId,
+      external_id: id,
     });
 
-    return externalId;
+    return id;
   } catch (err) {
     console.error("sendCandidateEmail exception:", err);
     return null;
