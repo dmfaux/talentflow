@@ -493,7 +493,7 @@ export function CampaignWizard({
               onClick={() => { if (i < step) setStep(i); }}
               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-semibold transition-colors cursor-pointer ${
                 i < step
-                  ? "bg-accent text-ink"
+                  ? "bg-accent text-white"
                   : i === step
                     ? "bg-charcoal text-white"
                     : "bg-cream text-txt-muted border border-border"
@@ -1089,7 +1089,7 @@ export function CampaignWizard({
               <button
                 onClick={() => submit("active")}
                 disabled={submitting}
-                className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-5 text-[0.8rem] font-medium text-ink transition-colors hover:bg-accent-light hover:text-white disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
                 {submitting && (
                   <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">

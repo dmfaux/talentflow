@@ -180,7 +180,7 @@ export default function ClientDetailPage() {
             </button>
             <Link
               href={`/clients/${id}/edit`}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-cobalt px-3 text-[0.75rem] font-medium text-ink transition-colors hover:bg-cobalt-deep cursor-pointer"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-cobalt px-3 text-[0.75rem] font-medium text-white transition-colors hover:bg-cobalt-deep cursor-pointer"
             >
               Edit branding
             </Link>
@@ -287,7 +287,7 @@ export default function ClientDetailPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-5 text-[0.8rem] font-medium text-ink transition-colors hover:bg-accent-light hover:text-white disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                 >
                   {saving && (
                     <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">

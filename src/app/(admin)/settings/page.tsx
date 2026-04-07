@@ -126,7 +126,7 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={lookupLoading || !lookupEmail}
-              className="inline-flex h-10 shrink-0 items-center rounded-lg bg-accent px-4 text-[0.78rem] font-medium text-ink transition-colors hover:bg-accent-light hover:text-white disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              className="inline-flex h-10 shrink-0 items-center rounded-lg bg-accent px-4 text-[0.78rem] font-medium text-white transition-colors hover:bg-accent-light disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
             >
               {lookupLoading ? "Looking up..." : "Look Up"}
             </button>

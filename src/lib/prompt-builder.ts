@@ -118,7 +118,7 @@ The injected form has its own internal styling and is approximately 500–700px 
 
 # Footer
 
-Include a subtle footer at the very bottom of the page with the text "Powered by TalentFlow". Style it small, muted, and unobtrusive — it should not compete with the page content. Centre-align it with generous top margin.
+Include a subtle footer at the very bottom of the page with the text "Powered by TalentStream". Style it small, muted, and unobtrusive — it should not compete with the page content. Centre-align it with generous top margin.
 
 # Colours
 

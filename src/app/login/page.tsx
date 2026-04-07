@@ -136,7 +136,7 @@ function LoginForm() {
             <button
               type="submit"
               disabled={loading}
-              className="relative h-12 w-full rounded-lg bg-cobalt font-medium text-[0.92rem] text-ink transition-all duration-200 hover:bg-cobalt-deep hover:text-white disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed shadow-[0_4px_16px_-4px_rgba(255,200,0,0.5)]"
+              className="relative h-12 w-full rounded-lg bg-cobalt font-medium text-[0.92rem] text-white transition-all duration-200 hover:bg-cobalt-deep disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed shadow-[0_4px_16px_-4px_rgba(94,56,255,0.4)]"
             >
               {loading ? (
                 <span className="inline-flex items-center gap-2">

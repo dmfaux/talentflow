@@ -58,7 +58,7 @@ export function CampaignActions({ campaignId, status }: Props) {
             <button
               onClick={() => updateStatus("active")}
               disabled={loading}
-              className="inline-flex h-8 items-center rounded-lg bg-accent px-3 text-[0.75rem] font-medium text-ink transition-colors hover:bg-accent-light hover:text-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex h-8 items-center rounded-lg bg-accent px-3 text-[0.75rem] font-medium text-white transition-colors hover:bg-accent-light cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Publish
             </button>

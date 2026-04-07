@@ -47,7 +47,7 @@ export function EmptyState({ icon, title, description, actionLabel, actionHref }
       {actionLabel && actionHref && (
         <Link
           href={actionHref}
-          className="mt-4 inline-flex h-8 items-center rounded-lg bg-accent px-4 text-[0.75rem] font-medium text-ink transition-colors hover:bg-accent-light hover:text-white"
+          className="mt-4 inline-flex h-8 items-center rounded-lg bg-accent px-4 text-[0.75rem] font-medium text-white transition-colors hover:bg-accent-light"
         >
           {actionLabel}
         </Link>
