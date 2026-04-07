@@ -475,7 +475,7 @@ export function CampaignWizard({
   // ── Render ───────────────────────────────────────────────────────
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-4xl">
       {/* Breadcrumb */}
       <div className="mb-6 flex items-center gap-2 text-xs text-txt-muted">
         <Link href="/campaigns" className="hover:text-charcoal transition-colors">

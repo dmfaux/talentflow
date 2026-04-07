@@ -14,6 +14,8 @@ export const SLOT_ALLOW_LIST = [
   "campaign.department",
   "campaign.location",
   "campaign.employment_type",
+  "campaign.salary_range",
+  // Legacy separate slots — still accepted for backwards compatibility
   "campaign.salary_range_min",
   "campaign.salary_range_max",
 ] as const;
@@ -102,7 +104,49 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
+/** Format a number as ZAR currency (e.g. 450000 → "R 450,000"). */
+function formatZar(n: number): string {
+  return "R " + n.toLocaleString("en-ZA");
+}
+
+/**
+ * Build the salary range string from min/max.
+ * - Both set:    "R 450,000 – R 650,000"
+ * - Only min:    "From R 450,000"
+ * - Only max:    "Up to R 650,000"
+ * - Neither:     ""
+ */
+function formatSalaryRange(
+  min: number | null | undefined,
+  max: number | null | undefined
+): string {
+  if (min && max) return `${formatZar(min)} – ${formatZar(max)}`;
+  if (min) return `From ${formatZar(min)}`;
+  if (max) return `Up to ${formatZar(max)}`;
+  return "";
+}
+
+const SALARY_FORMAT_SLOTS = new Set<string>([
+  "campaign.salary_range_min",
+  "campaign.salary_range_max",
+]);
+
 function resolveSlot(name: string, data: SlotData): string {
+  // Combined salary range slot
+  if (name === "campaign.salary_range") {
+    return escapeHtml(
+      formatSalaryRange(data.campaign.salary_range_min, data.campaign.salary_range_max)
+    );
+  }
+
+  // Legacy separate salary slots — format as ZAR
+  if (SALARY_FORMAT_SLOTS.has(name)) {
+    const key = name === "campaign.salary_range_min" ? "salary_range_min" : "salary_range_max";
+    const val = data.campaign[key];
+    if (val === null || val === undefined) return "";
+    return escapeHtml(formatZar(val));
+  }
+
   const [ns, key] = name.split(".", 2);
   const obj = ns === "client" ? data.client : ns === "campaign" ? data.campaign : undefined;
   if (!obj) return "";

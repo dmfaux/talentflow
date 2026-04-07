@@ -324,11 +324,10 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
 
   const labelStyle: React.CSSProperties = {
     display: "block",
-    fontSize: "0.72rem",
+    fontSize: "0.875rem",
     fontWeight: 600,
-    textTransform: "uppercase",
-    letterSpacing: "0.1em",
-    color: "rgba(17, 18, 60, 0.62)",
+    letterSpacing: "0.01em",
+    color: "rgba(17, 18, 60, 0.72)",
     marginBottom: "0.5rem",
     fontFamily: "var(--font-instrument-sans), system-ui, sans-serif",
   };
@@ -499,39 +498,39 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
           lineHeight: 1.5,
         }}
       >
-        <input
-          type="checkbox"
-          checked={fields.whatsapp_opt_in}
-          onChange={(e) => setField("whatsapp_opt_in", e.target.checked)}
+        <span
+          role="checkbox"
+          aria-checked={fields.whatsapp_opt_in}
+          tabIndex={0}
+          onClick={() => setField("whatsapp_opt_in", !fields.whatsapp_opt_in)}
+          onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setField("whatsapp_opt_in", !fields.whatsapp_opt_in); } }}
           style={{
             marginTop: "0.15rem",
-            width: "1rem",
-            height: "1rem",
-            accentColor: accentColour,
+            width: "1.125rem",
+            height: "1.125rem",
+            borderRadius: "0.3rem",
+            border: `1.5px solid ${fields.whatsapp_opt_in ? primaryColour : fieldBorder}`,
+            backgroundColor: fields.whatsapp_opt_in ? primaryColour : "#ffffff",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
             cursor: "pointer",
             flexShrink: 0,
+            transition: "all 0.15s ease",
           }}
-        />
+        >
+          {fields.whatsapp_opt_in && (
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2.5 6.5L5 9l4.5-6" />
+            </svg>
+          )}
+        </span>
         <span>I would like to receive WhatsApp messages about my application.</span>
       </label>
 
       {/* Gating questions */}
       {gatingConfig.length > 0 && (
         <div style={{ marginBottom: "1.5rem" }}>
-          <div
-            style={{
-              paddingBottom: "0.625rem",
-              marginBottom: "1.125rem",
-              borderBottom: `1px solid ${fieldBorder}`,
-              fontSize: "0.72rem",
-              fontWeight: 600,
-              textTransform: "uppercase",
-              letterSpacing: "0.12em",
-              color: "rgba(17, 18, 60, 0.62)",
-            }}
-          >
-            Screening Questions
-          </div>
           {gatingConfig.map((q) => {
             const errKey = `answer_${q.id}`;
             const hasErr = !!fieldErrors[errKey];
@@ -768,22 +767,35 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
             cursor: "pointer",
           }}
         >
-          <input
-            type="checkbox"
-            required
-            checked={fields.popia_consent}
-            onChange={(e) => setField("popia_consent", e.target.checked)}
+          <span
+            role="checkbox"
+            aria-checked={fields.popia_consent}
             aria-invalid={!!fieldErrors.popia_consent}
             aria-describedby="ts-popia-text"
+            tabIndex={0}
+            onClick={() => setField("popia_consent", !fields.popia_consent)}
+            onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setField("popia_consent", !fields.popia_consent); } }}
             style={{
               marginTop: "0.2rem",
-              width: "1.1rem",
-              height: "1.1rem",
-              accentColor: accentColour,
+              width: "1.125rem",
+              height: "1.125rem",
+              borderRadius: "0.3rem",
+              border: `1.5px solid ${fields.popia_consent ? primaryColour : fieldErrors.popia_consent ? errorRed : fieldBorder}`,
+              backgroundColor: fields.popia_consent ? primaryColour : "#ffffff",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
               cursor: "pointer",
               flexShrink: 0,
+              transition: "all 0.15s ease",
             }}
-          />
+          >
+            {fields.popia_consent && (
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2.5 6.5L5 9l4.5-6" />
+              </svg>
+            )}
+          </span>
           <div>
             <div
               style={{

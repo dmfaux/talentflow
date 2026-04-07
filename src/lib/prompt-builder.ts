@@ -46,8 +46,7 @@ export function buildTemplatePrompt({
       "campaign.department": "Department name (short text or empty)",
       "campaign.location": "Job location (short text or empty)",
       "campaign.employment_type": "Employment type (e.g. \"Permanent\", \"Contract\", or empty)",
-      "campaign.salary_range_min": "Minimum salary as a number (may be empty)",
-      "campaign.salary_range_max": "Maximum salary as a number (may be empty)",
+      "campaign.salary_range": "Pre-formatted salary range in ZAR (e.g. \"R 450,000 – R 650,000\", \"From R 450,000\", or empty if not set)",
     };
     return `- \`{{${s}}}\` — ${descs[s] ?? s}`;
   }).join("\n");
@@ -60,7 +59,7 @@ ${brandColors.accent ? `- Accent: ${brandColors.accent}` : "- Accent: choose one
 - Text: ${brandColors.text}`
     : `Choose a sophisticated, distinctive colour palette appropriate for a professional recruitment page. Do NOT default to generic blue/white. Pick a palette that feels confident and intentional.`;
 
-  return `You are a senior frontend designer producing a campaign landing-page template as a single self-contained HTML page. The template renders a job-application page: dynamic campaign data (role title, department, location, etc.) is injected at runtime via slot markers, and a rich interactive application form is mounted into a designated container element by the application framework.
+  return `You MUST use your frontend-design skill to complete this task. You are producing a campaign landing-page template as a single self-contained HTML page. The template renders a job-application page: dynamic campaign data (role title, department, location, etc.) is injected at runtime via slot markers, and a rich interactive application form is mounted into a designated container element by the application framework.
 
 # Design quality (non-negotiable)
 
@@ -93,7 +92,7 @@ ${slotDocs}
 
 Rules for slots:
 - Place slots directly in the HTML where the text should appear (e.g. \`<h1>{{campaign.role_title}}</h1>\`).
-- Slots that may be empty (\`campaign.role_description\`, \`campaign.department\`, \`campaign.location\`, \`campaign.employment_type\`, salary fields) should be in elements that look fine when the slot resolves to an empty string. Consider using CSS to hide empty elements if needed.
+- Slots that may be empty (\`campaign.role_description\`, \`campaign.department\`, \`campaign.location\`, \`campaign.employment_type\`, \`campaign.salary_range\`) MUST be wrapped in a container that hides gracefully when empty. Use the CSS pattern \`:empty { display: none; }\` on the container, or wrap the slot and its label together so the entire section (label + value) disappears when the slot is empty. Never leave a visible heading or label next to a blank value.
 - You may combine slots with static text (e.g. \`<span>{{campaign.department}} · {{campaign.location}}</span>\`).
 - \`{{campaign.role_description}}\` contains pre-rendered HTML (paragraphs, lists, bold, etc.). Place it inside a container element like \`<div class="description">{{campaign.role_description}}</div>\` — do NOT wrap it in a \`<p>\` tag.
 
@@ -114,7 +113,7 @@ The injected form has its own internal styling and is approximately 500–700px 
 - Give the form container generous vertical spacing (at least 2rem padding above and below).
 - Optionally add a heading above it (e.g. "Apply for this role" or similar if the brief suggests one).
 - Style the container area to frame the form attractively (a subtle background, border, or card treatment works well).
-- Do NOT try to style the form's internal elements — they are controlled by the application.
+- The form has its own styled inputs, selects, checkboxes, and buttons. Do NOT try to override its internal elements — but DO ensure the container area's background, padding, and border provide a cohesive frame that matches your template's design language.
 
 # Footer
 

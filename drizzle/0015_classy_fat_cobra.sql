@@ -1,0 +1,1 @@
+ALTER TABLE "clients" ALTER COLUMN "brand_text_color" SET DEFAULT '#11123c';
