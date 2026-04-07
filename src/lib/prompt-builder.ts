@@ -19,16 +19,24 @@ export interface BrandColors {
   text: string;
 }
 
+export interface LogoInput {
+  url: string;
+  background: string;
+  position: string;
+}
+
 export interface BuildPromptInput {
   name: string;
   brief: string;
   brandColors?: BrandColors | null;
+  logo?: LogoInput | null;
 }
 
 export function buildTemplatePrompt({
   name,
   brief,
   brandColors,
+  logo,
 }: BuildPromptInput): string {
   const slotDocs = SLOT_ALLOW_LIST.map((s) => {
     const descs: Record<string, string> = {
@@ -112,6 +120,18 @@ The injected form has its own internal styling and is approximately 500–700px 
 # Colours
 
 ${brandSection}
+
+# Company logo
+${logo
+    ? `The client has a logo hosted at this URL — include it in the page using an \`<img>\` tag:
+
+    ${logo.url}
+
+- Position the logo at the **${logo.position.replace("-", " ")}** of the header/hero area.
+- The logo works best on a **${logo.background}** background${logo.background === "transparent" ? " (it has transparency, so ensure adequate contrast with whatever is behind it)" : logo.background === "dark" ? " — place it on a dark surface or add a dark container behind it" : " — place it on a light/white surface"}.
+- Size the logo sensibly (max-height ~48–64px for desktop, smaller on mobile). Do NOT stretch or distort it.
+- Do NOT add a border or drop shadow to the logo unless the brief requests it.`
+    : "No client logo is available. Use {{client.name}} as text instead of an image logo."}
 
 # User input
 

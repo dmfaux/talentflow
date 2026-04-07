@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { buildTemplatePrompt, type BrandColors } from "@/lib/prompt-builder";
-import { validateHtmlTemplate } from "@/lib/slots";
+import { validateHtmlTemplate, replaceSlots, type SlotData } from "@/lib/slots";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -147,6 +147,7 @@ export function CampaignWizard({
   const [designBrief, setDesignBrief] = useState("");
   const [promptCopied, setPromptCopied] = useState(false);
   const [htmlValidation, setHtmlValidation] = useState<{ ok: boolean; errors?: string[] } | null>(null);
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
 
   useEffect(() => {
     fetch("/api/admin/clients")
@@ -374,10 +375,19 @@ export function CampaignWizard({
         }
       : null;
 
+    const logo = client?.branding_logo_url
+      ? {
+          url: client.branding_logo_url,
+          background: client.logo_background ?? "light",
+          position: client.logo_position ?? "top-left",
+        }
+      : null;
+
     return buildTemplatePrompt({
       name: form.role_title || "Campaign Landing Page",
       brief: designBrief || `A professional job application landing page for the ${form.role_title || "open"} role at ${client?.name || "the company"}.`,
       brandColors,
+      logo,
     });
   }
 
@@ -954,6 +964,17 @@ export function CampaignWizard({
                 </div>
               )}
             </div>
+
+            {/* Live preview */}
+            {htmlValidation?.ok && form.html_template.trim() && (
+              <TemplatePreview
+                html={form.html_template}
+                form={form}
+                clientName={clients.find((c) => c.id === form.client_id)?.name}
+                previewDevice={previewDevice}
+                setPreviewDevice={setPreviewDevice}
+              />
+            )}
           </div>
         )}
 
@@ -1244,6 +1265,95 @@ function ClientBrandingSummary({ client }: { client: Client | undefined }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Template Preview ────────────────────────────────────────────────
+
+function TemplatePreview({
+  html,
+  form,
+  clientName,
+  previewDevice,
+  setPreviewDevice,
+}: {
+  html: string;
+  form: FormData;
+  clientName: string | undefined;
+  previewDevice: "desktop" | "mobile";
+  setPreviewDevice: (d: "desktop" | "mobile") => void;
+}) {
+  const slotData: SlotData = {
+    client: { name: clientName ?? "Company" },
+    campaign: {
+      role_title: form.role_title || "Sample Role Title",
+      role_description: form.role_description || null,
+      department: form.department || null,
+      location: form.location || null,
+      employment_type: form.employment_type || null,
+      salary_range_min: form.salary_range_min ? parseInt(form.salary_range_min) : null,
+      salary_range_max: form.salary_range_max ? parseInt(form.salary_range_max) : null,
+    },
+  };
+
+  // Replace slots with current form data, then swap the form mount point
+  // with a placeholder so the preview doesn't show an empty div.
+  let processed = replaceSlots(html, slotData);
+  processed = processed.replace(
+    /<div\s+id\s*=\s*["']application-form["']\s*>\s*<\/div>/i,
+    '<div style="padding:2rem;background:#f9f9f9;border:1px dashed #ccc;border-radius:0.75rem;text-align:center;color:#888;font-family:sans-serif"><p style="margin:0 0 0.5rem;font-size:0.9rem;font-weight:600">Application Form</p><p style="margin:0;font-size:0.78rem">Interactive form will appear here at runtime.</p></div>'
+  );
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <label className={labelClass}>Preview</label>
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-cream/40 p-0.5">
+          <button
+            type="button"
+            onClick={() => setPreviewDevice("desktop")}
+            className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[0.65rem] font-medium transition-colors cursor-pointer ${
+              previewDevice === "desktop"
+                ? "bg-surface text-charcoal shadow-sm"
+                : "text-txt-muted hover:text-txt-secondary"
+            }`}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="1.5" y="2" width="13" height="9" rx="1.5" />
+              <path d="M5.5 14h5M8 11v3" />
+            </svg>
+            Desktop
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreviewDevice("mobile")}
+            className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[0.65rem] font-medium transition-colors cursor-pointer ${
+              previewDevice === "mobile"
+                ? "bg-surface text-charcoal shadow-sm"
+                : "text-txt-muted hover:text-txt-secondary"
+            }`}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="4" y="1.5" width="8" height="13" rx="1.5" />
+              <path d="M7 12.5h2" />
+            </svg>
+            Mobile
+          </button>
+        </div>
+      </div>
+      <div className="flex justify-center rounded-lg border border-border bg-cream/40 p-4">
+        <iframe
+          srcDoc={processed}
+          sandbox="allow-same-origin"
+          title="Template preview"
+          className="rounded-lg border border-border bg-white"
+          style={{
+            width: previewDevice === "mobile" ? 375 : "100%",
+            height: 600,
+          }}
+        />
+      </div>
     </div>
   );
 }
