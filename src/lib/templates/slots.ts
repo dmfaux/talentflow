@@ -16,11 +16,18 @@ export const SLOT_ALLOW_LIST = [
   "campaign.employment_type",
   "campaign.salary_range_min",
   "campaign.salary_range_max",
+  "campaign.key_responsibilities",
 ] as const;
 
 export type SlotName = (typeof SLOT_ALLOW_LIST)[number];
 
 const SLOT_SET = new Set<string>(SLOT_ALLOW_LIST);
+
+/** Slots that contain pre-rendered HTML (from markdown) and must not be escaped. */
+const RAW_HTML_SLOTS = new Set<string>([
+  "campaign.role_description",
+  "campaign.key_responsibilities",
+]);
 
 // ── Slot data for replacement ──────────────────────────────────────
 
@@ -36,6 +43,7 @@ export interface SlotData {
     employment_type?: string | null;
     salary_range_min?: number | null;
     salary_range_max?: number | null;
+    key_responsibilities?: string | null;
   };
 }
 
@@ -103,7 +111,7 @@ function resolveSlot(name: string, data: SlotData): string {
   if (!obj) return "";
   const raw = (obj as Record<string, unknown>)[key];
   if (raw === null || raw === undefined) return "";
-  return escapeHtml(String(raw));
+  return RAW_HTML_SLOTS.has(name) ? String(raw) : escapeHtml(String(raw));
 }
 
 export function replaceSlots(html: string, data: SlotData): string {

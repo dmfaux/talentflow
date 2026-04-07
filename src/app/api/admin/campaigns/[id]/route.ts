@@ -114,6 +114,7 @@ export async function PATCH(
       "slug",
       "role_title",
       "role_description",
+      "key_responsibilities",
       "department",
       "location",
       "employment_type",

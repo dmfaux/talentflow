@@ -1,0 +1,1 @@
+ALTER TABLE "campaigns" ADD COLUMN "key_responsibilities" text;

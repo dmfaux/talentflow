@@ -1,6 +1,6 @@
 {
-  "id": "c04bd140-137b-4fb7-aae4-ad123644b7ad",
-  "prevId": "3cb00f90-77bc-46d5-a880-e448b39090bd",
+  "id": "ca09b138-524a-486d-a2a8-691cc8b56e27",
+  "prevId": "c6b031b7-48a6-4470-8eac-76eff8b04532",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -35,6 +35,12 @@
         },
         "role_description": {
           "name": "role_description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "key_responsibilities": {
+          "name": "key_responsibilities",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -1044,13 +1050,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "source": {
-          "name": "source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'custom'"
-        },
         "status": {
           "name": "status",
           "type": "text",
@@ -1058,15 +1057,15 @@
           "notNull": true,
           "default": "'draft'"
         },
-        "block_tree": {
-          "name": "block_tree",
-          "type": "jsonb",
+        "html_template": {
+          "name": "html_template",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "published_block_tree": {
-          "name": "published_block_tree",
-          "type": "jsonb",
+        "published_html_template": {
+          "name": "published_html_template",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -1124,21 +1123,6 @@
           "columns": [
             {
               "expression": "owner_client_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "templates_source_idx": {
-          "name": "templates_source_idx",
-          "columns": [
-            {
-              "expression": "source",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

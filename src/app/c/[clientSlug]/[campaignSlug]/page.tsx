@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { campaigns, clients, templates } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { replaceSlots, type SlotData } from "@/lib/templates/slots";
+import { renderMarkdown } from "@/lib/markdown";
 import { HtmlTemplateRenderer } from "@/components/candidate/HtmlTemplateRenderer";
 import type { GatingQuestion } from "@/lib/gating";
 
@@ -16,6 +17,7 @@ async function getCampaign(clientSlug: string, campaignSlug: string) {
       campaign_slug: campaigns.slug,
       role_title: campaigns.role_title,
       role_description: campaigns.role_description,
+      key_responsibilities: campaigns.key_responsibilities,
       department: campaigns.department,
       location: campaigns.location,
       employment_type: campaigns.employment_type,
@@ -112,7 +114,8 @@ export default async function CampaignPage({ params }: Props) {
     client: { name: campaign.client_name },
     campaign: {
       role_title: campaign.role_title,
-      role_description: campaign.role_description,
+      role_description: renderMarkdown(campaign.role_description),
+      key_responsibilities: renderMarkdown(campaign.key_responsibilities),
       department: campaign.department,
       location: campaign.location,
       employment_type: campaign.employment_type,

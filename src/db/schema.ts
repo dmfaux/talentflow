@@ -119,6 +119,7 @@ export const campaigns = pgTable(
     slug: text("slug").notNull(),
     role_title: text("role_title").notNull(),
     role_description: text("role_description"),
+    key_responsibilities: text("key_responsibilities"),
     department: text("department"),
     location: text("location"),
     employment_type: text("employment_type"),

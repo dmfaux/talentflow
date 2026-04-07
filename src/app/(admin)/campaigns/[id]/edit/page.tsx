@@ -47,6 +47,8 @@ export default async function EditCampaignPage({ params }: Props) {
     client_id: campaign.client_id,
     slug: campaign.slug,
     role_title: campaign.role_title,
+    role_description: campaign.role_description ?? "",
+    key_responsibilities: campaign.key_responsibilities ?? "",
     department: campaign.department ?? "",
     location: campaign.location ?? "",
     employment_type: campaign.employment_type ?? "",

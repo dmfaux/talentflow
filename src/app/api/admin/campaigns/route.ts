@@ -121,6 +121,7 @@ export async function POST(request: NextRequest) {
         slug: body.slug,
         role_title: body.role_title,
         role_description: body.role_description ?? null,
+        key_responsibilities: body.key_responsibilities ?? null,
         department: body.department ?? null,
         location: body.location ?? null,
         employment_type: body.employment_type ?? null,

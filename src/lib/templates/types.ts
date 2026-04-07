@@ -21,6 +21,7 @@ export interface TemplateCampaign {
   slug: string;
   role_title: string;
   role_description: string | null;
+  key_responsibilities: string | null;
   department: string | null;
   location: string | null;
   employment_type: string | null;

@@ -53,6 +53,8 @@ export interface FormData {
   client_id: string;
   slug: string;
   role_title: string;
+  role_description: string;
+  key_responsibilities: string;
   department: string;
   location: string;
   employment_type: string;
@@ -87,6 +89,8 @@ const INITIAL: FormData = {
   client_id: "",
   slug: "",
   role_title: "",
+  role_description: "",
+  key_responsibilities: "",
   department: "",
   location: "",
   employment_type: "",
@@ -144,6 +148,7 @@ export function CampaignWizard({
   const [slugManual, setSlugManual] = useState(slugManualInit);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [showMarkdownHelp, setShowMarkdownHelp] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
@@ -406,6 +411,8 @@ export function CampaignWizard({
       client_id: form.client_id,
       slug: form.slug,
       role_title: form.role_title,
+      role_description: form.role_description || null,
+      key_responsibilities: form.key_responsibilities || null,
       department: form.department || null,
       location: form.location || null,
       employment_type: form.employment_type || null,
@@ -661,6 +668,42 @@ export function CampaignWizard({
                 <input id="salary_max" type="number" value={form.salary_range_max} onChange={(e) => updateForm({ salary_range_max: e.target.value })} placeholder="650000" className={inputClass} />
               </div>
             </div>
+
+            <div>
+              <label htmlFor="role_description" className={labelClass}>
+                Role Description
+              </label>
+              <textarea
+                id="role_description"
+                value={form.role_description}
+                onChange={(e) => updateForm({ role_description: e.target.value })}
+                placeholder="Describe the role, team, and what makes it a great opportunity..."
+                rows={5}
+                className="w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none"
+              />
+              <button type="button" onClick={() => setShowMarkdownHelp(true)} className="mt-1 inline-flex items-center gap-1 text-[0.65rem] text-txt-muted hover:text-accent transition-colors cursor-pointer">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><circle cx="8" cy="8" r="6.5" /><path d="M6.5 6.2a1.5 1.5 0 0 1 2.8.5c0 1-1.3 1.3-1.3 2.3" /><path d="M8 12v.01" /></svg>
+                Supports markdown — formatting guide
+              </button>
+            </div>
+
+            <div>
+              <label htmlFor="key_responsibilities" className={labelClass}>
+                Key Responsibilities
+              </label>
+              <textarea
+                id="key_responsibilities"
+                value={form.key_responsibilities}
+                onChange={(e) => updateForm({ key_responsibilities: e.target.value })}
+                placeholder={"- Lead technical design and architecture decisions\n- Mentor junior engineers and conduct code reviews\n- Collaborate with product and design teams"}
+                rows={6}
+                className="w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none"
+              />
+              <button type="button" onClick={() => setShowMarkdownHelp(true)} className="mt-1 inline-flex items-center gap-1 text-[0.65rem] text-txt-muted hover:text-accent transition-colors cursor-pointer">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><circle cx="8" cy="8" r="6.5" /><path d="M6.5 6.2a1.5 1.5 0 0 1 2.8.5c0 1-1.3 1.3-1.3 2.3" /><path d="M8 12v.01" /></svg>
+                Supports markdown — formatting guide
+              </button>
+            </div>
           </div>
         )}
 
@@ -881,6 +924,18 @@ export function CampaignWizard({
                 <div><span className="text-txt-muted">Location:</span> <span className="text-charcoal">{form.location || "—"}</span></div>
                 <div><span className="text-txt-muted">Department:</span> <span className="text-charcoal">{form.department || "—"}</span></div>
               </div>
+              {form.role_description && (
+                <div className="mt-2 border-t border-border pt-2 text-sm">
+                  <span className="text-txt-muted">Description:</span>{" "}
+                  <span className="text-charcoal">{form.role_description.length} characters</span>
+                </div>
+              )}
+              {form.key_responsibilities && (
+                <div className="text-sm">
+                  <span className="text-txt-muted">Key Responsibilities:</span>{" "}
+                  <span className="text-charcoal">{form.key_responsibilities.length} characters</span>
+                </div>
+              )}
             </div>
 
             {/* Gating summary */}
@@ -992,6 +1047,69 @@ export function CampaignWizard({
           )}
         </div>
       </div>
+
+      {/* ── Markdown help dialog ──────────────────────────────── */}
+      {showMarkdownHelp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/30 backdrop-blur-sm" onClick={() => setShowMarkdownHelp(false)}>
+          <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-charcoal">Markdown Formatting Guide</h3>
+            <p className="mt-1 text-xs text-txt-muted">Use these patterns in the description and key responsibilities fields.</p>
+            <table className="mt-4 w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-txt-muted">
+                  <th className="pb-2 pr-4">You type</th>
+                  <th className="pb-2">Result</th>
+                </tr>
+              </thead>
+              <tbody className="text-charcoal">
+                <tr className="border-b border-border/50">
+                  <td className="py-2 pr-4 font-mono text-xs text-txt-secondary"># Heading</td>
+                  <td className="py-2 font-semibold">Heading</td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="py-2 pr-4 font-mono text-xs text-txt-secondary">## Subheading</td>
+                  <td className="py-2 font-semibold text-[0.85rem]">Subheading</td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="py-2 pr-4 font-mono text-xs text-txt-secondary">**bold text**</td>
+                  <td className="py-2 font-bold">bold text</td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="py-2 pr-4 font-mono text-xs text-txt-secondary">*italic text*</td>
+                  <td className="py-2 italic">italic text</td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="py-2 pr-4 font-mono text-xs text-txt-secondary">[link text](url)</td>
+                  <td className="py-2 text-accent underline">link text</td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="py-2 pr-4 font-mono text-xs text-txt-secondary whitespace-pre">- item one{"\n"}- item two</td>
+                  <td className="py-2">
+                    <span className="mr-1.5">&#x2022;</span>item one<br />
+                    <span className="mr-1.5">&#x2022;</span>item two
+                  </td>
+                </tr>
+                <tr className="border-b border-border/50">
+                  <td className="py-2 pr-4 font-mono text-xs text-txt-secondary whitespace-pre">1. first{"\n"}2. second</td>
+                  <td className="py-2">1. first<br />2. second</td>
+                </tr>
+                <tr>
+                  <td className="py-2 pr-4 font-mono text-xs text-txt-secondary">&gt; quote text</td>
+                  <td className="py-2 border-l-2 border-txt-muted pl-2 italic text-txt-secondary">quote text</td>
+                </tr>
+              </tbody>
+            </table>
+            <div className="mt-5 flex justify-end">
+              <button
+                onClick={() => setShowMarkdownHelp(false)}
+                className="inline-flex h-9 items-center rounded-lg bg-charcoal px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-charcoal-light cursor-pointer"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1156,7 +1274,8 @@ function TemplateGalleryStep({
     const replacements: Record<string, string> = {
       "client.name": clientSlug ?? "Company",
       "campaign.role_title": form.role_title || "Sample Role",
-      "campaign.role_description": "",
+      "campaign.role_description": form.role_description,
+      "campaign.key_responsibilities": form.key_responsibilities,
       "campaign.department": form.department,
       "campaign.location": form.location,
       "campaign.employment_type": form.employment_type,

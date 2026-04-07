@@ -78,6 +78,20 @@
       "when": 1775396013065,
       "tag": "0010_backfill_template_status_log",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1775396100000,
+      "tag": "0011_replace_block_tree_with_html",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1775543931197,
+      "tag": "0012_fat_starjammers",
+      "breakpoints": true
     }
   ]
 }

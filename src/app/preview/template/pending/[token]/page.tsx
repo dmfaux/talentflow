@@ -17,7 +17,9 @@ const DEMO_SLOT_DATA: SlotData = {
   campaign: {
     role_title: "Senior Role - Preview",
     role_description:
-      "This is a sample role description used to preview the template. Candidates will see the actual role title, description, and details you configure when creating a campaign with this template.",
+      "<p>This is a sample role description used to preview the template. Candidates will see the actual role title, description, and details you configure when creating a campaign with this template.</p>",
+    key_responsibilities:
+      "<ul><li>Lead cross-functional projects</li><li>Mentor junior team members</li><li>Drive process improvement initiatives</li></ul>",
     department: "Operations",
     location: "Cape Town",
     employment_type: "Full-time",

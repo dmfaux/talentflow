@@ -38,7 +38,8 @@ const SAMPLE_SLOT_DATA: SlotData = {
   client: { name: "Acme Corp" },
   campaign: {
     role_title: "Senior Software Engineer",
-    role_description: "We are looking for an experienced engineer to join our growing team.",
+    role_description: "<p>We are looking for an experienced engineer to join our growing team.</p>",
+    key_responsibilities: "<ul><li>Design and build scalable systems</li><li>Collaborate with product and design teams</li><li>Participate in code reviews</li></ul>",
     department: "Engineering",
     location: "Cape Town",
     employment_type: "Permanent",
