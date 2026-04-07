@@ -279,15 +279,6 @@ async function main() {
     }))
   ).returning({ id: schema.clients.id, slug: schema.clients.slug, name: schema.clients.name });
 
-  // Look up default template (editorial) for seeded campaigns
-  const defaultTemplate = await db.query.templates.findFirst({
-    where: eq(schema.templates.key, "editorial"),
-    columns: { id: true },
-  });
-  if (!defaultTemplate) {
-    throw new Error("Default template 'editorial' not found. Run the templates seed first.");
-  }
-
   // Generate campaigns — 2-4 per client
   console.log("Generating campaigns...");
   const campaignsToInsert: typeof schema.campaigns.$inferInsert[] = [];
@@ -321,7 +312,6 @@ async function main() {
         location: pick(LOCATIONS),
         employment_type: role.employment_type,
         status,
-        template_id: defaultTemplate.id,
         gating_config: buildGating(role.department),
         scoring_rubric: buildRubric(role.title),
         campaign_start: campaignStart,

@@ -55,7 +55,6 @@ You MUST respond with a single valid JSON object matching the exact schema speci
 export function buildScoringPrompt(
   roleTitle: string,
   roleDescription: string | null,
-  keyResponsibilities: string | null,
   rubric: ScoringRubric,
   cvText: string,
   gatingAnswers: Record<string, string> | null
@@ -65,7 +64,6 @@ export function buildScoringPrompt(
   return `## Role
 **Title:** ${roleTitle}
 ${roleDescription ? `**Description:** ${roleDescription}` : ""}
-${keyResponsibilities ? `**Key Responsibilities:**\n${keyResponsibilities}` : ""}
 
 ## Scoring Rubric
 
@@ -150,7 +148,6 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
   const userPrompt = buildScoringPrompt(
     candidate.campaign.role_title,
     candidate.campaign.role_description,
-    candidate.campaign.key_responsibilities,
     rubric,
     candidate.cv_text,
     candidate.gating_answers as Record<string, string> | null

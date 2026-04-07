@@ -40,7 +40,6 @@ export function buildTemplatePrompt({
       "campaign.employment_type": "Employment type (e.g. \"Permanent\", \"Contract\", or empty)",
       "campaign.salary_range_min": "Minimum salary as a number (may be empty)",
       "campaign.salary_range_max": "Maximum salary as a number (may be empty)",
-      "campaign.key_responsibilities": "Key responsibilities as HTML (rendered from markdown — may contain <ul>, <li>, <p>, <strong> etc., or be empty). Place inside a <div>, not a <p>.",
     };
     return `- \`{{${s}}}\` — ${descs[s] ?? s}`;
   }).join("\n");
@@ -89,7 +88,7 @@ Rules for slots:
 - Place slots directly in the HTML where the text should appear (e.g. \`<h1>{{campaign.role_title}}</h1>\`).
 - Slots that may be empty (\`campaign.role_description\`, \`campaign.department\`, \`campaign.location\`, \`campaign.employment_type\`, salary fields) should be in elements that look fine when the slot resolves to an empty string. Consider using CSS to hide empty elements if needed.
 - You may combine slots with static text (e.g. \`<span>{{campaign.department}} · {{campaign.location}}</span>\`).
-- \`{{campaign.role_description}}\` and \`{{campaign.key_responsibilities}}\` contain pre-rendered HTML (paragraphs, lists, bold, etc.). Place them inside a container element like \`<div class="description">{{campaign.role_description}}</div>\` — do NOT wrap them in a \`<p>\` tag.
+- \`{{campaign.role_description}}\` contains pre-rendered HTML (paragraphs, lists, bold, etc.). Place it inside a container element like \`<div class="description">{{campaign.role_description}}</div>\` — do NOT wrap it in a \`<p>\` tag.
 
 # Application form container
 

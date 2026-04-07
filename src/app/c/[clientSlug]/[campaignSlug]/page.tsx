@@ -1,8 +1,8 @@
 import { Metadata } from "next";
 import { db } from "@/db";
-import { campaigns, clients, templates } from "@/db/schema";
+import { campaigns, clients } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { replaceSlots, type SlotData } from "@/lib/templates/slots";
+import { replaceSlots, type SlotData } from "@/lib/slots";
 import { renderMarkdown } from "@/lib/markdown";
 import { HtmlTemplateRenderer } from "@/components/candidate/HtmlTemplateRenderer";
 import type { GatingQuestion } from "@/lib/gating";
@@ -17,7 +17,6 @@ async function getCampaign(clientSlug: string, campaignSlug: string) {
       campaign_slug: campaigns.slug,
       role_title: campaigns.role_title,
       role_description: campaigns.role_description,
-      key_responsibilities: campaigns.key_responsibilities,
       department: campaigns.department,
       location: campaigns.location,
       employment_type: campaigns.employment_type,
@@ -25,18 +24,16 @@ async function getCampaign(clientSlug: string, campaignSlug: string) {
       salary_range_max: campaigns.salary_range_max,
       gating_config: campaigns.gating_config,
       status: campaigns.status,
+      html_template: campaigns.html_template,
       client_slug: clients.slug,
       client_name: clients.name,
       brand_primary_color: clients.brand_primary_color,
       brand_secondary_color: clients.brand_secondary_color,
       brand_accent_color: clients.brand_accent_color,
       brand_text_color: clients.brand_text_color,
-      template_status: templates.status,
-      published_html_template: templates.published_html_template,
     })
     .from(campaigns)
     .innerJoin(clients, eq(campaigns.client_id, clients.id))
-    .innerJoin(templates, eq(campaigns.template_id, templates.id))
     .where(and(eq(clients.slug, clientSlug), eq(campaigns.slug, campaignSlug)))
     .limit(1);
 
@@ -85,21 +82,9 @@ export default async function CampaignPage({ params }: Props) {
     );
   }
 
-  if (
-    campaign.template_status !== "published" &&
-    campaign.template_status !== "archived"
-  ) {
-    return (
-      <CampaignError
-        title="Coming soon"
-        message="This campaign page is being set up. Please check back shortly."
-      />
-    );
-  }
-
-  if (!campaign.published_html_template) {
+  if (!campaign.html_template) {
     console.error(
-      `[candidate-landing] Template has no published_html_template (client="${clientSlug}", campaign="${campaignSlug}").`
+      `[candidate-landing] Campaign has no html_template (client="${clientSlug}", campaign="${campaignSlug}").`
     );
     return (
       <CampaignError
@@ -115,7 +100,6 @@ export default async function CampaignPage({ params }: Props) {
     campaign: {
       role_title: campaign.role_title,
       role_description: renderMarkdown(campaign.role_description),
-      key_responsibilities: renderMarkdown(campaign.key_responsibilities),
       department: campaign.department,
       location: campaign.location,
       employment_type: campaign.employment_type,
@@ -123,10 +107,7 @@ export default async function CampaignPage({ params }: Props) {
       salary_range_max: campaign.salary_range_max,
     },
   };
-  const processedHtml = replaceSlots(
-    campaign.published_html_template,
-    slotData
-  );
+  const processedHtml = replaceSlots(campaign.html_template, slotData);
 
   return (
     <HtmlTemplateRenderer

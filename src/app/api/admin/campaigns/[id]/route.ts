@@ -1,11 +1,10 @@
 import { db } from "@/db";
-import { campaigns, candidates, templates } from "@/db/schema";
+import { campaigns, candidates } from "@/db/schema";
 import { error, requireApiAuth, success } from "@/lib/api";
 import { validateSlug } from "@/lib/slug";
+import { validateHtmlTemplate } from "@/lib/slots";
 import { and, eq, sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(
   _request: Request,
@@ -64,20 +63,10 @@ export async function PATCH(
     });
     if (!existing) return error("Campaign not found", 404);
 
-    // Validate template_id if provided
-    if (body.template_id !== undefined) {
-      if (typeof body.template_id !== "string" || !UUID_REGEX.test(body.template_id)) {
-        return error("template_id must be a valid UUID");
-      }
-      // Re-assigning a campaign's template: target must be published.
-      const template = await db.query.templates.findFirst({
-        where: and(
-          eq(templates.id, body.template_id),
-          eq(templates.status, "published")
-        ),
-        columns: { id: true },
-      });
-      if (!template) return error("Template not found or not published", 404);
+    // Validate HTML template if provided
+    if (body.html_template !== undefined && body.html_template) {
+      const htmlCheck = validateHtmlTemplate(body.html_template);
+      if (!htmlCheck.ok) return error(htmlCheck.errors.join("; "));
     }
 
     // Validate slug if provided
@@ -114,12 +103,11 @@ export async function PATCH(
       "slug",
       "role_title",
       "role_description",
-      "key_responsibilities",
       "department",
       "location",
       "employment_type",
       "status",
-      "template_id",
+      "html_template",
       "gating_config",
       "scoring_rubric",
       "salary_range_min",

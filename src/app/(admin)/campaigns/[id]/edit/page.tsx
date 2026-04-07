@@ -48,7 +48,6 @@ export default async function EditCampaignPage({ params }: Props) {
     slug: campaign.slug,
     role_title: campaign.role_title,
     role_description: campaign.role_description ?? "",
-    key_responsibilities: campaign.key_responsibilities ?? "",
     department: campaign.department ?? "",
     location: campaign.location ?? "",
     employment_type: campaign.employment_type ?? "",
@@ -64,7 +63,7 @@ export default async function EditCampaignPage({ params }: Props) {
       progression: weights.progression ?? 25,
       tenure: weights.tenure ?? 25,
     },
-    template_id: campaign.template_id,
+    html_template: campaign.html_template ?? "",
   };
 
   return (

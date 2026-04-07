@@ -99,6 +99,13 @@
       "when": 1775550366692,
       "tag": "0013_add_jobs_table",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1775560206299,
+      "tag": "0014_equal_catseye",
+      "breakpoints": true
     }
   ]
 }

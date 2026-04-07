@@ -11,7 +11,6 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:seed:admin": "tsx src/db/seed-admin.ts",
-    "db:seed-templates": "tsx scripts/seed-templates.ts",
     "db:studio": "drizzle-kit studio",
     "storage:init": "tsx scripts/init-storage.ts",
     "jobs:poll": "while true; do curl -s -X POST http://localhost:3000/api/jobs/process; sleep 10; done"

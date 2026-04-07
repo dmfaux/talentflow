@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { buildTemplatePrompt, type BrandColors } from "@/lib/prompt-builder";
+import { validateHtmlTemplate } from "@/lib/slots";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -54,7 +56,6 @@ export interface FormData {
   slug: string;
   role_title: string;
   role_description: string;
-  key_responsibilities: string;
   department: string;
   location: string;
   employment_type: string;
@@ -65,17 +66,7 @@ export interface FormData {
   nice_to_haves: string[];
   dealbreakers: string[];
   dimension_weights: { skills: number; experience: number; progression: number; tenure: number };
-  template_id: string;
-}
-
-interface Template {
-  id: string;
-  key: string;
-  name: string;
-  description: string | null;
-  thumbnail_url: string | null;
-  owner_client_id: string | null;
-  is_active: boolean;
+  html_template: string;
 }
 
 const STEPS = ["Basics", "Gating Questions", "Scoring Rubric", "Landing Page", "Review"] as const;
@@ -90,7 +81,6 @@ const INITIAL: FormData = {
   slug: "",
   role_title: "",
   role_description: "",
-  key_responsibilities: "",
   department: "",
   location: "",
   employment_type: "",
@@ -101,7 +91,7 @@ const INITIAL: FormData = {
   nice_to_haves: [""],
   dealbreakers: [""],
   dimension_weights: { skills: 25, experience: 25, progression: 25, tenure: 25 },
-  template_id: "",
+  html_template: "",
 };
 
 function slugify(s: string) {
@@ -150,13 +140,13 @@ export function CampaignWizard({
   const [submitting, setSubmitting] = useState(false);
   const [showMarkdownHelp, setShowMarkdownHelp] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [templatesLoading, setTemplatesLoading] = useState(false);
-  const [templatesError, setTemplatesError] = useState("");
-  const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
   const [slugStatus, setSlugStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
   const [slugMessage, setSlugMessage] = useState("");
   const [slugSuggestion, setSlugSuggestion] = useState("");
+  // Landing page step state
+  const [designBrief, setDesignBrief] = useState("");
+  const [promptCopied, setPromptCopied] = useState(false);
+  const [htmlValidation, setHtmlValidation] = useState<{ ok: boolean; errors?: string[] } | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/clients")
@@ -223,40 +213,6 @@ export function CampaignWizard({
     };
   }, [form.slug, form.client_id, mode, campaignId]);
 
-  // Fetch templates when entering Step 3 / client changes. In edit
-  // mode we also load them eagerly because the user may open directly
-  // on the Review step, which needs template details for the summary.
-  useEffect(() => {
-    const shouldLoad = step >= 3 || mode === "edit";
-    if (!shouldLoad || !form.client_id) return;
-    let cancelled = false;
-    setTemplatesLoading(true);
-    setTemplatesError("");
-    fetch(`/api/admin/templates?client_id=${encodeURIComponent(form.client_id)}`)
-      .then((r) => r.json())
-      .then((res) => {
-        if (cancelled) return;
-        const list: Template[] = res.data ?? [];
-        setTemplates(list);
-        // Auto-select bespoke if available and nothing selected yet
-        setForm((prev) => {
-          if (prev.template_id) return prev;
-          const bespoke = list.find((t) => t.owner_client_id === prev.client_id);
-          if (bespoke) return { ...prev, template_id: bespoke.id };
-          return prev;
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setTemplatesError("Failed to load templates");
-      })
-      .finally(() => {
-        if (!cancelled) setTemplatesLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [form.client_id, step, mode]);
-
   function updateForm(patch: Partial<FormData>) {
     setForm((prev) => ({ ...prev, ...patch }));
   }
@@ -299,7 +255,12 @@ export function CampaignWizard({
     }
 
     if (s === 3) {
-      if (!form.template_id) errs.template_id = "Select a template";
+      if (!form.html_template.trim()) {
+        errs.html_template = "Paste your HTML template";
+      } else {
+        const check = validateHtmlTemplate(form.html_template);
+        if (!check.ok) errs.html_template = check.errors.join("; ");
+      }
     }
 
     setErrors(errs);
@@ -400,6 +361,45 @@ export function CampaignWizard({
     updateForm({ [key]: form[key].filter((_, i) => i !== idx) });
   }
 
+  // ── Prompt builder ──────────────────────────────────────────────
+
+  function generatePrompt(): string {
+    const client = clients.find((c) => c.id === form.client_id);
+    const brandColors: BrandColors | null = client?.brand_primary_color
+      ? {
+          primary: client.brand_primary_color,
+          secondary: client.brand_secondary_color ?? "#f3f0e8",
+          accent: client.brand_accent_color,
+          text: client.brand_text_color ?? "#0b0f1c",
+        }
+      : null;
+
+    return buildTemplatePrompt({
+      name: form.role_title || "Campaign Landing Page",
+      brief: designBrief || `A professional job application landing page for the ${form.role_title || "open"} role at ${client?.name || "the company"}.`,
+      brandColors,
+    });
+  }
+
+  function copyPrompt() {
+    const prompt = generatePrompt();
+    navigator.clipboard?.writeText(prompt).then(() => {
+      setPromptCopied(true);
+      setTimeout(() => setPromptCopied(false), 2000);
+    });
+  }
+
+  // ── HTML validation on paste ────────────────────────────────────
+
+  function handleHtmlChange(html: string) {
+    updateForm({ html_template: html });
+    if (html.trim()) {
+      setHtmlValidation(validateHtmlTemplate(html));
+    } else {
+      setHtmlValidation(null);
+    }
+  }
+
   // ── Submit ───────────────────────────────────────────────────────
 
   async function submit(status: "draft" | "active") {
@@ -412,7 +412,6 @@ export function CampaignWizard({
       slug: form.slug,
       role_title: form.role_title,
       role_description: form.role_description || null,
-      key_responsibilities: form.key_responsibilities || null,
       department: form.department || null,
       location: form.location || null,
       employment_type: form.employment_type || null,
@@ -425,7 +424,7 @@ export function CampaignWizard({
         dealbreakers: form.dealbreakers.filter((s) => s.trim()),
         dimension_weights: form.dimension_weights,
       },
-      template_id: form.template_id,
+      html_template: form.html_template || null,
       status,
     };
 
@@ -686,24 +685,6 @@ export function CampaignWizard({
                 Supports markdown — formatting guide
               </button>
             </div>
-
-            <div>
-              <label htmlFor="key_responsibilities" className={labelClass}>
-                Key Responsibilities
-              </label>
-              <textarea
-                id="key_responsibilities"
-                value={form.key_responsibilities}
-                onChange={(e) => updateForm({ key_responsibilities: e.target.value })}
-                placeholder={"- Lead technical design and architecture decisions\n- Mentor junior engineers and conduct code reviews\n- Collaborate with product and design teams"}
-                rows={6}
-                className="w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none"
-              />
-              <button type="button" onClick={() => setShowMarkdownHelp(true)} className="mt-1 inline-flex items-center gap-1 text-[0.65rem] text-txt-muted hover:text-accent transition-colors cursor-pointer">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><circle cx="8" cy="8" r="6.5" /><path d="M6.5 6.2a1.5 1.5 0 0 1 2.8.5c0 1-1.3 1.3-1.3 2.3" /><path d="M8 12v.01" /></svg>
-                Supports markdown — formatting guide
-              </button>
-            </div>
           </div>
         )}
 
@@ -885,21 +866,95 @@ export function CampaignWizard({
           </div>
         )}
 
-        {/* ── Step 3: Landing Page Template Gallery ────────────── */}
+        {/* ── Step 3: Landing Page (AI prompt + HTML paste) ────── */}
         {step === 3 && (
-          <TemplateGalleryStep
-            templates={templates}
-            loading={templatesLoading}
-            error={templatesError}
-            selectedTemplateId={form.template_id}
-            onSelect={(id) => updateForm({ template_id: id })}
-            clientId={form.client_id}
-            clientSlug={clients.find((c) => c.id === form.client_id)?.slug}
-            form={form}
-            previewDevice={previewDevice}
-            setPreviewDevice={setPreviewDevice}
-            validationError={errors.template_id}
-          />
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-base font-semibold text-charcoal">Landing Page</h2>
+              <p className="mt-1 text-xs text-txt-muted">
+                Generate an AI prompt, paste it into Claude or ChatGPT, then paste the HTML result below.
+              </p>
+            </div>
+
+            {/* Design brief */}
+            <div>
+              <label htmlFor="design_brief" className={labelClass}>Design Brief (optional)</label>
+              <textarea
+                id="design_brief"
+                value={designBrief}
+                onChange={(e) => setDesignBrief(e.target.value)}
+                placeholder="Describe any specific design preferences — layout style, tone, sections to include..."
+                rows={3}
+                className="w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none"
+              />
+            </div>
+
+            {/* Copy prompt button */}
+            <button
+              type="button"
+              onClick={copyPrompt}
+              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border bg-cream/40 px-4 text-[0.8rem] font-medium text-charcoal transition-colors hover:bg-cream hover:border-txt-muted cursor-pointer"
+            >
+              {promptCopied ? (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 8.5L6.5 12L13 4" />
+                  </svg>
+                  Copied to clipboard
+                </>
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="5" y="5" width="8" height="8" rx="1.5" />
+                    <path d="M3 11V3.5A1.5 1.5 0 014.5 2H11" />
+                  </svg>
+                  Copy AI Prompt to Clipboard
+                </>
+              )}
+            </button>
+
+            <div className="relative">
+              <div className="absolute inset-x-0 top-0 h-px bg-border" />
+              <p className="relative -top-2 mx-auto w-fit bg-surface px-3 text-[0.65rem] font-medium uppercase tracking-[0.15em] text-txt-muted">
+                Then paste the generated HTML below
+              </p>
+            </div>
+
+            {/* HTML paste area */}
+            <div>
+              <label htmlFor="html_template" className={labelClass}>
+                HTML Template <span className="text-red">*</span>
+              </label>
+              <textarea
+                id="html_template"
+                value={form.html_template}
+                onChange={(e) => handleHtmlChange(e.target.value)}
+                placeholder="Paste the complete HTML page here..."
+                rows={12}
+                className={`w-full rounded-lg border bg-cream/40 px-3.5 py-2.5 font-mono text-xs text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none ${
+                  errors.html_template ? "border-red" : htmlValidation?.ok ? "border-green" : "border-border"
+                }`}
+              />
+              {errors.html_template && (
+                <p className="mt-1 text-xs text-red">{errors.html_template}</p>
+              )}
+              {htmlValidation?.ok && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-green">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M2.5 6.5L5 9l4.5-6" />
+                  </svg>
+                  Valid HTML template ({form.html_template.length.toLocaleString()} characters)
+                </p>
+              )}
+              {htmlValidation && !htmlValidation.ok && !errors.html_template && (
+                <div className="mt-1 space-y-0.5">
+                  {htmlValidation.errors?.map((err, i) => (
+                    <p key={i} className="text-xs text-red">{err}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {/* ── Step 4: Review ───────────────────────────────────── */}
@@ -928,12 +983,6 @@ export function CampaignWizard({
                 <div className="mt-2 border-t border-border pt-2 text-sm">
                   <span className="text-txt-muted">Description:</span>{" "}
                   <span className="text-charcoal">{form.role_description.length} characters</span>
-                </div>
-              )}
-              {form.key_responsibilities && (
-                <div className="text-sm">
-                  <span className="text-txt-muted">Key Responsibilities:</span>{" "}
-                  <span className="text-charcoal">{form.key_responsibilities.length} characters</span>
                 </div>
               )}
             </div>
@@ -966,33 +1015,19 @@ export function CampaignWizard({
               </div>
             </div>
 
-            {/* Template summary */}
+            {/* Landing page summary */}
             <div className="rounded-lg border border-border p-4">
               <h3 className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-txt-muted">Landing Page</h3>
-              {(() => {
-                const selected = templates.find((t) => t.id === form.template_id);
-                if (!selected) {
-                  return <p className="mt-1 text-sm text-charcoal">No template selected</p>;
-                }
-                return (
-                  <div className="mt-2 flex gap-3">
-                    <div className="h-[80px] w-[120px] shrink-0 overflow-hidden rounded border border-border bg-cream/40">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={selected.thumbnail_url ?? "/templates/default.svg"}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-display text-[1rem] text-charcoal">{selected.name}</p>
-                      {selected.description && (
-                        <p className="mt-0.5 text-xs text-txt-muted line-clamp-2">{selected.description}</p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
+              {form.html_template ? (
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-charcoal">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green">
+                    <path d="M3 7.5L5.5 10l5.5-6" />
+                  </svg>
+                  HTML template pasted ({form.html_template.length.toLocaleString()} characters)
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-red">No HTML template — go back to Step 4 to paste one</p>
+              )}
             </div>
           </div>
         )}
@@ -1053,7 +1088,7 @@ export function CampaignWizard({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/30 backdrop-blur-sm" onClick={() => setShowMarkdownHelp(false)}>
           <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-charcoal">Markdown Formatting Guide</h3>
-            <p className="mt-1 text-xs text-txt-muted">Use these patterns in the description and key responsibilities fields.</p>
+            <p className="mt-1 text-xs text-txt-muted">Use these patterns in the description field.</p>
             <table className="mt-4 w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-txt-muted">
@@ -1164,8 +1199,7 @@ function ClientBrandingSummary({ client }: { client: Client | undefined }) {
         {client.name} — Brand Kit
       </p>
       <p className="mt-1 text-xs text-txt-secondary">
-        This campaign will inherit the client&apos;s branding. When generating the landing
-        page HTML with Claude, use these colours in your prompt so the page matches the client&apos;s brand.
+        This campaign will inherit the client&apos;s branding. The AI prompt will include these colours automatically.
       </p>
 
       <div className="mt-3 flex items-center gap-3">
@@ -1209,252 +1243,6 @@ function ClientBrandingSummary({ client }: { client: Client | undefined }) {
             Copy
           </button>
         </div>
-      )}
-    </div>
-  );
-}
-
-// ── Template Gallery Step ───────────────────────────────────────────
-
-interface TemplateGalleryStepProps {
-  templates: Template[];
-  loading: boolean;
-  error: string;
-  selectedTemplateId: string;
-  onSelect: (id: string) => void;
-  clientId: string;
-  clientSlug: string | undefined;
-  form: FormData;
-  previewDevice: "desktop" | "mobile";
-  setPreviewDevice: (d: "desktop" | "mobile") => void;
-  validationError?: string;
-}
-
-function TemplateGalleryStep({
-  templates,
-  loading,
-  error,
-  selectedTemplateId,
-  onSelect,
-  clientId,
-  clientSlug,
-  form,
-  previewDevice,
-  setPreviewDevice,
-  validationError,
-}: TemplateGalleryStepProps) {
-  // Sort: bespoke first (for this client), then shared library (null owner)
-  const sorted = [...templates].sort((a, b) => {
-    const aBespoke = a.owner_client_id === clientId ? 0 : 1;
-    const bBespoke = b.owner_client_id === clientId ? 0 : 1;
-    return aBespoke - bBespoke;
-  });
-
-  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
-
-  // Fetch the selected template's published HTML for preview
-  // Fetch published HTML for the selected template's live preview
-  const [rawTemplateHtml, setRawTemplateHtml] = useState<string | null>(null);
-  useEffect(() => {
-    if (!selectedTemplate) return;
-    let cancelled = false;
-    fetch(`/api/admin/templates/${selectedTemplate.id}`)
-      .then((r) => r.json())
-      .then((res) => {
-        if (!cancelled) setRawTemplateHtml(res.data?.published_html_template ?? null);
-      })
-      .catch(() => { if (!cancelled) setRawTemplateHtml(null); });
-    return () => { cancelled = true; };
-  }, [selectedTemplate]);
-
-  // Process the raw HTML with current form data for preview
-  const previewHtml = (() => {
-    if (!rawTemplateHtml || !selectedTemplate) return null;
-    let processed = rawTemplateHtml;
-    const replacements: Record<string, string> = {
-      "client.name": clientSlug ?? "Company",
-      "campaign.role_title": form.role_title || "Sample Role",
-      "campaign.role_description": form.role_description,
-      "campaign.key_responsibilities": form.key_responsibilities,
-      "campaign.department": form.department,
-      "campaign.location": form.location,
-      "campaign.employment_type": form.employment_type,
-      "campaign.salary_range_min": form.salary_range_min,
-      "campaign.salary_range_max": form.salary_range_max,
-    };
-    for (const [key, val] of Object.entries(replacements)) {
-      processed = processed.replaceAll(`{{${key}}}`, val || "");
-    }
-    processed = processed.replace(
-      /<div\s+id\s*=\s*["']application-form["']\s*>\s*<\/div>/i,
-      '<div style="padding:2rem;background:#f9f9f9;border:1px dashed #ccc;border-radius:0.75rem;text-align:center;color:#888;font-family:sans-serif"><p style="margin:0 0 0.5rem;font-size:0.9rem;font-weight:600">Application Form</p><p style="margin:0;font-size:0.78rem">Interactive form will appear here at runtime.</p></div>'
-    );
-    return processed;
-  })();
-
-  return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-base font-semibold text-charcoal">Landing Page Template</h2>
-        <p className="mt-1 text-xs text-txt-muted">
-          Choose a template — candidates will see this exactly.
-        </p>
-      </div>
-
-      {validationError && <p className="text-xs text-red">{validationError}</p>}
-
-      {!clientId && (
-        <div className="rounded-lg border border-dashed border-border bg-cream/40 p-6 text-center text-xs text-txt-muted">
-          Pick a client on Step 1 to see available templates.
-        </div>
-      )}
-
-      {clientId && loading && (
-        <div className="rounded-lg border border-dashed border-border bg-cream/40 p-6 text-center text-xs text-txt-muted">
-          Loading templates...
-        </div>
-      )}
-
-      {clientId && !loading && error && (
-        <div className="rounded-lg border border-red/30 bg-red-light p-4 text-xs text-red">
-          {error}
-        </div>
-      )}
-
-      {clientId && !loading && !error && sorted.length === 0 && (
-        <div className="rounded-lg border border-dashed border-border bg-cream/40 p-6 text-center text-xs text-txt-muted">
-          No templates available for this client.
-        </div>
-      )}
-
-      {clientId && !loading && !error && sorted.length > 0 && (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {sorted.map((template) => {
-              const isSelected = template.id === selectedTemplateId;
-              const isBespoke = template.owner_client_id !== null;
-              return (
-                <button
-                  key={template.id}
-                  type="button"
-                  onClick={() => onSelect(template.id)}
-                  className={`group text-left overflow-hidden rounded-xl border-2 transition-all cursor-pointer ${
-                    isSelected
-                      ? "border-cobalt ring-2 ring-cobalt/20"
-                      : "border-border hover:border-border-strong"
-                  } ${isBespoke ? "shadow-sm" : ""}`}
-                >
-                  <div className="relative aspect-[16/9] w-full overflow-hidden rounded-t-xl bg-cream/40">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={template.thumbnail_url ?? "/templates/default.svg"}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                  <div className="p-4">
-                    <div className="flex items-center gap-2">
-                      {isBespoke ? (
-                        <span
-                          className="text-[0.6rem] font-semibold uppercase tracking-[0.14em] rounded px-2 py-0.5"
-                          style={{
-                            backgroundColor: "var(--color-vermillion-soft)",
-                            color: "var(--color-vermillion-deep)",
-                          }}
-                        >
-                          Bespoke
-                        </span>
-                      ) : (
-                        <span className="text-[0.6rem] font-semibold uppercase tracking-[0.14em] rounded px-2 py-0.5 bg-canvas-2 text-ink-muted">
-                          Shared Library
-                        </span>
-                      )}
-                      {isBespoke && (
-                        <span className="text-[0.6rem] italic text-txt-muted">Exclusive</span>
-                      )}
-                    </div>
-                    <h3 className="mt-2 font-display text-[1.1rem] text-ink">{template.name}</h3>
-                    {template.description && (
-                      <p className="text-xs text-ink-muted mt-1 line-clamp-2">
-                        {template.description}
-                      </p>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Live preview */}
-          {selectedTemplate && previewHtml && (
-            <div className="pt-2">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <p className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
-                  Preview
-                </p>
-                <div className="inline-flex items-center gap-1 rounded-lg border border-border bg-cream/40 p-1">
-                  <button
-                    type="button"
-                    onClick={() => setPreviewDevice("desktop")}
-                    className={`inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-[0.7rem] font-medium transition-colors cursor-pointer ${
-                      previewDevice === "desktop"
-                        ? "bg-paper text-charcoal shadow-sm"
-                        : "text-txt-muted hover:text-charcoal"
-                    }`}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1.5" y="2.5" width="11" height="7" rx="1" /><path d="M5 12h4M7 10v2" strokeLinecap="round" /></svg>
-                    Desktop
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewDevice("mobile")}
-                    className={`inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-[0.7rem] font-medium transition-colors cursor-pointer ${
-                      previewDevice === "mobile"
-                        ? "bg-paper text-charcoal shadow-sm"
-                        : "text-txt-muted hover:text-charcoal"
-                    }`}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="4" y="1.5" width="6" height="11" rx="1" /><path d="M6.5 11h1" strokeLinecap="round" /></svg>
-                    Mobile
-                  </button>
-                </div>
-              </div>
-              <div
-                className={previewDevice === "mobile" ? "mx-auto max-w-[390px]" : ""}
-              >
-                <div
-                  className="overflow-hidden rounded-xl border border-border bg-paper"
-                  style={{ boxShadow: "0 12px 32px -16px rgba(11, 15, 28, 0.18)" }}
-                >
-                  <div className="flex items-center gap-3 border-b border-border bg-canvas-2 px-3 py-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="h-2.5 w-2.5 rounded-full bg-[#d9b8b0]" />
-                      <span className="h-2.5 w-2.5 rounded-full bg-[#dfc9a0]" />
-                      <span className="h-2.5 w-2.5 rounded-full bg-[#b4c7a8]" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex h-6 items-center justify-center rounded-md border border-border bg-paper px-3">
-                        <span className="font-mono text-[0.65rem] text-ink-muted truncate">
-                          {clientSlug || "client"}.talentstream.co.za/{form.slug || "campaign"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <iframe
-                    srcDoc={previewHtml}
-                    sandbox=""
-                    className="w-full bg-paper"
-                    style={{
-                      height: previewDevice === "mobile" ? "700px" : "600px",
-                      border: 0,
-                    }}
-                    title="Template preview"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </>
       )}
     </div>
   );

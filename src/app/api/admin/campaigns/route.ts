@@ -1,11 +1,10 @@
 import { db } from "@/db";
-import { campaigns, clients, templates } from "@/db/schema";
+import { campaigns, clients } from "@/db/schema";
 import { error, requireApiAuth, success } from "@/lib/api";
 import { validateSlug } from "@/lib/slug";
+import { validateHtmlTemplate } from "@/lib/slots";
 import { and, desc, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(request: NextRequest) {
   const authError = await requireApiAuth();
@@ -62,14 +61,8 @@ export async function POST(request: NextRequest) {
     if (!body.client_id) return error("client_id is required");
     if (!body.slug) return error("slug is required");
     if (!body.role_title) return error("role_title is required");
-    if (!body.template_id) return error("template_id is required");
     if (body.gating_config === undefined) return error("gating_config is required");
     if (body.scoring_rubric === undefined) return error("scoring_rubric is required");
-
-    // template_id must be a valid UUID
-    if (typeof body.template_id !== "string" || !UUID_REGEX.test(body.template_id)) {
-      return error("template_id must be a valid UUID");
-    }
 
     // Slug validation
     const slugCheck = validateSlug(body.slug);
@@ -89,27 +82,18 @@ export async function POST(request: NextRequest) {
       return error("scoring_rubric must be a JSON object");
     }
 
+    // Validate HTML template if provided
+    if (body.html_template) {
+      const htmlCheck = validateHtmlTemplate(body.html_template);
+      if (!htmlCheck.ok) return error(htmlCheck.errors.join("; "));
+    }
+
     // Verify client exists
     const client = await db.query.clients.findFirst({
       where: eq(clients.id, body.client_id),
       columns: { id: true },
     });
     if (!client) return error("Client not found", 404);
-
-    // Verify template exists, is published, and has rendered HTML.
-    const template = await db.query.templates.findFirst({
-      where: and(
-        eq(templates.id, body.template_id),
-        eq(templates.status, "published")
-      ),
-      columns: { id: true, published_html_template: true },
-    });
-    if (!template) return error("Template not found or not published", 404);
-    if (!template.published_html_template) {
-      return error(
-        "Template is published but has no HTML content. Edit the template to add HTML, then republish it."
-      );
-    }
 
     // Check slug uniqueness per client
     const existing = await db.query.campaigns.findFirst({
@@ -125,12 +109,11 @@ export async function POST(request: NextRequest) {
         slug: body.slug,
         role_title: body.role_title,
         role_description: body.role_description ?? null,
-        key_responsibilities: body.key_responsibilities ?? null,
         department: body.department ?? null,
         location: body.location ?? null,
         employment_type: body.employment_type ?? null,
         status: body.status ?? "draft",
-        template_id: body.template_id,
+        html_template: body.html_template ?? null,
         gating_config: body.gating_config,
         scoring_rubric: body.scoring_rubric,
         campaign_start: body.campaign_start

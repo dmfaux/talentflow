@@ -41,72 +41,6 @@ export const clients = pgTable(
   (table) => [uniqueIndex("clients_slug_idx").on(table.slug)]
 );
 
-// ── Templates ────────────────────────────────────────────────────────
-
-export const templates = pgTable(
-  "templates",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    key: text("key").notNull().unique(),
-    name: text("name").notNull(),
-    description: text("description"),
-    thumbnail_url: text("thumbnail_url"),
-    owner_client_id: uuid("owner_client_id").references(() => clients.id),
-    // Lifecycle: 'draft' | 'pending' | 'published' | 'archived'.
-    // - draft: editable working copy, not selectable by campaigns.
-    // - pending: locked, awaiting client approval (shareable via preview_token).
-    // - published: selectable by new campaigns, rendered on public landing.
-    // - archived: not selectable for new campaigns; existing campaigns
-    //   continue rendering from published_html_template.
-    status: text("status").notNull().default("draft"),
-    // Draft/working-copy HTML. Edited via PATCH. Validated on write.
-    // Contains mustache-style {{slots}} and a <div id="application-form">
-    // mount point for the React ApplicationForm portal.
-    html_template: text("html_template"),
-    // Snapshot of html_template taken at publish time. Live campaigns
-    // always render from this column — never from `html_template` — so
-    // draft edits don't affect running campaigns.
-    published_html_template: text("published_html_template"),
-    // Timestamp of most recent publish (any transition ending at 'published').
-    published_at: timestamp("published_at"),
-    // Unauthenticated shareable token for client review while status='pending'.
-    preview_token: text("preview_token"),
-    preview_token_expires_at: timestamp("preview_token_expires_at"),
-    created_at: timestamp("created_at").defaultNow().notNull(),
-    updated_at: timestamp("updated_at").defaultNow().notNull(),
-  },
-  (table) => [
-    uniqueIndex("templates_key_idx").on(table.key),
-    index("templates_owner_client_id_idx").on(table.owner_client_id),
-    index("templates_status_idx").on(table.status),
-    uniqueIndex("templates_preview_token_idx").on(table.preview_token),
-  ]
-);
-
-// ── Template status log ────────────────────────────────────────────
-//
-// Append-only audit trail of status changes. The first row for each
-// template has from_status=NULL (the creation event). Subsequent rows
-// capture each transition via the transition endpoint.
-
-export const templateStatusLog = pgTable(
-  "template_status_log",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    template_id: uuid("template_id")
-      .notNull()
-      .references(() => templates.id),
-    from_status: text("from_status"), // NULL for the creation event
-    to_status: text("to_status").notNull(),
-    changed_by: uuid("changed_by").references(() => users.id),
-    changed_at: timestamp("changed_at").defaultNow().notNull(),
-  },
-  (table) => [
-    index("template_status_log_template_id_idx").on(table.template_id),
-    index("template_status_log_changed_at_idx").on(table.changed_at),
-  ]
-);
-
 // ── Campaigns ────────────────────────────────────────────────────────
 
 export const campaigns = pgTable(
@@ -119,14 +53,11 @@ export const campaigns = pgTable(
     slug: text("slug").notNull(),
     role_title: text("role_title").notNull(),
     role_description: text("role_description"),
-    key_responsibilities: text("key_responsibilities"),
     department: text("department"),
     location: text("location"),
     employment_type: text("employment_type"),
     status: text("status").notNull().default("draft"),
-    template_id: uuid("template_id")
-      .notNull()
-      .references(() => templates.id),
+    html_template: text("html_template"),
     gating_config: jsonb("gating_config").notNull(),
     scoring_rubric: jsonb("scoring_rubric").notNull(),
     campaign_start: timestamp("campaign_start"),
@@ -140,7 +71,6 @@ export const campaigns = pgTable(
     unique("campaigns_client_id_slug_unique").on(table.client_id, table.slug),
     index("campaigns_client_id_idx").on(table.client_id),
     index("campaigns_status_idx").on(table.status),
-    index("campaigns_template_id_idx").on(table.template_id),
   ]
 );
 
@@ -275,31 +205,7 @@ export const messages = pgTable(
 export const clientsRelations = relations(clients, ({ many }) => ({
   campaigns: many(campaigns),
   users: many(users),
-  ownedTemplates: many(templates),
 }));
-
-export const templatesRelations = relations(templates, ({ one, many }) => ({
-  ownerClient: one(clients, {
-    fields: [templates.owner_client_id],
-    references: [clients.id],
-  }),
-  campaigns: many(campaigns),
-  statusLog: many(templateStatusLog),
-}));
-
-export const templateStatusLogRelations = relations(
-  templateStatusLog,
-  ({ one }) => ({
-    template: one(templates, {
-      fields: [templateStatusLog.template_id],
-      references: [templates.id],
-    }),
-    changedBy: one(users, {
-      fields: [templateStatusLog.changed_by],
-      references: [users.id],
-    }),
-  })
-);
 
 export const usersRelations = relations(users, ({ one, many }) => ({
   client: one(clients, {
@@ -323,10 +229,6 @@ export const campaignsRelations = relations(campaigns, ({ one, many }) => ({
   client: one(clients, {
     fields: [campaigns.client_id],
     references: [clients.id],
-  }),
-  template: one(templates, {
-    fields: [campaigns.template_id],
-    references: [templates.id],
   }),
   candidates: many(candidates),
 }));
