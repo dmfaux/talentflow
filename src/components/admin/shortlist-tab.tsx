@@ -50,14 +50,6 @@ export function ShortlistTab({ campaignId, candidates: initial }: Props) {
     router.refresh();
   }
 
-  function moveItem(idx: number, dir: -1 | 1) {
-    const target = idx + dir;
-    if (target < 0 || target >= items.length) return;
-    const arr = [...items];
-    [arr[idx], arr[target]] = [arr[target], arr[idx]];
-    setItems(arr);
-  }
-
   async function saveNotes(candidateId: string, notes: string) {
     setSavingId(candidateId);
     await fetch(`/api/admin/candidates/${candidateId}`, {
@@ -81,7 +73,7 @@ export function ShortlistTab({ campaignId, candidates: initial }: Props) {
 
   return (
     <div className="space-y-4">
-      {items.map((c, idx) => {
+      {items.map((c) => {
         const dims = c.ai_dimensions ?? {};
         const scoreColor =
           c.ai_score === null
@@ -100,27 +92,6 @@ export function ShortlistTab({ campaignId, candidates: initial }: Props) {
             {/* Header row */}
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-4">
-                {/* Position controls */}
-                <div className="flex flex-col items-center gap-0.5">
-                  <button
-                    onClick={() => moveItem(idx, -1)}
-                    disabled={idx === 0}
-                    className="p-0.5 text-txt-muted hover:text-charcoal disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 7l3-3 3 3" /></svg>
-                  </button>
-                  <span className="font-mono text-[0.6rem] text-txt-muted">
-                    {idx + 1}
-                  </span>
-                  <button
-                    onClick={() => moveItem(idx, 1)}
-                    disabled={idx === items.length - 1}
-                    className="p-0.5 text-txt-muted hover:text-charcoal disabled:opacity-20 cursor-pointer disabled:cursor-not-allowed"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 5l3 3 3-3" /></svg>
-                  </button>
-                </div>
-
                 <div>
                   <h3
                     className="text-sm font-semibold text-charcoal cursor-pointer hover:text-accent transition-colors"
