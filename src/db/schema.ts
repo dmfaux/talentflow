@@ -200,6 +200,32 @@ export const messages = pgTable(
   (table) => [index("messages_candidate_id_idx").on(table.candidate_id)]
 );
 
+// ── Events (visitor tracking) ───────────────────────────────────────
+
+export const events = pgTable(
+  "events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    campaign_id: uuid("campaign_id")
+      .notNull()
+      .references(() => campaigns.id),
+    event_type: text("event_type").notNull(),
+    session_id: text("session_id").notNull(),
+    visitor_id: text("visitor_id"),
+    device_type: text("device_type"),
+    browser: text("browser"),
+    metadata: jsonb("metadata"),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("events_campaign_id_idx").on(table.campaign_id),
+    index("events_event_type_idx").on(table.event_type),
+    index("events_created_at_idx").on(table.created_at),
+    index("events_session_id_idx").on(table.session_id),
+    index("events_visitor_id_idx").on(table.visitor_id),
+  ]
+);
+
 // ── Relations ────────────────────────────────────────────────────────
 
 export const clientsRelations = relations(clients, ({ many }) => ({
@@ -231,6 +257,7 @@ export const campaignsRelations = relations(campaigns, ({ one, many }) => ({
     references: [clients.id],
   }),
   candidates: many(candidates),
+  events: many(events),
 }));
 
 export const candidatesRelations = relations(candidates, ({ one, many }) => ({
@@ -253,6 +280,13 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   candidate: one(candidates, {
     fields: [messages.candidate_id],
     references: [candidates.id],
+  }),
+}));
+
+export const eventsRelations = relations(events, ({ one }) => ({
+  campaign: one(campaigns, {
+    fields: [events.campaign_id],
+    references: [campaigns.id],
   }),
 }));
 

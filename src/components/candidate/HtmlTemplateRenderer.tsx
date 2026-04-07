@@ -7,6 +7,7 @@ import {
   type BrandColours,
   type ApplicationFormCampaign,
 } from "./ApplicationForm";
+import { createTracker, type Tracker } from "@/lib/tracking";
 
 interface Props {
   html: string;
@@ -48,6 +49,7 @@ export function HtmlTemplateRenderer({
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const formRootRef = useRef<Root | null>(null);
+  const trackerRef = useRef<Tracker | null>(null);
 
   const safeHtml = useMemo(() => extractBodyContent(html), [html]);
 
@@ -65,6 +67,11 @@ export function HtmlTemplateRenderer({
     const mount = container.querySelector<HTMLElement>("#application-form");
     if (!mount) return;
 
+    // Initialise visitor tracker
+    const tracker = createTracker(clientSlug, campaign.slug);
+    trackerRef.current = tracker;
+    tracker.track("page_view", { referrer: document.referrer || undefined });
+
     // Create an independent React root inside the mount point.
     const root = createRoot(mount);
     formRootRef.current = root;
@@ -76,14 +83,17 @@ export function HtmlTemplateRenderer({
         clientName={p.clientName}
         campaign={p.campaign}
         brandColours={p.brandColours}
+        tracker={tracker}
       />
     );
 
     return () => {
       root.unmount();
       formRootRef.current = null;
+      trackerRef.current?.flush();
+      trackerRef.current = null;
     };
-  }, [safeHtml]);
+  }, [safeHtml, clientSlug, campaign.slug]);
 
   // No dangerouslySetInnerHTML — we fully manage innerHTML in the effect.
   return <div ref={containerRef} suppressHydrationWarning />;

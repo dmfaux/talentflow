@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import type { GatingQuestion } from "@/lib/gating";
+import type { Tracker } from "@/lib/tracking";
 import { ApplicationFormSuccess } from "./ApplicationFormSuccess";
 import { ApplicationFormError } from "./ApplicationFormError";
 
@@ -25,6 +26,7 @@ interface Props {
   campaign: ApplicationFormCampaign;
   brandColours: BrandColours;
   clientName?: string;
+  tracker?: Tracker;
 }
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -91,7 +93,7 @@ type SubmissionResult =
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function ApplicationForm({ clientSlug, campaign, brandColours, clientName }: Props) {
+export function ApplicationForm({ clientSlug, campaign, brandColours, clientName, tracker }: Props) {
   const { gating_config: gatingConfig, slug: campaignSlug } = campaign;
   const [fields, setFields] = useState<FormFields>({
     name: "",
@@ -108,6 +110,55 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SubmissionResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Tracking ──────────────────────────────────────────────────────
+  const formStartedRef = useRef(false);
+  const formSubmittedRef = useRef(false);
+  const abandonFiredRef = useRef(false);
+  const fieldsCompletedRef = useRef<Set<string>>(new Set());
+  const lastCompletedFieldRef = useRef<string | null>(null);
+
+  /** Record that a field received meaningful input (value changed). */
+  const trackFieldCompleted = useCallback(
+    (field: string) => {
+      if (!tracker) return;
+      if (!formStartedRef.current) {
+        formStartedRef.current = true;
+        tracker.track("form_start");
+      }
+      fieldsCompletedRef.current.add(field);
+      lastCompletedFieldRef.current = field;
+      tracker.track("field_interact", { field });
+    },
+    [tracker],
+  );
+
+  // Fire form_abandon once on visibility change (only if user actually engaged)
+  const abandonRef = useRef<(() => void) | null>(null);
+  abandonRef.current = () => {
+    if (
+      formStartedRef.current &&
+      !formSubmittedRef.current &&
+      !abandonFiredRef.current &&
+      fieldsCompletedRef.current.size > 0 &&
+      tracker
+    ) {
+      abandonFiredRef.current = true;
+      tracker.track("form_abandon", {
+        last_field: lastCompletedFieldRef.current,
+        fields_completed: Array.from(fieldsCompletedRef.current),
+      });
+      tracker.flush();
+    }
+  };
+  // Register once
+  const registeredRef = useRef(false);
+  if (!registeredRef.current && typeof document !== "undefined") {
+    registeredRef.current = true;
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") abandonRef.current?.();
+    });
+  }
 
   const primaryColour = brandColours.primary || "#11123c";
   const primaryButtonText = buttonTextColour(primaryColour);
@@ -164,6 +215,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
     }
     setCvError(null);
     setCvFile(file);
+    trackFieldCompleted("cv");
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -246,6 +298,9 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
       const data = await res.json().catch(() => ({}));
 
       if (res.ok && data.success) {
+        formSubmittedRef.current = true;
+        tracker?.track("form_submit");
+        tracker?.flush();
         setResult({ kind: "success", message: data.message || "Thank you for applying." });
         return;
       }
@@ -425,7 +480,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
           required
           autoComplete="name"
           value={fields.name}
-          onChange={(e) => setField("name", e.target.value)}
+          onChange={(e) => { setField("name", e.target.value); trackFieldCompleted("name"); }}
           aria-invalid={!!fieldErrors.name}
           aria-describedby={fieldErrors.name ? "ts-name-error" : undefined}
           style={{ ...inputBaseStyle, ...inputErrorStyle(!!fieldErrors.name) }}
@@ -452,7 +507,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
           required
           autoComplete="email"
           value={fields.email}
-          onChange={(e) => setField("email", e.target.value)}
+          onChange={(e) => { setField("email", e.target.value); trackFieldCompleted("email"); }}
           aria-invalid={!!fieldErrors.email}
           aria-describedby={fieldErrors.email ? "ts-email-error" : undefined}
           style={{ ...inputBaseStyle, ...inputErrorStyle(!!fieldErrors.email) }}
@@ -478,7 +533,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
           type="tel"
           autoComplete="tel"
           value={fields.phone}
-          onChange={(e) => setField("phone", e.target.value)}
+          onChange={(e) => { setField("phone", e.target.value); trackFieldCompleted("phone"); }}
           style={inputBaseStyle}
           onFocus={(e) => (e.currentTarget.style.borderColor = fieldBorderFocus)}
           onBlur={(e) => (e.currentTarget.style.borderColor = fieldBorder)}
@@ -564,7 +619,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
                           name={`answer_${q.id}`}
                           value={opt.value}
                           checked={fields.answers[q.id] === opt.value}
-                          onChange={() => setAnswer(q.id, opt.value)}
+                          onChange={() => { setAnswer(q.id, opt.value); trackFieldCompleted(`question_${q.id}`); }}
                           style={{ accentColor: primaryColour, cursor: "pointer" }}
                         />
                         <span>{opt.value}</span>
@@ -576,7 +631,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
                     id={`ts-q-${q.id}`}
                     required
                     value={fields.answers[q.id] ?? ""}
-                    onChange={(e) => setAnswer(q.id, e.target.value)}
+                    onChange={(e) => { setAnswer(q.id, e.target.value); trackFieldCompleted(`question_${q.id}`); }}
                     aria-invalid={hasErr}
                     style={{ ...selectStyle, ...inputErrorStyle(hasErr) }}
                     onFocus={(e) => (e.currentTarget.style.borderColor = fieldBorderFocus)}
@@ -773,8 +828,8 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
             aria-invalid={!!fieldErrors.popia_consent}
             aria-describedby="ts-popia-text"
             tabIndex={0}
-            onClick={() => setField("popia_consent", !fields.popia_consent)}
-            onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setField("popia_consent", !fields.popia_consent); } }}
+            onClick={() => { setField("popia_consent", !fields.popia_consent); trackFieldCompleted("popia_consent"); }}
+            onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setField("popia_consent", !fields.popia_consent); trackFieldCompleted("popia_consent"); } }}
             style={{
               marginTop: "0.2rem",
               width: "1.125rem",

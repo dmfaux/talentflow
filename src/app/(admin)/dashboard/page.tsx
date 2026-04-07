@@ -41,6 +41,29 @@ interface DashboardData {
   time_series: { period: string; count: number }[];
 }
 
+interface AnalyticsData {
+  range: Range;
+  granularity: "day" | "week" | "month";
+  visitors: {
+    total: number;
+    unique: number;
+    sessions: number;
+    time_series: { period: string; views: number; unique: number }[];
+  };
+  funnel: {
+    page_views: number;
+    form_starts: number;
+    form_submits: number;
+    view_to_start_pct: number;
+    start_to_submit_pct: number;
+  };
+  abandonment: {
+    drop_off_by_field: { field: string; count: number }[];
+  };
+  browsers: { browser: string | null; count: number }[];
+  devices: { device_type: string | null; count: number }[];
+}
+
 const RANGE_OPTIONS: { value: Range; label: string }[] = [
   { value: "week", label: "Week" },
   { value: "month", label: "Month" },
@@ -86,6 +109,22 @@ const CAMPAIGN_STATUS_STYLES: Record<string, string> = {
   paused: "bg-warning-light text-warning",
   closed: "bg-red-light text-red",
   archived: "bg-cream text-txt-muted",
+};
+
+const BROWSER_COLORS: Record<string, string> = {
+  Chrome: "#4285F4",
+  Safari: "#007AFF",
+  Firefox: "#FF7139",
+  Edge: "#0078D4",
+  Opera: "#FF1B2D",
+  "Samsung Internet": "#1428A0",
+  other: "#9fb5c4",
+};
+
+const DEVICE_COLORS: Record<string, string> = {
+  desktop: "#5e38ff",
+  mobile: "#067340",
+  tablet: "#d68a0b",
 };
 
 function StatCard({
@@ -434,14 +473,20 @@ function LoadingSkeleton() {
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<Range>("month");
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/admin/dashboard?range=${range}`)
-      .then((r) => r.json())
-      .then((res) => setData(res.data ?? null))
+    Promise.all([
+      fetch(`/api/admin/dashboard?range=${range}`).then((r) => r.json()),
+      fetch(`/api/admin/analytics?range=${range}`).then((r) => r.json()),
+    ])
+      .then(([dashRes, analyticsRes]) => {
+        setData(dashRes.data ?? null);
+        setAnalytics(analyticsRes.data ?? null);
+      })
       .finally(() => setLoading(false));
   }, [range]);
 
@@ -720,6 +765,157 @@ export default function DashboardPage() {
           </p>
         )}
       </div>
+
+      {/* ── Visitor Analytics ── */}
+      {analytics && (
+        <>
+          <div className="mt-8 mb-6 flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-charcoal">Visitor Analytics</h2>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
+          {/* Visitor KPI cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <StatCard
+              label="Unique visitors"
+              value={analytics.visitors.unique}
+              sub={`${analytics.visitors.sessions} visits · ${analytics.visitors.total} views`}
+            />
+            <StatCard
+              label="Form started"
+              value={analytics.funnel.form_starts}
+              sub={`${analytics.funnel.view_to_start_pct}% of visitors`}
+            />
+            <StatCard
+              label="Applications"
+              value={analytics.funnel.form_submits}
+              sub={`${analytics.funnel.start_to_submit_pct}% completion`}
+            />
+            <StatCard
+              label="Form conversion"
+              value={
+                analytics.funnel.page_views > 0
+                  ? `${Math.round((analytics.funnel.form_submits / analytics.funnel.page_views) * 1000) / 10}%`
+                  : "—"
+              }
+              sub="visitor → application"
+            />
+          </div>
+
+          {/* Visitor volume chart */}
+          <div className="rounded-xl border border-border bg-surface p-6 mb-6">
+            <h2 className="text-sm font-semibold text-charcoal mb-5">
+              Visitor volume
+              <span className="ml-2 text-xs font-normal text-txt-muted">
+                {RANGE_SUBTITLES[range]}
+              </span>
+            </h2>
+            <AreaChart
+              data={analytics.visitors.time_series.map((t) => ({
+                period: t.period,
+                count: t.unique,
+                label: formatPeriodLabel(t.period, analytics.granularity),
+              }))}
+              height={160}
+            />
+          </div>
+
+          {/* Funnel + Drop-off */}
+          <div className="grid lg:grid-cols-2 gap-4 mb-6">
+            <div className="rounded-xl border border-border bg-surface p-6">
+              <h2 className="text-sm font-semibold text-charcoal mb-5">
+                Conversion funnel
+              </h2>
+              <div className="space-y-4">
+                <FunnelRow
+                  label="Viewed page"
+                  count={analytics.funnel.page_views}
+                  total={analytics.funnel.page_views}
+                  color="bg-accent"
+                />
+                <FunnelRow
+                  label="Started application"
+                  count={analytics.funnel.form_starts}
+                  total={analytics.funnel.page_views}
+                  color="bg-[#7a87ff]"
+                />
+                <FunnelRow
+                  label="Submitted application"
+                  count={analytics.funnel.form_submits}
+                  total={analytics.funnel.page_views}
+                  color="bg-green"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-surface p-6">
+              <h2 className="text-sm font-semibold text-charcoal mb-5">
+                Form drop-off by field
+              </h2>
+              {analytics.abandonment.drop_off_by_field.length > 0 ? (
+                <BarChart
+                  data={analytics.abandonment.drop_off_by_field}
+                  labelKey="field"
+                  valueKey="count"
+                  maxHeight={160}
+                  barColor="bg-vermillion"
+                />
+              ) : (
+                <p className="text-sm text-txt-muted py-10 text-center">
+                  No abandonment data yet
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Browser + Device */}
+          <div className="grid lg:grid-cols-2 gap-4 mb-6">
+            <div className="rounded-xl border border-border bg-surface p-6">
+              <h2 className="text-sm font-semibold text-charcoal mb-5">
+                Browser breakdown
+              </h2>
+              {analytics.browsers.length > 0 ? (
+                <DonutChart
+                  total={analytics.browsers.reduce((s, b) => s + b.count, 0)}
+                  centerLabel="Visitors"
+                  centerValue={analytics.visitors.unique}
+                  segments={analytics.browsers.map((b) => ({
+                    label: b.browser ?? "Unknown",
+                    value: b.count,
+                    color: BROWSER_COLORS[b.browser ?? ""] ?? "#9fb5c4",
+                  }))}
+                />
+              ) : (
+                <p className="text-sm text-txt-muted py-10 text-center">
+                  No visitor data yet
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-border bg-surface p-6">
+              <h2 className="text-sm font-semibold text-charcoal mb-5">
+                Device breakdown
+              </h2>
+              {analytics.devices.length > 0 ? (
+                <DonutChart
+                  total={analytics.devices.reduce((s, d) => s + d.count, 0)}
+                  centerLabel="Visitors"
+                  centerValue={analytics.visitors.unique}
+                  segments={analytics.devices.map((d) => ({
+                    label: d.device_type ?? "Unknown",
+                    value: d.count,
+                    color: DEVICE_COLORS[d.device_type ?? ""] ?? "#9fb5c4",
+                  }))}
+                />
+              ) : (
+                <p className="text-sm text-txt-muted py-10 text-center">
+                  No visitor data yet
+                </p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
