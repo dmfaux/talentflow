@@ -74,8 +74,7 @@ ${brandColors.accent ? `- Accent: ${brandColors.accent}` : "- Accent: choose one
 
 - DO NOT infer, invent, or add any content the user did not ask for. No made-up headings, no filler paragraphs, no "About the role" sections unless the brief specifically requests them.
 - DO NOT insert example or placeholder text. Use the slot markers for dynamic content and the user's exact words from the brief for any static content.
-- DO NOT wrap your answer in markdown code fences. DO NOT add commentary, preamble, or explanation.
-- Return ONE complete HTML page and nothing else.
+- Return the HTML page as an **artifact** (type: text/html) so it renders as a live preview. This lets the user see the design and request changes inline before copying the final HTML.
 
 # HTML requirements
 
@@ -117,6 +116,10 @@ The injected form has its own internal styling and is approximately 500–700px 
 - Style the container area to frame the form attractively (a subtle background, border, or card treatment works well).
 - Do NOT try to style the form's internal elements — they are controlled by the application.
 
+# Footer
+
+Include a subtle footer at the very bottom of the page with the text "Powered by TalentFlow". Style it small, muted, and unobtrusive — it should not compete with the page content. Centre-align it with generous top margin.
+
 # Colours
 
 ${brandSection}
@@ -138,5 +141,5 @@ ${logo
 TEMPLATE NAME: ${name}
 DESIGN BRIEF: ${brief}
 
-Return the complete HTML page now. Nothing else.`;
+Return the complete HTML page as an artifact now. The user will preview it, request tweaks, and copy the final version when satisfied.`;
 }

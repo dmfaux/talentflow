@@ -882,7 +882,7 @@ export function CampaignWizard({
             <div>
               <h2 className="text-base font-semibold text-charcoal">Landing Page</h2>
               <p className="mt-1 text-xs text-txt-muted">
-                Generate an AI prompt, paste it into Claude or ChatGPT, then paste the HTML result below.
+                Copy the AI prompt below into Claude or ChatGPT. It will generate a live preview as an artifact — tweak the design until you&apos;re happy, then paste the final HTML here.
               </p>
             </div>
 
