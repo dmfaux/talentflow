@@ -51,10 +51,10 @@ function hexOrFallback(hex: string, fallback: string): string {
 export function LiveCampaignPreview({ values, clientName, clientSlug }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>("desktop");
 
-  const primary = hexOrFallback(values.brand_primary_color, "#0b0f1c");
-  const secondary = hexOrFallback(values.brand_secondary_color, "#f3f0e8");
+  const primary = hexOrFallback(values.brand_primary_color, "#11123c");
+  const secondary = hexOrFallback(values.brand_secondary_color, "#f0f3f7");
   const accent = values.brand_accent_color ? hexOrFallback(values.brand_accent_color, primary) : primary;
-  const text = hexOrFallback(values.brand_text_color, "#0b0f1c");
+  const text = hexOrFallback(values.brand_text_color, "#11123c");
 
   const displayName = clientName.trim() || "Client";
   const subdomain = clientSlug.trim() || "client";
@@ -68,14 +68,14 @@ export function LiveCampaignPreview({ values, clientName, clientSlug }: Props) {
 
   const primaryRgb = hexToRgb(primary);
   const primaryButtonText =
-    primaryRgb && relativeLuminance(primaryRgb) > 0.55 ? "#0b0f1c" : "#ffffff";
+    primaryRgb && relativeLuminance(primaryRgb) > 0.55 ? "#11123c" : "#ffffff";
 
   const logoJustify = values.logo_position === "top-centre" ? "justify-center" : "justify-start";
   const logoBg =
     values.logo_background === "light"
       ? "#ffffff"
       : values.logo_background === "dark"
-        ? "#0b0f1c"
+        ? "#11123c"
         : "transparent";
 
   const logoInitial = displayName.charAt(0).toUpperCase();
@@ -145,22 +145,22 @@ export function LiveCampaignPreview({ values, clientName, clientSlug }: Props) {
         <div className="flex justify-center rounded-xl border border-border bg-canvas-2 px-6 py-6">
           {/* Phone frame */}
           <div
-            className="overflow-hidden rounded-[1.75rem] border-[6px] border-[#0b0f1c] bg-paper"
-            style={{ width: "280px", boxShadow: "0 12px 32px -16px rgba(11, 15, 28, 0.35)" }}
+            className="overflow-hidden rounded-[1.75rem] border-[6px] border-[#11123c] bg-paper"
+            style={{ width: "280px", boxShadow: "0 12px 32px -16px rgba(17, 18, 60, 0.35)" }}
           >
             {/* Status bar */}
             <div className="relative flex items-center justify-between bg-white px-5 pb-1 pt-1.5">
-              <span className="font-mono text-[0.6rem] font-semibold text-[#0b0f1c]">9:41</span>
+              <span className="font-mono text-[0.6rem] font-semibold text-[#11123c]">9:41</span>
               {/* Notch */}
-              <div className="absolute left-1/2 top-0 h-3 w-14 -translate-x-1/2 rounded-b-xl bg-[#0b0f1c]" />
+              <div className="absolute left-1/2 top-0 h-3 w-14 -translate-x-1/2 rounded-b-xl bg-[#11123c]" />
               <div className="flex items-center gap-1">
-                <svg width="10" height="7" viewBox="0 0 10 7" fill="currentColor" className="text-[#0b0f1c]">
+                <svg width="10" height="7" viewBox="0 0 10 7" fill="currentColor" className="text-[#11123c]">
                   <rect x="0" y="5" width="1.5" height="2" rx="0.3" />
                   <rect x="2.2" y="3.5" width="1.5" height="3.5" rx="0.3" />
                   <rect x="4.4" y="2" width="1.5" height="5" rx="0.3" />
                   <rect x="6.6" y="0.5" width="1.5" height="6.5" rx="0.3" />
                 </svg>
-                <svg width="12" height="7" viewBox="0 0 12 7" fill="none" stroke="currentColor" strokeWidth="0.8" className="text-[#0b0f1c]">
+                <svg width="12" height="7" viewBox="0 0 12 7" fill="none" stroke="currentColor" strokeWidth="0.8" className="text-[#11123c]">
                   <rect x="0.4" y="0.9" width="9.5" height="5.2" rx="1" />
                   <rect x="1.6" y="2.1" width="7.1" height="2.8" rx="0.3" fill="currentColor" />
                   <path d="M10.6 2.4v2.2" strokeLinecap="round" />
@@ -198,7 +198,7 @@ export function LiveCampaignPreview({ values, clientName, clientSlug }: Props) {
         /* Browser chrome */
         <div
           className="overflow-hidden rounded-xl border border-border bg-paper"
-          style={{ boxShadow: "0 12px 32px -16px rgba(11, 15, 28, 0.18)" }}
+          style={{ boxShadow: "0 12px 32px -16px rgba(17, 18, 60, 0.18)" }}
         >
           {/* Title bar */}
           <div className="flex items-center gap-3 border-b border-border bg-canvas-2 px-3 py-2">
@@ -315,7 +315,7 @@ function FakeCampaignPage({
             backgroundColor: accent,
             color:
               hexToRgb(accent) && relativeLuminance(hexToRgb(accent)!) > 0.55
-                ? "#0b0f1c"
+                ? "#11123c"
                 : "#ffffff",
           }}
         >

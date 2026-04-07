@@ -4,7 +4,7 @@ export default function CampaignLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#f3f0e8" }} className="antialiased">
+    <div style={{ minHeight: "100vh", backgroundColor: "#f0f3f7" }} className="antialiased">
       {children}
     </div>
   );

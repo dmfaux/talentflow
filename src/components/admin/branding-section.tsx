@@ -37,7 +37,7 @@ const COLOR_HELP: Record<keyof BrandingValues | string, string> = {
 
 const LOGO_BG_SWATCHES: Record<LogoBackground, string> = {
   light: "#ffffff",
-  dark: "#0b0f1c",
+  dark: "#11123c",
   transparent: "transparent",
 };
 
@@ -388,11 +388,11 @@ function LogoPreviewBox({
     background === "transparent"
       ? {
           backgroundImage:
-            "linear-gradient(45deg, #e5dfd0 25%, transparent 25%), linear-gradient(-45deg, #e5dfd0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5dfd0 75%), linear-gradient(-45deg, transparent 75%, #e5dfd0 75%)",
+            "linear-gradient(45deg, #d1dce6 25%, transparent 25%), linear-gradient(-45deg, #d1dce6 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d1dce6 75%), linear-gradient(-45deg, transparent 75%, #d1dce6 75%)",
           backgroundSize: "12px 12px",
           backgroundPosition: "0 0, 0 6px, 6px -6px, -6px 0",
         }
-      : { backgroundColor: background === "light" ? "#ffffff" : "#0b0f1c" };
+      : { backgroundColor: background === "light" ? "#ffffff" : "#11123c" };
 
   return (
     <div

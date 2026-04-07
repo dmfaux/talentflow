@@ -221,13 +221,13 @@ function AreaChart({
         <>
           <svg width={width} height={height} className="block">
             {/* Horizontal gridlines */}
-            <line x1={0} y1={padTop} x2={width} y2={padTop} stroke="#e5dfd0" strokeWidth="1" />
-            <line x1={0} y1={padTop + plotHeight / 2} x2={width} y2={padTop + plotHeight / 2} stroke="#e5dfd0" strokeWidth="1" strokeDasharray="2 2" />
-            <line x1={0} y1={padTop + plotHeight} x2={width} y2={padTop + plotHeight} stroke="#e5dfd0" strokeWidth="1" />
+            <line x1={0} y1={padTop} x2={width} y2={padTop} stroke="#d1dce6" strokeWidth="1" />
+            <line x1={0} y1={padTop + plotHeight / 2} x2={width} y2={padTop + plotHeight / 2} stroke="#d1dce6" strokeWidth="1" strokeDasharray="2 2" />
+            <line x1={0} y1={padTop + plotHeight} x2={width} y2={padTop + plotHeight} stroke="#d1dce6" strokeWidth="1" />
 
             {/* Area fill */}
             {n > 1 && (
-              <path d={areaPath} fill="#ffc800" fillOpacity="0.08" />
+              <path d={areaPath} fill="#5e38ff" fillOpacity="0.08" />
             )}
 
             {/* Line */}
@@ -235,7 +235,7 @@ function AreaChart({
               <path
                 d={linePath}
                 fill="none"
-                stroke="#ffc800"
+                stroke="#5e38ff"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -250,7 +250,7 @@ function AreaChart({
                 cy={points[i].y}
                 r="3"
                 fill="#ffffff"
-                stroke="#ffc800"
+                stroke="#5e38ff"
                 strokeWidth="1.5"
               />
             ))}
@@ -556,7 +556,7 @@ export default function DashboardPage() {
               {
                 label: "Scored",
                 value: data.status_breakdown.find((s) => s.status === "scored")?.count ?? 0,
-                color: "#ffc800",
+                color: "#5e38ff",
               },
               {
                 label: "Awaiting scoring",
@@ -568,12 +568,12 @@ export default function DashboardPage() {
               {
                 label: "Rejected",
                 value: data.status_breakdown.find((s) => s.status === "rejected")?.count ?? 0,
-                color: "#e63917",
+                color: "#05dbd6",
               },
               {
                 label: "Gating failed",
                 value: data.status_breakdown.find((s) => s.status === "gating_failed")?.count ?? 0,
-                color: "#8e96ad",
+                color: "#9fb5c4",
               },
             ]}
           />

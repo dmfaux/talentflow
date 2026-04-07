@@ -26,14 +26,14 @@ interface Props {
 }
 
 export function ApplicationFormSuccess({ message, brandColours, clientName }: Props) {
-  const primary = brandColours.primary || "#0b0f1c";
-  const text = brandColours.text || "#0b0f1c";
+  const primary = brandColours.primary || "#11123c";
+  const text = brandColours.text || "#11123c";
 
   const iconColour = "#067340";
   const iconBg = "#d3ecd9";
 
   const primaryRgb = hexToRgb(primary);
-  const primaryButtonText = primaryRgb && relativeLuminance(primaryRgb) > 0.55 ? "#0b0f1c" : "#ffffff";
+  const primaryButtonText = primaryRgb && relativeLuminance(primaryRgb) > 0.55 ? "#11123c" : "#ffffff";
 
   return (
     <div
@@ -81,7 +81,7 @@ export function ApplicationFormSuccess({ message, brandColours, clientName }: Pr
         style={{
           fontSize: "0.95rem",
           lineHeight: 1.6,
-          color: "rgba(11, 15, 28, 0.72)",
+          color: "rgba(17, 18, 60, 0.72)",
           maxWidth: "28rem",
           margin: "0 auto 1.25rem",
         }}
@@ -115,7 +115,7 @@ export function ApplicationFormSuccess({ message, brandColours, clientName }: Pr
           style={{
             marginTop: "1.75rem",
             fontSize: "0.78rem",
-            color: "rgba(11, 15, 28, 0.45)",
+            color: "rgba(17, 18, 60, 0.45)",
             fontFamily: "var(--font-jetbrains-mono), monospace",
             letterSpacing: "0.03em",
           }}

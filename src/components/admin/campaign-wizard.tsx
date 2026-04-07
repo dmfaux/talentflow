@@ -368,9 +368,9 @@ export function CampaignWizard({
     const brandColors: BrandColors | null = client?.brand_primary_color
       ? {
           primary: client.brand_primary_color,
-          secondary: client.brand_secondary_color ?? "#f3f0e8",
+          secondary: client.brand_secondary_color ?? "#f0f3f7",
           accent: client.brand_accent_color,
-          text: client.brand_text_color ?? "#0b0f1c",
+          text: client.brand_text_color ?? "#11123c",
         }
       : null;
 
@@ -1183,11 +1183,11 @@ function ClientBrandingSummary({ client }: { client: Client | undefined }) {
     logoBg === "transparent"
       ? {
           backgroundImage:
-            "linear-gradient(45deg, #e5dfd0 25%, transparent 25%), linear-gradient(-45deg, #e5dfd0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5dfd0 75%), linear-gradient(-45deg, transparent 75%, #e5dfd0 75%)",
+            "linear-gradient(45deg, #d1dce6 25%, transparent 25%), linear-gradient(-45deg, #d1dce6 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d1dce6 75%), linear-gradient(-45deg, transparent 75%, #d1dce6 75%)",
           backgroundSize: "8px 8px",
           backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0",
         }
-      : { backgroundColor: logoBg === "light" ? "#ffffff" : "#0b0f1c" };
+      : { backgroundColor: logoBg === "light" ? "#ffffff" : "#11123c" };
 
   const promptSnippet = swatches
     .map((s) => `${s.label.toLowerCase()}: ${s.value}`)
