@@ -33,6 +33,9 @@ export async function GET(request: NextRequest) {
         )
       );
       conditions.push(eq(templates.status, "published"));
+      // Only show templates that have rendered HTML — legacy seed
+      // templates may be 'published' with null published_html_template.
+      conditions.push(sql`${templates.published_html_template} IS NOT NULL`);
     } else if (filter === "shared") {
       conditions.push(isNull(templates.owner_client_id));
     } else if (filter === "bespoke") {

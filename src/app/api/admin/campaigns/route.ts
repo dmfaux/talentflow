@@ -96,16 +96,20 @@ export async function POST(request: NextRequest) {
     });
     if (!client) return error("Client not found", 404);
 
-    // Verify template exists and is published (only published templates
-    // can be assigned to new campaigns).
+    // Verify template exists, is published, and has rendered HTML.
     const template = await db.query.templates.findFirst({
       where: and(
         eq(templates.id, body.template_id),
         eq(templates.status, "published")
       ),
-      columns: { id: true },
+      columns: { id: true, published_html_template: true },
     });
     if (!template) return error("Template not found or not published", 404);
+    if (!template.published_html_template) {
+      return error(
+        "Template is published but has no HTML content. Edit the template to add HTML, then republish it."
+      );
+    }
 
     // Check slug uniqueness per client
     const existing = await db.query.campaigns.findFirst({
