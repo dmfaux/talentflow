@@ -110,7 +110,7 @@ export async function downloadBlob(
 
   const container = getContainerClient();
   const containerUrl = container.url.replace(/\/$/, "");
-  const blobPath = blobUrl.replace(containerUrl + "/", "");
+  const blobPath = decodeURIComponent(blobUrl.replace(containerUrl + "/", ""));
   const blockBlob = container.getBlockBlobClient(blobPath);
 
   const response = await blockBlob.download(0);
@@ -130,7 +130,7 @@ export async function deleteCV(blobUrl: string): Promise<void> {
 
   const container = getContainerClient();
   const containerUrl = container.url.replace(/\/$/, "");
-  const blobPath = blobUrl.replace(containerUrl + "/", "");
+  const blobPath = decodeURIComponent(blobUrl.replace(containerUrl + "/", ""));
   const blockBlob = container.getBlockBlobClient(blobPath);
   await blockBlob.deleteIfExists();
 }
@@ -145,7 +145,7 @@ export function generateSasUrl(
   const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME!;
   const container = client.getContainerClient(containerName);
   const containerUrl = container.url.replace(/\/$/, "");
-  const blobPath = blobUrl.replace(containerUrl + "/", "");
+  const blobPath = decodeURIComponent(blobUrl.replace(containerUrl + "/", ""));
 
   const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING!;
   const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
