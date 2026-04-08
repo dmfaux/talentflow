@@ -14,10 +14,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const now = new Date();
-  const lockUntil = new Date(now.getTime() + LOCK_DURATION_MS);
+  const now = new Date().toISOString();
+  const lockUntil = new Date(Date.now() + LOCK_DURATION_MS).toISOString();
 
   // Atomically claim a batch of ready jobs
+  // Use sql.raw() for timestamps to avoid Drizzle converting strings to Date
+  // objects which postgres.js rejects. Values are self-generated, not user input.
   const readyJobs = await db.execute<{
     id: string;
     type: string;
@@ -27,13 +29,13 @@ export async function POST(request: NextRequest) {
   }>(sql`
     UPDATE jobs
     SET status = 'processing',
-        locked_until = ${lockUntil},
+        locked_until = ${sql.raw(`'${lockUntil}'::timestamptz`)},
         attempts = attempts + 1
     WHERE id IN (
       SELECT id FROM jobs
       WHERE status = 'pending'
-        AND deliver_at <= ${now}
-        AND (locked_until IS NULL OR locked_until < ${now})
+        AND deliver_at <= ${sql.raw(`'${now}'::timestamptz`)}
+        AND (locked_until IS NULL OR locked_until < ${sql.raw(`'${now}'::timestamptz`)})
       ORDER BY deliver_at ASC
       LIMIT ${BATCH_SIZE}
       FOR UPDATE SKIP LOCKED
