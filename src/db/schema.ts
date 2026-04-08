@@ -123,11 +123,13 @@ export const scoringLogs = pgTable(
     candidate_id: uuid("candidate_id")
       .notNull()
       .references(() => candidates.id),
+    provider: text("provider"),
     model_version: text("model_version").notNull(),
     full_prompt: text("full_prompt").notNull(),
     full_response: text("full_response").notNull(),
     score: real("score"),
     processing_time_ms: integer("processing_time_ms"),
+    fallback_chain: jsonb("fallback_chain"),
     created_at: timestamp("created_at").defaultNow().notNull(),
     updated_at: timestamp("updated_at").defaultNow().notNull(),
   },

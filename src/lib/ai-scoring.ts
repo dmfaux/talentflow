@@ -1,22 +1,14 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/db";
-import { candidates, campaigns, clients, scoringLogs } from "@/db/schema";
+import { candidates, scoringLogs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { sendFollowUpQuestion } from "./whatsapp";
-
-const MODEL = "claude-sonnet-4-20250514";
-const MAX_TOKENS = 1024;
-
-// ── Client singleton ─────────────────────────────────────────────────
-
-let anthropicClient: Anthropic | null = null;
-
-function getClient(): Anthropic {
-  if (!anthropicClient) {
-    anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  }
-  return anthropicClient;
-}
+import {
+  callWithFallback,
+  AllProvidersFailedError,
+  SYSTEM_PROMPT,
+  type ScoringResult,
+  type ProviderAttempt,
+} from "./ai";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -32,25 +24,7 @@ interface ScoringRubric {
   };
 }
 
-interface ScoringResult {
-  overall_score: number;
-  dimensions: {
-    skills_match: number;
-    experience_depth: number;
-    career_progression: number;
-    tenure_patterns: number;
-  };
-  confidence: "high" | "medium" | "low";
-  rationale: string;
-  flags: string[];
-  recommendation: string;
-}
-
 // ── Prompt builder ───────────────────────────────────────────────────
-
-const SYSTEM_PROMPT = `You are an expert recruitment assessor. You evaluate candidate CVs against specific job requirements with precision and objectivity.
-
-You MUST respond with a single valid JSON object matching the exact schema specified. Do not include any text outside the JSON object. Do not wrap it in markdown code fences.`;
 
 export function buildScoringPrompt(
   roleTitle: string,
@@ -110,17 +84,6 @@ Respond with exactly this JSON structure:
 }`;
 }
 
-// ── Response parser ──────────────────────────────────────────────────
-
-function parseResponse(raw: string): ScoringResult {
-  // Strip markdown code fences if present
-  let cleaned = raw.trim();
-  if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
-  }
-  return JSON.parse(cleaned);
-}
-
 // ── Score candidate ──────────────────────────────────────────────────
 
 export async function scoreCandidate(candidateId: string): Promise<void> {
@@ -154,66 +117,19 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
   );
 
   const startTime = Date.now();
-  let fullResponse = "";
 
-  // Call API with one retry on 5xx
-  async function callApi(): Promise<Anthropic.Message> {
-    return getClient().messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userPrompt }],
-    });
-  }
-
-  let response: Anthropic.Message;
+  // Call AI with provider fallback chain
+  let aiResult;
   try {
-    response = await callApi();
+    aiResult = await callWithFallback(SYSTEM_PROMPT, userPrompt);
   } catch (err: unknown) {
-    const status = (err as { status?: number }).status;
-    if (status && status >= 500) {
-      console.warn(`scoreCandidate: 5xx error for ${candidateId}, retrying...`);
-      try {
-        response = await callApi();
-      } catch (retryErr) {
-        return handleApiFailure(candidateId, userPrompt, startTime, retryErr);
-      }
-    } else {
-      return handleApiFailure(candidateId, userPrompt, startTime, err);
-    }
+    const attempts =
+      err instanceof AllProvidersFailedError ? err.attempts : [];
+    return handleApiFailure(candidateId, userPrompt, startTime, err, attempts);
   }
 
   const processingTimeMs = Date.now() - startTime;
-  fullResponse =
-    response.content[0].type === "text" ? response.content[0].text : "";
-
-  // Parse the response
-  let result: ScoringResult;
-  try {
-    result = parseResponse(fullResponse);
-  } catch (err) {
-    console.error(`scoreCandidate: failed to parse response for ${candidateId}:`, err);
-
-    await db.insert(scoringLogs).values({
-      candidate_id: candidateId,
-      model_version: MODEL,
-      full_prompt: SYSTEM_PROMPT + "\n\n" + userPrompt,
-      full_response: fullResponse,
-      score: null,
-      processing_time_ms: processingTimeMs,
-    });
-
-    await db
-      .update(candidates)
-      .set({
-        status: "scored",
-        ai_flags: [{ type: "parse_error", message: "AI response could not be parsed" }],
-        ai_rationale: "AI scoring completed but the response was malformed. Manual review required.",
-        updated_at: new Date(),
-      })
-      .where(eq(candidates.id, candidateId));
-    return;
-  }
+  const result: ScoringResult = aiResult.output;
 
   // Determine status based on flags
   const hasFlags = Array.isArray(result.flags) && result.flags.length > 0;
@@ -236,11 +152,14 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
   // Write scoring log
   await db.insert(scoringLogs).values({
     candidate_id: candidateId,
-    model_version: MODEL,
+    provider: aiResult.providerName,
+    model_version: aiResult.modelId,
     full_prompt: SYSTEM_PROMPT + "\n\n" + userPrompt,
-    full_response: fullResponse,
+    full_response: aiResult.text,
     score: result.overall_score,
     processing_time_ms: processingTimeMs,
+    fallback_chain:
+      aiResult.attempts.length > 0 ? aiResult.attempts : null,
   });
 
   // Auto-send follow-up if there are flags
@@ -255,7 +174,8 @@ async function handleApiFailure(
   candidateId: string,
   prompt: string,
   startTime: number,
-  err: unknown
+  err: unknown,
+  attempts: ProviderAttempt[]
 ): Promise<void> {
   const processingTimeMs = Date.now() - startTime;
   const message = err instanceof Error ? err.message : "Unknown API error";
@@ -263,11 +183,13 @@ async function handleApiFailure(
 
   await db.insert(scoringLogs).values({
     candidate_id: candidateId,
-    model_version: MODEL,
+    provider: attempts.length > 0 ? attempts[attempts.length - 1].provider : null,
+    model_version: "unknown",
     full_prompt: SYSTEM_PROMPT + "\n\n" + prompt,
     full_response: `ERROR: ${message}`,
     score: null,
     processing_time_ms: processingTimeMs,
+    fallback_chain: attempts.length > 0 ? attempts : null,
   });
 
   await db
@@ -275,7 +197,8 @@ async function handleApiFailure(
     .set({
       status: "scored",
       ai_flags: [{ type: "api_error", message }],
-      ai_rationale: "AI scoring failed due to an API error. Manual review required.",
+      ai_rationale:
+        "AI scoring failed due to an API error. Manual review required.",
       updated_at: new Date(),
     })
     .where(eq(candidates.id, candidateId));

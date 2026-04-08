@@ -16,11 +16,14 @@
     "jobs:poll": "while true; do curl -s -X POST http://localhost:3000/api/jobs/process; sleep 10; done"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.82.0",
+    "@ai-sdk/anthropic": "^3.0.68",
+    "@ai-sdk/openai": "^3.0.52",
+    "@ai-sdk/openai-compatible": "^2.0.41",
     "@azure/service-bus": "^7.9.0",
     "@azure/storage-blob": "^12.31.0",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/noto-serif": "^5.2.9",
+    "ai": "^6.0.153",
     "bcryptjs": "^3.0.2",
     "dotenv": "^17.4.0",
     "drizzle-orm": "^0.45.2",
