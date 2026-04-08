@@ -57,7 +57,7 @@ function createProviderFactory(name: ProviderName): ProviderFactory {
     case "local": {
       const provider = createOpenAICompatible({
         name: "local",
-        baseURL: process.env.AI_LOCAL_BASE_URL || "http://localhost:1234/v1",
+        baseURL: process.env.AI_LOCAL_BASE_URL || "http://localhost:11434/v1",
         apiKey: process.env.AI_LOCAL_API_KEY || "not-needed",
       });
       return (modelId: string) => provider(modelId);

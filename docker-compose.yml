@@ -22,6 +22,14 @@ services:
     volumes:
       - azurite-data:/data
 
+  ollama:
+    image: ollama/ollama
+    container_name: talentstream-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
   mailpit:
     image: axllent/mailpit
     container_name: talentstream-mailpit
@@ -32,3 +40,4 @@ services:
 volumes:
   pgdata:
   azurite-data:
+  ollama-data:
