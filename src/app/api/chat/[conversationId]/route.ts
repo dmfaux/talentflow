@@ -10,6 +10,7 @@ import {
 import { buildChatSystemPrompt } from "@/lib/ai/chat-prompt";
 import { getChatModel } from "@/lib/ai/chat-provider";
 import { eq, and, asc } from "drizzle-orm";
+import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 import type { Topic } from "@/lib/chat";
 
@@ -128,8 +129,16 @@ export async function POST(
       content: m.content,
     })),
     maxOutputTokens: 512,
-    onFinish: async ({ text, reasoningText }) => {
-      // Remove reasoning that leaked into the text field
+  });
+
+  // Run post-processing after the response is sent — `after()` guarantees
+  // execution and proper error visibility, unlike streamText's onFinish
+  // which silently swallows all errors via the SDK's internal notify().
+  after(async () => {
+    try {
+      const text = await result.text;
+      const reasoningText = await result.reasoningText;
+
       let cleanText = stripThinking(text);
       if (reasoningText && cleanText.startsWith(reasoningText)) {
         cleanText = cleanText.slice(reasoningText.length).trim();
@@ -159,7 +168,9 @@ export async function POST(
           await updateConversationActivity(conversationId, covered);
         }
       }
-    },
+    } catch (err) {
+      console.error("Chat post-processing failed:", err);
+    }
   });
 
   return result.toTextStreamResponse();
