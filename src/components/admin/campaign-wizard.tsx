@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { buildTemplatePrompt, type BrandColors } from "@/lib/prompt-builder";
 import { validateHtmlTemplate, replaceSlots, type SlotData } from "@/lib/slots";
+import { renderMarkdown } from "@/lib/markdown";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -1288,7 +1289,7 @@ function TemplatePreview({
     client: { name: clientName ?? "Company" },
     campaign: {
       role_title: form.role_title || "Sample Role Title",
-      role_description: form.role_description || null,
+      role_description: renderMarkdown(form.role_description),
       department: form.department || null,
       location: form.location || null,
       employment_type: form.employment_type || null,
