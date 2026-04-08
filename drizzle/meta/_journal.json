@@ -141,6 +141,13 @@
       "when": 1775628003124,
       "tag": "0019_thankful_magdalene",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1775641282527,
+      "tag": "0020_pink_quasar",
+      "breakpoints": true
     }
   ]
 }

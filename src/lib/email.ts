@@ -220,3 +220,57 @@ export function gatingFailedEmail(
     </p>
   `);
 }
+
+export function chatInvitationEmail(
+  candidateName: string,
+  roleTitle: string,
+  clientName: string,
+  chatUrl: string
+): string {
+  return wrapTemplate(`
+    <h2 style="margin:0 0 16px;font-size:20px;color:#1B4332;font-weight:normal;font-style:italic;">
+      We'd like to chat
+    </h2>
+    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
+      Hi ${candidateName},
+    </p>
+    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
+      We have a few follow-up questions about your application for the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>. This should only take a few minutes.
+    </p>
+    <p style="margin:0 0 24px;">
+      <a href="${chatUrl}" style="display:inline-block;background:#0c0c0e;color:#fafaf7;text-decoration:none;padding:12px 20px;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:500;">
+        Continue to chat
+      </a>
+    </p>
+    <p style="margin:0;font-size:13px;color:#666;line-height:1.6;">
+      If the button doesn't work, copy and paste this link into your browser:<br>
+      <a href="${chatUrl}" style="color:#1B4332;word-break:break-all;">${chatUrl}</a>
+    </p>
+  `);
+}
+
+export function chatAccessEmail(
+  candidateName: string,
+  roleTitle: string,
+  magicLinkUrl: string
+): string {
+  return wrapTemplate(`
+    <h2 style="margin:0 0 16px;font-size:20px;color:#1B4332;font-weight:normal;font-style:italic;">
+      Verify your identity
+    </h2>
+    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
+      Hi ${candidateName},
+    </p>
+    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
+      We received a request to access your chat for the <strong>${roleTitle}</strong> application. Click below to verify your identity and continue the conversation. This link expires in 1 hour.
+    </p>
+    <p style="margin:0 0 24px;">
+      <a href="${magicLinkUrl}" style="display:inline-block;background:#0c0c0e;color:#fafaf7;text-decoration:none;padding:12px 20px;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:500;">
+        Verify &amp; continue
+      </a>
+    </p>
+    <p style="margin:0;font-size:13px;color:#666;line-height:1.6;">
+      If you didn't request this, you can safely ignore this email.
+    </p>
+  `);
+}

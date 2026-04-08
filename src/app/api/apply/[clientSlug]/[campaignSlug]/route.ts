@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { campaigns, candidates, clients } from "@/db/schema";
 import { uploadCV } from "@/lib/azure-storage";
+import { generateChatToken } from "@/lib/chat-auth";
 import { applicationReceivedEmail, sendCandidateEmail } from "@/lib/email";
 import { evaluateGating, GatingQuestion } from "@/lib/gating";
 import { getQueue } from "@/lib/queue";
@@ -135,6 +136,13 @@ export async function POST(
     const clientName = campaign.client_name ?? "the company";
     const candidateId = newCandidate.id;
 
+    // Generate persistent chat token for in-app chat authentication
+    const chatToken = generateChatToken();
+    await db
+      .update(candidates)
+      .set({ chat_token_hash: chatToken.hash })
+      .where(eq(candidates.id, candidateId));
+
     if (cvFile) {
       const buffer = Buffer.from(await cvFile.arrayBuffer());
       const blobUrl = await uploadCV(clientSlug, campaignSlug, candidateId, buffer, cvFile.name);
@@ -163,7 +171,7 @@ export async function POST(
       );
     }
 
-    return json({ success: true, candidate_id: candidateId, message: "Thank you for applying! Your application has been received and will be reviewed shortly." }, 201);
+    return json({ success: true, candidate_id: candidateId, chat_token: chatToken.raw, message: "Thank you for applying! Your application has been received and will be reviewed shortly." }, 201);
   } catch (err) {
     console.error("POST /api/apply error:", err);
     return json({ error: "Internal server error" }, 500);

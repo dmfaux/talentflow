@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { candidates, scoringLogs } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { sendFollowUpQuestion } from "./whatsapp";
+import { getQueue } from "./queue";
 import {
   callWithFallback,
   AllProvidersFailedError,
@@ -162,11 +162,19 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
       aiResult.attempts.length > 0 ? aiResult.attempts : null,
   });
 
-  // Auto-send follow-up if there are flags
+  // Open chat channel if there are flags
   if (hasFlags) {
-    sendFollowUpQuestion(candidateId).catch((err) =>
-      console.error(`scoreCandidate: follow-up failed for ${candidateId}:`, err)
-    );
+    getQueue()
+      .enqueue(
+        { type: "send-chat-invitation", candidateId },
+        { deduplicationId: `chat-invite-${candidateId}` }
+      )
+      .catch((err) =>
+        console.error(
+          `scoreCandidate: chat invitation failed for ${candidateId}:`,
+          err
+        )
+      );
   }
 }
 

@@ -64,6 +64,7 @@ export const campaigns = pgTable(
     campaign_end: timestamp("campaign_end"),
     salary_range_min: integer("salary_range_min"),
     salary_range_max: integer("salary_range_max"),
+    chat_lifecycle: text("chat_lifecycle").notNull().default("dormant"),
     created_at: timestamp("created_at").defaultNow().notNull(),
     updated_at: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -87,6 +88,7 @@ export const candidates = pgTable(
     email: text("email").notNull(),
     phone: text("phone"),
     whatsapp_opted_in: boolean("whatsapp_opted_in").default(false),
+    chat_token_hash: text("chat_token_hash"),
     gating_answers: jsonb("gating_answers"),
     gating_passed: boolean("gating_passed"),
     cv_url: text("cv_url"),
@@ -203,6 +205,70 @@ export const messages = pgTable(
   (table) => [index("messages_candidate_id_idx").on(table.candidate_id)]
 );
 
+// ── Conversations (chat) ────────────────────────────────────────────
+
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    candidate_id: uuid("candidate_id")
+      .notNull()
+      .references(() => candidates.id),
+    status: text("status").notNull().default("active"),
+    lifecycle: text("lifecycle").notNull().default("dormant"),
+    topics: jsonb("topics"),
+    topics_covered_count: integer("topics_covered_count").notNull().default(0),
+    last_activity_at: timestamp("last_activity_at").defaultNow().notNull(),
+    dormant_after_minutes: integer("dormant_after_minutes").notNull().default(30),
+    closed_reason: text("closed_reason"),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("conversations_candidate_id_idx").on(table.candidate_id),
+    index("conversations_status_idx").on(table.status),
+  ]
+);
+
+// ── Chat Messages ───────────────────────────────────────────────────
+
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversation_id: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id),
+    role: text("role").notNull(),
+    content: text("content").notNull(),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("chat_messages_conversation_id_idx").on(table.conversation_id),
+    index("chat_messages_created_at_idx").on(table.created_at),
+  ]
+);
+
+// ── Chat Tokens (magic link) ───────────────────────────────────────
+
+export const chatTokens = pgTable(
+  "chat_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    candidate_id: uuid("candidate_id")
+      .notNull()
+      .references(() => candidates.id),
+    token_hash: text("token_hash").notNull(),
+    expires_at: timestamp("expires_at").notNull(),
+    used_at: timestamp("used_at"),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("chat_tokens_hash_idx").on(table.token_hash),
+    index("chat_tokens_candidate_id_idx").on(table.candidate_id),
+  ]
+);
+
 // ── Events (visitor tracking) ───────────────────────────────────────
 
 export const events = pgTable(
@@ -270,6 +336,8 @@ export const candidatesRelations = relations(candidates, ({ one, many }) => ({
   }),
   scoringLogs: many(scoringLogs),
   messages: many(messages),
+  conversations: many(conversations),
+  chatTokens: many(chatTokens),
 }));
 
 export const scoringLogsRelations = relations(scoringLogs, ({ one }) => ({
@@ -290,6 +358,31 @@ export const eventsRelations = relations(events, ({ one }) => ({
   campaign: one(campaigns, {
     fields: [events.campaign_id],
     references: [campaigns.id],
+  }),
+}));
+
+export const conversationsRelations = relations(
+  conversations,
+  ({ one, many }) => ({
+    candidate: one(candidates, {
+      fields: [conversations.candidate_id],
+      references: [candidates.id],
+    }),
+    chatMessages: many(chatMessages),
+  })
+);
+
+export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [chatMessages.conversation_id],
+    references: [conversations.id],
+  }),
+}));
+
+export const chatTokensRelations = relations(chatTokens, ({ one }) => ({
+  candidate: one(candidates, {
+    fields: [chatTokens.candidate_id],
+    references: [candidates.id],
   }),
 }));
 

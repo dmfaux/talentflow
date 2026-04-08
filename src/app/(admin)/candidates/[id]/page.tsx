@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { candidates, messages, scoringLogs } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { candidates, chatMessages, messages, scoringLogs } from "@/db/schema";
+import { eq, desc, asc } from "drizzle-orm";
 import { CandidateActions } from "@/components/admin/candidate-actions";
 import { CandidateNotes } from "@/components/admin/candidate-notes";
 import { AuditLog } from "@/components/admin/audit-log";
@@ -53,6 +53,9 @@ export default async function CandidateDetailPage({ params }: Props) {
       campaign: { with: { client: true } },
       scoringLogs: { orderBy: [desc(scoringLogs.created_at)] },
       messages: { orderBy: [desc(messages.created_at)] },
+      conversations: {
+        with: { chatMessages: { orderBy: [asc(chatMessages.created_at)] } },
+      },
     },
   });
 
@@ -245,9 +248,9 @@ export default async function CandidateDetailPage({ params }: Props) {
                 <span className="text-charcoal">{candidate.source ?? "\u2014"}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-txt-muted">WhatsApp</span>
+                <span className="text-txt-muted">Chat</span>
                 <span className="text-charcoal">
-                  {candidate.whatsapp_opted_in ? "Opted in" : "No"}
+                  {candidate.conversations.length > 0 ? "Active" : "None"}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -409,6 +412,54 @@ export default async function CandidateDetailPage({ params }: Props) {
                       <p className="mt-0.5 text-xs text-charcoal line-clamp-2">
                         {msg.content}
                       </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Chat Transcript */}
+          {candidate.conversations.length > 0 && (
+            <div className="rounded-xl border border-border bg-surface p-5">
+              <h3 className="mb-4 text-sm font-semibold text-charcoal">
+                Chat Transcript
+                <span className="ml-2 font-mono text-xs font-normal text-txt-muted">
+                  {candidate.conversations.length} conversation{candidate.conversations.length !== 1 ? "s" : ""}
+                </span>
+              </h3>
+              <div className="space-y-4">
+                {candidate.conversations.map((conv) => (
+                  <div key={conv.id} className="rounded-lg border border-border">
+                    <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
+                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-[0.65rem] font-medium ${
+                        conv.status === "active" ? "bg-green-light text-green" :
+                        conv.status === "dormant" ? "bg-warning-light text-warning" :
+                        "bg-cream text-txt-muted"
+                      }`}>
+                        {conv.status}
+                      </span>
+                      <span className="font-mono text-[0.65rem] text-txt-muted">
+                        {new Date(conv.created_at).toLocaleString("en-ZA")}
+                      </span>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto px-4 py-3">
+                      <div className="space-y-2.5">
+                        {conv.chatMessages.map((msg) => (
+                          <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                            <div className={`max-w-[80%] rounded-xl px-3.5 py-2 ${
+                              msg.role === "user"
+                                ? "bg-accent/10 text-charcoal"
+                                : "bg-cream text-txt-secondary"
+                            }`}>
+                              <p className="mb-0.5 text-[0.6rem] font-medium text-txt-muted">
+                                {msg.role === "user" ? "Candidate" : "Bot"}
+                              </p>
+                              <p className="text-xs leading-relaxed">{msg.content}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 ))}

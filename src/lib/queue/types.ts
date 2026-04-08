@@ -11,7 +11,8 @@ export type JobPayload =
       type: "send-email";
       candidateId: string;
       emailKind: "gating_failed" | "gating_passed" | "application_received";
-    };
+    }
+  | { type: "send-chat-invitation"; candidateId: string };
 
 export interface JobQueue {
   enqueue(payload: JobPayload, options?: EnqueueOptions): Promise<void>;

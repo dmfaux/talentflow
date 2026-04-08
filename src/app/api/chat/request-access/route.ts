@@ -1,0 +1,73 @@
+import { db } from "@/db";
+import { campaigns, candidates, chatTokens, clients } from "@/db/schema";
+import { generateMagicLinkToken } from "@/lib/chat-auth";
+import { chatAccessEmail, sendCandidateEmail } from "@/lib/email";
+import { and, eq } from "drizzle-orm";
+import { NextRequest, NextResponse } from "next/server";
+
+export async function POST(request: NextRequest) {
+  try {
+    const { email, clientSlug, campaignSlug } = await request.json();
+
+    if (!email || !clientSlug || !campaignSlug) {
+      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    }
+
+    // Always return success to prevent email enumeration
+    const successResponse = NextResponse.json({ success: true });
+
+    const trimmedEmail = email.trim().toLowerCase();
+
+    // Look up candidate by email + campaign
+    const [candidate] = await db
+      .select({
+        id: candidates.id,
+        name: candidates.name,
+        role_title: campaigns.role_title,
+      })
+      .from(candidates)
+      .innerJoin(campaigns, eq(candidates.campaign_id, campaigns.id))
+      .innerJoin(clients, eq(campaigns.client_id, clients.id))
+      .where(
+        and(
+          eq(candidates.email, trimmedEmail),
+          eq(clients.slug, clientSlug),
+          eq(campaigns.slug, campaignSlug)
+        )
+      )
+      .limit(1);
+
+    if (!candidate) return successResponse;
+
+    // Generate magic link token
+    const token = generateMagicLinkToken();
+    await db.insert(chatTokens).values({
+      candidate_id: candidate.id,
+      token_hash: token.hash,
+      expires_at: token.expiresAt,
+    });
+
+    // Build magic link URL
+    const origin =
+      process.env.NEXT_PUBLIC_APP_URL ??
+      request.nextUrl.origin;
+    const redirect = `/c/${clientSlug}/${campaignSlug}/chat`;
+    const magicLinkUrl = `${origin}/api/chat/verify?token=${token.raw}&redirect=${encodeURIComponent(redirect)}`;
+
+    // Send email
+    await sendCandidateEmail(
+      trimmedEmail,
+      `Verify your identity — ${candidate.role_title}`,
+      chatAccessEmail(candidate.name, candidate.role_title, magicLinkUrl),
+      candidate.id
+    );
+
+    return successResponse;
+  } catch (err) {
+    console.error("POST /api/chat/request-access error:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}

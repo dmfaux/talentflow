@@ -82,7 +82,6 @@ interface FormFields {
   name: string;
   email: string;
   phone: string;
-  whatsapp_opt_in: boolean;
   popia_consent: boolean;
   answers: Record<string, string>;
 }
@@ -99,7 +98,6 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
     name: "",
     email: "",
     phone: "",
-    whatsapp_opt_in: false,
     popia_consent: false,
     answers: {},
   });
@@ -285,7 +283,7 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
       formData.append("name", fields.name.trim());
       formData.append("email", fields.email.trim());
       if (fields.phone.trim()) formData.append("phone", fields.phone.trim());
-      formData.append("whatsapp_opt_in", fields.whatsapp_opt_in ? "true" : "false");
+      formData.append("whatsapp_opt_in", "false");
       formData.append("popia_consent", "true");
       formData.append("answers", JSON.stringify(fields.answers));
       if (cvFile) formData.append("cv", cvFile);
@@ -301,6 +299,9 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
         formSubmittedRef.current = true;
         tracker?.track("form_submit");
         tracker?.flush();
+        if (data.chat_token) {
+          try { localStorage.setItem(`ts_chat_${clientSlug}_${campaignSlug}`, data.chat_token); } catch {}
+        }
         setResult({ kind: "success", message: data.message || "Thank you for applying." });
         return;
       }
@@ -539,49 +540,6 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
           onBlur={(e) => (e.currentTarget.style.borderColor = fieldBorder)}
         />
       </div>
-
-      {/* WhatsApp opt-in */}
-      <label
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          gap: "0.625rem",
-          marginBottom: "1.5rem",
-          cursor: "pointer",
-          fontSize: "0.85rem",
-          color: "rgba(17, 18, 60, 0.72)",
-          lineHeight: 1.5,
-        }}
-      >
-        <span
-          role="checkbox"
-          aria-checked={fields.whatsapp_opt_in}
-          tabIndex={0}
-          onClick={() => setField("whatsapp_opt_in", !fields.whatsapp_opt_in)}
-          onKeyDown={(e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); setField("whatsapp_opt_in", !fields.whatsapp_opt_in); } }}
-          style={{
-            marginTop: "0.15rem",
-            width: "1.125rem",
-            height: "1.125rem",
-            borderRadius: "0.3rem",
-            border: `1.5px solid ${fields.whatsapp_opt_in ? primaryColour : fieldBorder}`,
-            backgroundColor: fields.whatsapp_opt_in ? primaryColour : "#ffffff",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            flexShrink: 0,
-            transition: "all 0.15s ease",
-          }}
-        >
-          {fields.whatsapp_opt_in && (
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M2.5 6.5L5 9l4.5-6" />
-            </svg>
-          )}
-        </span>
-        <span>I would like to receive WhatsApp messages about my application.</span>
-      </label>
 
       {/* Gating questions */}
       {gatingConfig.length > 0 && (

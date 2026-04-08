@@ -55,10 +55,44 @@ export function CandidateActions({ candidateId, status, hasCv }: Props) {
 
   const canShortlist = !["shortlisted", "rejected", "withdrawn", "gating_failed"].includes(status);
   const canReject = !["rejected", "withdrawn", "gating_failed"].includes(status);
+  const canOpenChat = !["gating_failed", "withdrawn", "rejected"].includes(status);
+
+  async function openChat() {
+    setLoading("open-chat");
+    try {
+      const res = await fetch(`/api/admin/candidates/${candidateId}/open-chat`, { method: "POST" });
+      if (res.ok) {
+        const { data } = await res.json();
+        toast(
+          data.existing
+            ? "Chat already active — invitation resent"
+            : "Chat opened — invitation sent to candidate",
+          "success"
+        );
+      } else {
+        toast("Failed to open chat", "error");
+      }
+      router.refresh();
+    } finally {
+      setLoading("");
+    }
+  }
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
+        {canOpenChat && (
+          <button
+            onClick={openChat}
+            disabled={!!loading}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-[0.75rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer disabled:opacity-50"
+          >
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 10a1.5 1.5 0 01-1.5 1.5H5L2 14V3.5A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5z" />
+            </svg>
+            {loading === "open-chat" ? "..." : "Open Chat"}
+          </button>
+        )}
         {canShortlist && (
           <button
             onClick={() => updateStatus("shortlisted")}

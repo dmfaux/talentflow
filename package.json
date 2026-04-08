@@ -19,6 +19,7 @@
     "@ai-sdk/anthropic": "^3.0.68",
     "@ai-sdk/openai": "^3.0.52",
     "@ai-sdk/openai-compatible": "^2.0.41",
+    "@ai-sdk/react": "^3.0.155",
     "@azure/service-bus": "^7.9.0",
     "@azure/storage-blob": "^12.31.0",
     "@fontsource/inter": "^5.2.8",

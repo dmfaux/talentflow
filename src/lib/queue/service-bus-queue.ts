@@ -27,6 +27,7 @@ function getSender(queueName: string): ServiceBusSender {
 const QUEUE_MAP: Record<string, string> = {
   "candidate-processing": "candidate-processing",
   "send-email": "candidate-emails",
+  "send-chat-invitation": "chat-invitations",
 };
 
 export class ServiceBusQueue implements JobQueue {
