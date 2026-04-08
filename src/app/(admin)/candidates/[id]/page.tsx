@@ -121,7 +121,7 @@ export default async function CandidateDetailPage({ params }: Props) {
                 STATUS_STYLES[candidate.status] ?? STATUS_STYLES.new
               }`}
             >
-              {candidate.status.replace(/_/g, " ")}
+              {candidate.status.replace(/_/g, " ").toUpperCase()}
             </span>
           </div>
           <div className="mt-2 flex items-center gap-3 text-xs text-txt-secondary">

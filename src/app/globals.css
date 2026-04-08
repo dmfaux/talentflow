@@ -34,12 +34,12 @@
 
   /* ── Purposeful colours ── */
   /* Cobalt — primary action, brand, trust */
-  --color-cobalt: #5e38ff;
-  --color-cobalt-deep: #4520d4;
-  --color-cobalt-tint: #ede8ff;
-  --color-accent: #5e38ff;
-  --color-accent-light: #4520d4;
-  --color-accent-tint: #ede8ff;
+  --color-cobalt: #2c5bff;
+  --color-cobalt-deep: #1a45d4;
+  --color-cobalt-tint: #e8eeff;
+  --color-accent: #2c5bff;
+  --color-accent-light: #1a45d4;
+  --color-accent-tint: #e8eeff;
 
   /* Vermillion — editorial accent, urgency, emphasis */
   --color-vermillion: #05dbd6;
@@ -269,7 +269,7 @@ body {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(94, 56, 255, 0.08) 50%,
+    rgba(44, 91, 255, 0.08) 50%,
     transparent 100%
   );
   background-size: 200% 100%;
@@ -305,7 +305,7 @@ html {
 
 /* ─── Selection ─── */
 ::selection {
-  background: #5e38ff;
+  background: #2c5bff;
   color: #ffffff;
 }
 

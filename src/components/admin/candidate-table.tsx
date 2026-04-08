@@ -113,7 +113,7 @@ export function CandidateTable({ campaignId, candidates, total, limit, offset }:
           >
             <option value="all">All statuses</option>
             {STATUSES.filter((s) => s !== "all").map((s) => (
-              <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+              <option key={s} value={s}>{s.replace(/_/g, " ").toUpperCase()}</option>
             ))}
           </select>
           {/* Confidence filter */}
@@ -228,7 +228,7 @@ export function CandidateTable({ campaignId, candidates, total, limit, offset }:
                   </td>
                   <td className="px-5 py-3">
                     <span className={`text-xs font-medium ${STATUS_STYLES[c.status] ?? "text-txt-muted"}`}>
-                      {c.status.replace(/_/g, " ")}
+                      {c.status.replace(/_/g, " ").toUpperCase()}
                     </span>
                   </td>
                   <td className="px-5 py-3 text-right font-mono text-[0.65rem] text-txt-muted">

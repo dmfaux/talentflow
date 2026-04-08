@@ -16,7 +16,7 @@ const TIER_CLASSES: Record<Tier, string> = {
 
 const TIER_INLINE_STYLES: Record<Tier, React.CSSProperties> = {
   standard: {},
-  premium: { backgroundColor: "#ede8ff", color: "#4520d4" },
+  premium: { backgroundColor: "#e8eeff", color: "#1a45d4" },
   enterprise: {},
 };
 

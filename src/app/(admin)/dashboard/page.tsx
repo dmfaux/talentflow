@@ -92,15 +92,15 @@ const RANGE_SUBTITLES: Record<Range, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  new: "New",
-  gating_failed: "Gating rejected",
-  gating_passed: "Gating passed",
-  scoring: "Scoring",
-  scored: "Scored",
-  follow_up: "Follow-up",
-  shortlisted: "Shortlisted",
-  rejected: "Rejected",
-  withdrawn: "Withdrawn",
+  new: "NEW",
+  gating_failed: "GATING REJECTED",
+  gating_passed: "GATING PASSED",
+  scoring: "SCORING",
+  scored: "SCORED",
+  follow_up: "FOLLOW-UP",
+  shortlisted: "SHORTLISTED",
+  rejected: "REJECTED",
+  withdrawn: "WITHDRAWN",
 };
 
 const CAMPAIGN_STATUS_STYLES: Record<string, string> = {
@@ -122,7 +122,7 @@ const BROWSER_COLORS: Record<string, string> = {
 };
 
 const DEVICE_COLORS: Record<string, string> = {
-  desktop: "#5e38ff",
+  desktop: "#2c5bff",
   mobile: "#067340",
   tablet: "#d68a0b",
 };
@@ -266,7 +266,7 @@ function AreaChart({
 
             {/* Area fill */}
             {n > 1 && (
-              <path d={areaPath} fill="#5e38ff" fillOpacity="0.08" />
+              <path d={areaPath} fill="#2c5bff" fillOpacity="0.08" />
             )}
 
             {/* Line */}
@@ -274,7 +274,7 @@ function AreaChart({
               <path
                 d={linePath}
                 fill="none"
-                stroke="#5e38ff"
+                stroke="#2c5bff"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -289,7 +289,7 @@ function AreaChart({
                 cy={points[i].y}
                 r="3"
                 fill="#ffffff"
-                stroke="#5e38ff"
+                stroke="#2c5bff"
                 strokeWidth="1.5"
               />
             ))}
@@ -596,7 +596,7 @@ export default function DashboardPage() {
               {
                 label: "Scored",
                 value: data.status_breakdown.find((s) => s.status === "scored")?.count ?? 0,
-                color: "#5e38ff",
+                color: "#2c5bff",
               },
               {
                 label: "Awaiting scoring",

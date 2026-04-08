@@ -30,7 +30,7 @@ const TIER_OPTIONS: Array<{
     helper:
       "Includes one bespoke template. Pay per campaign at a reduced rate.",
     badgeClass: "",
-    badgeStyle: { backgroundColor: "#ede8ff", color: "#4520d4" },
+    badgeStyle: { backgroundColor: "#e8eeff", color: "#1a45d4" },
   },
   {
     value: "enterprise",
