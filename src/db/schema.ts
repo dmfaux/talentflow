@@ -132,6 +132,7 @@ export const scoringLogs = pgTable(
     score: real("score"),
     processing_time_ms: integer("processing_time_ms"),
     fallback_chain: jsonb("fallback_chain"),
+    scoring_type: text("scoring_type").notNull().default("initial"),
     created_at: timestamp("created_at").defaultNow().notNull(),
     updated_at: timestamp("updated_at").defaultNow().notNull(),
   },

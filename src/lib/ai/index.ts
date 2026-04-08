@@ -3,6 +3,7 @@ export {
   type ScoringResult,
   ScoringResultSchema,
   SYSTEM_PROMPT,
+  RESCORE_SYSTEM_PROMPT,
   MAX_TOKENS,
   getProviderChain,
   getModelId,

@@ -1,0 +1,1 @@
+ALTER TABLE "scoring_logs" ADD COLUMN "scoring_type" text DEFAULT 'initial' NOT NULL;

@@ -1,11 +1,10 @@
-import { streamText } from "ai";
+import { generateObject, streamText } from "ai";
+import { z } from "zod";
 import { db } from "@/db";
 import { chatMessages, conversations } from "@/db/schema";
 import { verifyChatAuth } from "@/lib/chat-auth";
 import {
-  parseCoveredTopics,
   reactivateConversation,
-  stripTopicMarkers,
   updateConversationActivity,
 } from "@/lib/chat";
 import { buildChatSystemPrompt } from "@/lib/ai/chat-prompt";
@@ -129,21 +128,93 @@ export async function POST(
       content: m.content,
     })),
     maxOutputTokens: 512,
-    onFinish: async ({ text }) => {
-      const cleanText = stripTopicMarkers(text);
+    onFinish: async ({ text, reasoningText }) => {
+      // Remove reasoning that leaked into the text field
+      let cleanText = stripThinking(text);
+      if (reasoningText && cleanText.startsWith(reasoningText)) {
+        cleanText = cleanText.slice(reasoningText.length).trim();
+      }
 
       // Persist assistant response
-      await db.insert(chatMessages).values({
-        conversation_id: conversationId,
-        role: "assistant",
-        content: cleanText,
-      });
+      if (cleanText.trim()) {
+        await db.insert(chatMessages).values({
+          conversation_id: conversationId,
+          role: "assistant",
+          content: cleanText,
+        });
+      }
 
-      // Update topic coverage and conversation activity
-      const covered = parseCoveredTopics(text);
-      await updateConversationActivity(conversationId, covered);
+      // Evaluate topic coverage separately — works with any model
+      const pendingTopics = topics
+        .map((t, i) => ({ index: i, topic: t.topic }))
+        .filter((_, i) => !topics[i].covered);
+
+      if (pendingTopics.length > 0) {
+        const covered = await evaluateTopicCoverage(
+          history,
+          cleanText,
+          pendingTopics
+        );
+        if (covered.length > 0) {
+          await updateConversationActivity(conversationId, covered);
+        }
+      }
     },
   });
 
   return result.toTextStreamResponse();
+}
+
+/**
+ * Evaluate which topics have been substantively addressed using a
+ * separate focused AI call. Runs after the streamed response is complete
+ * so it doesn't affect user-perceived latency.
+ */
+async function evaluateTopicCoverage(
+  history: { role: string; content: string }[],
+  latestAssistantMessage: string,
+  pendingTopics: { index: number; topic: string }[]
+): Promise<number[]> {
+  try {
+    const transcript = [
+      ...history.slice(-10), // last 10 messages for context
+      { role: "assistant", content: latestAssistantMessage },
+    ]
+      .map((m) => `${m.role === "user" ? "CANDIDATE" : "ASSISTANT"}: ${m.content}`)
+      .join("\n");
+
+    const { object } = await generateObject({
+      model: getChatModel(),
+      schema: z.object({
+        coveredIndices: z
+          .array(z.number())
+          .describe(
+            "Indices of topics that the candidate has substantively addressed"
+          ),
+      }),
+      prompt: `Review this conversation and determine which of the following topics have been substantively addressed by the candidate (not just acknowledged or asked about).
+
+Topics:
+${pendingTopics.map((t) => `${t.index}: ${t.topic}`).join("\n")}
+
+Recent conversation:
+${transcript}
+
+Return the indices of topics where the candidate has provided a meaningful, substantive response. Do NOT include topics that were only asked about but not yet answered by the candidate.`,
+    });
+
+    // Filter to only valid pending indices
+    const validIndices = new Set(pendingTopics.map((t) => t.index));
+    return object.coveredIndices.filter((i) => validIndices.has(i));
+  } catch (err) {
+    console.error("evaluateTopicCoverage failed:", err);
+    return [];
+  }
+}
+
+/**
+ * Strip <think>...</think> blocks from completed text.
+ */
+function stripThinking(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 }

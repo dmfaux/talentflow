@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { chatMessages, conversations } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { reframeFlag } from "./ai/chat-prompt";
+import { getQueue } from "./queue";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -39,8 +40,8 @@ export async function createConversation(
   // Insert initial greeting message
   const greeting =
     flags.length > 0
-      ? `Hi ${candidateName}! Thanks for applying for the ${roleTitle} position at ${companyName}. I have a few follow-up questions about your application — this should only take a few minutes. Let's get started!`
-      : `Hi ${candidateName}! Thanks for applying for the ${roleTitle} position at ${companyName}. The recruitment team would like to learn a bit more about your background. How are you doing today?`;
+      ? `Hi ${candidateName}! Thanks for applying for the ${roleTitle} position at ${companyName}. I have a few follow-up questions about your application — this should only take a few minutes. Let me know when you're ready to start!`
+      : `Hi ${candidateName}! Thanks for applying for the ${roleTitle} position at ${companyName}. The recruitment team would like to learn a bit more about your background. Let me know when you're ready and we can get started!`;
 
   await db.insert(chatMessages).values({
     conversation_id: conv.id,
@@ -122,17 +123,24 @@ export async function updateConversationActivity(
       ...(closedReason && { closed_reason: closedReason }),
     })
     .where(eq(conversations.id, conversationId));
+
+  // Trigger automatic re-score when all topics have been covered
+  if (allCovered) {
+    getQueue()
+      .enqueue(
+        {
+          type: "rescore-after-chat",
+          candidateId: conv.candidate_id,
+          conversationId,
+        },
+        { deduplicationId: `rescore-chat-${conversationId}` }
+      )
+      .catch((err) =>
+        console.error(
+          `updateConversationActivity: rescore enqueue failed for ${conversationId}:`,
+          err
+        )
+      );
+  }
 }
 
-// ── Parse [TOPIC_COVERED:N] markers from AI response ────────────────
-
-export function parseCoveredTopics(text: string): number[] {
-  const matches = text.matchAll(/\[topic_covered:(\d+)\]/gi);
-  return [...matches].map((m) => parseInt(m[1], 10));
-}
-
-// ── Strip markers from display text ─────────────────────────────────
-
-export function stripTopicMarkers(text: string): string {
-  return text.replace(/\s*\[topic_covered:\d+\]/gi, "").trim();
-}

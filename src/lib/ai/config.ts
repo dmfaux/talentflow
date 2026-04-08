@@ -65,6 +65,12 @@ export const SYSTEM_PROMPT = `You are an expert recruitment assessor. You evalua
 
 You MUST respond with a single valid JSON object matching the exact schema specified. Do not include any text outside the JSON object. Do not wrap it in markdown code fences.`;
 
+export const RESCORE_SYSTEM_PROMPT = `You are an expert recruitment assessor performing a secondary evaluation. You have access to the candidate's CV, screening answers, an initial AI assessment, and a follow-up chat transcript. Your task is to produce an updated, more informed score.
+
+Be sceptical of chat responses — candidates naturally present themselves in the best possible light. Focus on the specificity and verifiability of their claims rather than eloquence or enthusiasm.
+
+You MUST respond with a single valid JSON object matching the exact schema specified. Do not include any text outside the JSON object. Do not wrap it in markdown code fences.`;
+
 // ── Scoring result schema ───────────────────────────────────────────
 
 export const ScoringResultSchema = z.object({

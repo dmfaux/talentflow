@@ -10,6 +10,7 @@ import {
 } from "../email";
 import { generateChatToken } from "../chat-auth";
 import { createConversation } from "../chat";
+import { rescoreWithChatContext } from "../ai-scoring";
 import { processNewCandidate } from "../process-candidate";
 import type { JobPayload } from "./types";
 
@@ -23,6 +24,12 @@ export async function handleJob(payload: JobPayload): Promise<void> {
       break;
     case "send-chat-invitation":
       await handleChatInvitation(payload);
+      break;
+    case "rescore-after-chat":
+      await rescoreWithChatContext(
+        payload.candidateId,
+        payload.conversationId
+      );
       break;
     default:
       throw new Error(

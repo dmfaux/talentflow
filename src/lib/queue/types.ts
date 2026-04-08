@@ -12,7 +12,8 @@ export type JobPayload =
       candidateId: string;
       emailKind: "gating_failed" | "gating_passed" | "application_received";
     }
-  | { type: "send-chat-invitation"; candidateId: string };
+  | { type: "send-chat-invitation"; candidateId: string }
+  | { type: "rescore-after-chat"; candidateId: string; conversationId: string };
 
 export interface JobQueue {
   enqueue(payload: JobPayload, options?: EnqueueOptions): Promise<void>;

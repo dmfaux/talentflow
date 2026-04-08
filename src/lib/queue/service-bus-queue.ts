@@ -28,6 +28,7 @@ const QUEUE_MAP: Record<string, string> = {
   "candidate-processing": "candidate-processing",
   "send-email": "candidate-emails",
   "send-chat-invitation": "chat-invitations",
+  "rescore-after-chat": "rescore-after-chat",
 };
 
 export class ServiceBusQueue implements JobQueue {

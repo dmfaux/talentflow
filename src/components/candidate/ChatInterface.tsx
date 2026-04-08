@@ -96,17 +96,11 @@ function buildPalette(brand: BrandColours) {
   };
 }
 
-function stripMarkers(text: string): string {
-  return text.replace(/\s*\[topic_covered:\d+\]/gi, "").trim();
-}
-
 function getMessageText(msg: UIMessage): string {
-  return stripMarkers(
-    msg.parts
-      .filter((p): p is { type: "text"; text: string } => p.type === "text")
-      .map((p) => p.text)
-      .join("")
-  );
+  return msg.parts
+    .filter((p): p is { type: "text"; text: string } => p.type === "text")
+    .map((p) => p.text)
+    .join("");
 }
 
 /* ── Component ──────────────────────────────────────────────────────── */
@@ -609,69 +603,52 @@ export function ChatInterface({
           </div>
         )}
 
-        {/* Closed banner */}
-        {isClosed && (
-          <div
-            className="px-4 py-3 text-center"
-            style={{
-              borderTop: `1px solid ${c.border}`,
-              backgroundColor: c.primaryTint,
-            }}
-          >
-            <p className="text-sm" style={{ color: c.textMuted }}>
-              This conversation has ended. Thank you for your time.
-            </p>
-          </div>
-        )}
-
         {/* Input area */}
-        {!isClosed && (
+        <div
+          className="bg-white px-4 py-3 sm:px-6"
+          style={{ borderTop: `1px solid ${c.border}` }}
+        >
           <div
-            className="bg-white px-4 py-3 sm:px-6"
-            style={{ borderTop: `1px solid ${c.border}` }}
+            className="mx-auto flex max-w-2xl items-center gap-2 rounded-xl px-3 py-2"
+            style={{ border: `1px solid ${c.border}`, backgroundColor: "#ffffff" }}
           >
-            <div className="mx-auto flex max-w-2xl items-end gap-2">
-              <div className="relative flex-1">
-                <textarea
-                  ref={textareaRef}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={onKeyDown}
-                  placeholder={
-                    convStatus === "dormant"
-                      ? "Type a message to resume the conversation..."
-                      : "Type your message..."
-                  }
-                  disabled={isStreaming}
-                  rows={3}
-                  className="w-full resize-none overflow-hidden rounded-xl bg-white px-4 py-3 text-sm outline-none transition-all disabled:opacity-50"
-                  style={{
-                    border: `1px solid ${c.border}`,
-                    color: c.textStrong,
-                  }}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={send}
-                disabled={!inputValue.trim() || isStreaming}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all disabled:opacity-30"
-                style={{
-                  backgroundColor: brandColours.secondary,
-                  color: contrastText(brandColours.secondary),
-                }}
-                aria-label="Send message"
+            <textarea
+              ref={textareaRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={onKeyDown}
+              placeholder={
+                isClosed
+                  ? "This conversation has ended — thank you for your time!"
+                  : convStatus === "dormant"
+                    ? "Type a message to resume the conversation..."
+                    : "Type your message..."
+              }
+              disabled={isStreaming || isClosed}
+              rows={1}
+              className="min-h-[1.5rem] flex-1 resize-none overflow-hidden bg-transparent text-sm outline-none disabled:opacity-50"
+              style={{ color: c.textStrong }}
+            />
+            <button
+              type="button"
+              onClick={send}
+              disabled={!inputValue.trim() || isStreaming || isClosed}
+              className="flex h-8 w-8 shrink-0 items-center justify-center self-end rounded-lg transition-all disabled:opacity-30"
+              style={{
+                backgroundColor: brandColours.secondary,
+                color: contrastText(brandColours.secondary),
+              }}
+              aria-label="Send message"
+            >
+              <svg
+                width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
               >
-                <svg
-                  width="18" height="18" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                >
-                  <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />
-                </svg>
-              </button>
-            </div>
+                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />
+              </svg>
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
