@@ -42,7 +42,7 @@ function getTransport(): EmailTransport {
       const nodemailer = require("nodemailer");
       const transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST ?? "localhost",
-        port: Number(process.env.SMTP_PORT ?? 1025),
+        port: Number(process.env.SMTP_PORT ?? 1026),
         secure: false,
       });
       _transport = {
