@@ -176,18 +176,6 @@ export async function POST(
         if (covered.length > 0) {
           await updateConversationActivity(conversationId, covered);
         }
-
-        // Safety net: if the bot wrapped up the conversation but the topic
-        // evaluator missed some topics (e.g. a "provide your CV" topic that
-        // can't be resolved via chat), force-mark them so the rescore fires.
-        if (covered.length < pendingTopics.length && isWrapUpMessage(cleanText)) {
-          const uncoveredIndices = pendingTopics
-            .map((t) => t.index)
-            .filter((i) => !covered.includes(i));
-          if (uncoveredIndices.length > 0) {
-            await updateConversationActivity(conversationId, uncoveredIndices);
-          }
-        }
       }
     } catch (err) {
       console.error("Chat post-processing failed:", err);
@@ -226,7 +214,11 @@ async function evaluateTopicCoverage(
       }),
       prompt: `Review this conversation and determine which of the following topics have been answered by the candidate.
 
-A topic is covered when the candidate has responded to the question — even if the answer is brief or vague. The only case where a topic is NOT covered is if the assistant asked the question but the candidate hasn't answered it yet.
+A topic is covered when:
+- The candidate has directly responded to a question about this topic, OR
+- The candidate has provided information through answers to OTHER questions that substantively addresses the concern raised in this topic (e.g. a topic asking for "detailed work history" is covered if the candidate described their roles, companies, and tools in response to other questions)
+
+A topic is NOT covered only if the underlying concern has not been addressed at all in the conversation.
 
 Topics:
 ${pendingTopics.map((t) => `${t.index}: ${t.topic}`).join("\n")}
@@ -234,7 +226,7 @@ ${pendingTopics.map((t) => `${t.index}: ${t.topic}`).join("\n")}
 Recent conversation:
 ${transcript}
 
-Return the indices of topics where the candidate has provided any response. Do NOT include topics that were only asked about but not yet answered.`,
+Return the indices of topics where the candidate has provided relevant information — whether directly or indirectly. Do NOT include topics that were only asked about but not yet answered.`,
     });
 
     // Filter to only valid pending indices
@@ -295,27 +287,6 @@ ${transcript}`,
     console.error("detectWithdrawal failed:", err);
     return false;
   }
-}
-
-/**
- * Detect whether the assistant's message is a conversation wrap-up (farewell)
- * rather than an ongoing question. The chat prompt instructs the bot to always
- * end with a question when topics remain, so a wrap-up message will contain
- * farewell language and no trailing question.
- */
-function isWrapUpMessage(text: string): boolean {
-  const lower = text.toLowerCase();
-  const hasWrapUpLanguage =
-    lower.includes("be in touch") ||
-    lower.includes("will review") ||
-    lower.includes("that covers everything") ||
-    lower.includes("all the best") ||
-    lower.includes("wish you well") ||
-    lower.includes("good luck") ||
-    lower.includes("thanks for your time") ||
-    lower.includes("thank you for your time");
-  const endsWithQuestion = /\?\s*$/.test(text.trim());
-  return hasWrapUpLanguage && !endsWithQuestion;
 }
 
 /**
