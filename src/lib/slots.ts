@@ -77,14 +77,16 @@ export function validateHtmlTemplate(
   }
 
   // All {{...}} slots must be from the allow-list
+  // Block delimiters {{#name}} and {{/name}} reference the same slots
   const seen = new Set<string>();
   let match: RegExpExecArray | null;
   const re = new RegExp(SLOT_REGEX.source, "g");
   while ((match = re.exec(html)) !== null) {
-    const name = match[1].trim();
+    const raw = match[1].trim();
+    const name = raw.replace(/^[#/]/, "");
     if (!SLOT_SET.has(name) && !seen.has(name)) {
       errors.push(
-        `Unknown slot "{{${name}}}". Allowed: ${SLOT_ALLOW_LIST.join(", ")}`
+        `Unknown slot "{{${raw}}}". Allowed: ${SLOT_ALLOW_LIST.join(", ")}`
       );
     }
     seen.add(name);
@@ -155,8 +157,30 @@ function resolveSlot(name: string, data: SlotData): string {
   return RAW_HTML_SLOTS.has(name) ? String(raw) : escapeHtml(String(raw));
 }
 
+// ── Conditional blocks ─────────────────────────────────────────────
+//
+// {{#slot.name}} ... {{/slot.name}} blocks are removed entirely when
+// the slot resolves to an empty string (null/undefined/missing data).
+// When the slot has a value the delimiters are stripped and inner
+// content (including nested {{slot.name}} markers) is kept.
+
+const BLOCK_REGEX = /\{\{#([^}]+)\}\}([\s\S]*?)\{\{\/\1\}\}/g;
+
+function resolveBlockValue(name: string, data: SlotData): string {
+  return resolveSlot(name.trim(), data);
+}
+
 export function replaceSlots(html: string, data: SlotData): string {
-  return html.replace(SLOT_REGEX, (_, name: string) =>
+  // 1. Process conditional blocks first — strip empty, keep non-empty
+  let result = html.replace(BLOCK_REGEX, (_, name: string, inner: string) => {
+    const value = resolveBlockValue(name, data);
+    return value ? inner : "";
+  });
+
+  // 2. Replace remaining standalone slot markers
+  result = result.replace(SLOT_REGEX, (_, name: string) =>
     resolveSlot(name.trim(), data)
   );
+
+  return result;
 }

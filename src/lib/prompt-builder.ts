@@ -92,7 +92,12 @@ ${slotDocs}
 
 Rules for slots:
 - Place slots directly in the HTML where the text should appear (e.g. \`<h1>{{campaign.role_title}}</h1>\`).
-- Slots that may be empty (\`campaign.role_description\`, \`campaign.department\`, \`campaign.location\`, \`campaign.employment_type\`, \`campaign.salary_range\`) MUST be wrapped in a container that hides gracefully when empty. Use the CSS pattern \`:empty { display: none; }\` on the container, or wrap the slot and its label together so the entire section (label + value) disappears when the slot is empty. Never leave a visible heading or label next to a blank value.
+- Slots that may be empty (\`campaign.role_description\`, \`campaign.department\`, \`campaign.location\`, \`campaign.employment_type\`, \`campaign.salary_range\`) MUST use conditional blocks so the entire section (label + value) is removed when the data is missing. Wrap optional sections with \`{{#slot.name}} ... {{/slot.name}}\` — the block is stripped entirely when the slot is empty. Example:
+  \`\`\`html
+  {{#campaign.salary_range}}<div class="salary"><strong>Salary:</strong> {{campaign.salary_range}}</div>{{/campaign.salary_range}}
+  {{#campaign.department}}<span class="dept">{{campaign.department}}</span>{{/campaign.department}}
+  \`\`\`
+  Do NOT rely on CSS \`:empty\` to hide these — use the conditional block syntax instead. Never leave a visible heading or label next to a blank value.
 - You may combine slots with static text (e.g. \`<span>{{campaign.department}} · {{campaign.location}}</span>\`).
 - \`{{campaign.role_description}}\` contains pre-rendered HTML (paragraphs, lists, bold, etc.). Place it inside a container element like \`<div class="description">{{campaign.role_description}}</div>\` — do NOT wrap it in a \`<p>\` tag.
 
