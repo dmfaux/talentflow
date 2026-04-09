@@ -3,7 +3,7 @@
 import { TierBadge } from "@/components/admin/tier-badge";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface Client {
   id: string;
@@ -15,10 +15,23 @@ interface Client {
   campaigns?: unknown[];
 }
 
+const TIERS = ["all", "standard", "premium", "enterprise"] as const;
+type TierFilter = (typeof TIERS)[number];
+
+const PAGE_SIZE = 20;
+
 export default function ClientsPage() {
   const router = useRouter();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Filters
+  const [search, setSearch] = useState("");
+  const [tierFilter, setTierFilter] = useState<TierFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+
+  // Pagination
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     fetch("/api/admin/clients")
@@ -27,6 +40,36 @@ export default function ClientsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return clients.filter((c) => {
+      if (tierFilter !== "all" && (c.tier ?? "standard") !== tierFilter) return false;
+      if (statusFilter === "active" && c.is_active === false) return false;
+      if (statusFilter === "inactive" && c.is_active !== false) return false;
+      if (q) {
+        const haystack = [c.name, c.contact_name ?? "", c.contact_email ?? ""]
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [clients, search, tierFilter, statusFilter]);
+
+  // Reset page when filters change
+  useEffect(() => { setPage(0); }, [search, tierFilter, statusFilter]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const hasActiveFilters = search.trim() !== "" || tierFilter !== "all" || statusFilter !== "all";
+
+  function clearFilters() {
+    setSearch("");
+    setTierFilter("all");
+    setStatusFilter("all");
+  }
+
   return (
     <div>
       {/* Page header */}
@@ -34,7 +77,11 @@ export default function ClientsPage() {
         <div>
           <h1 className="text-lg font-semibold text-charcoal">Clients</h1>
           <p className="mt-0.5 text-xs text-txt-muted">
-            {loading ? "Loading..." : `${clients.length} total`}
+            {loading
+              ? "Loading..."
+              : hasActiveFilters
+                ? `${filtered.length} of ${clients.length}`
+                : `${clients.length} total`}
           </p>
         </div>
         <Link
@@ -48,46 +95,123 @@ export default function ClientsPage() {
         </Link>
       </div>
 
+      {/* Toolbar */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-txt-muted pointer-events-none"
+          >
+            <circle cx="6" cy="6" r="4" />
+            <path d="M9 9l3 3" />
+          </svg>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name, contact, email..."
+            className="h-9 w-full rounded-lg border border-border bg-surface pl-8 pr-3 text-[0.78rem] text-charcoal outline-none placeholder:text-txt-muted focus:border-accent"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-txt-muted hover:text-charcoal cursor-pointer"
+              aria-label="Clear search"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                <path d="M3 3l6 6M9 3l-6 6" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Tier filter */}
+        <select
+          value={tierFilter}
+          onChange={(e) => setTierFilter(e.target.value as TierFilter)}
+          className="h-9 rounded-lg border border-border bg-surface px-2.5 text-[0.78rem] font-medium text-txt-secondary outline-none focus:border-accent cursor-pointer capitalize"
+        >
+          {TIERS.map((t) => (
+            <option key={t} value={t}>
+              {t === "all" ? "All tiers" : t}
+            </option>
+          ))}
+        </select>
+
+        {/* Status filter */}
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
+          className="h-9 rounded-lg border border-border bg-surface px-2.5 text-[0.78rem] font-medium text-txt-secondary outline-none focus:border-accent cursor-pointer"
+        >
+          <option value="all">All statuses</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+
+        {hasActiveFilters && (
+          <button
+            onClick={clearFilters}
+            className="h-9 rounded-lg border border-transparent px-2.5 text-[0.78rem] font-medium text-txt-muted hover:text-charcoal cursor-pointer"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
       {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-border bg-surface">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
-                Name
-              </th>
-              <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
-                Contact
-              </th>
-              <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
-                Email
-              </th>
-              <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted text-center">
-                Campaigns
-              </th>
-              <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
-                Status
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {loading ? (
-              <tr>
-                <td colSpan={5} className="px-5 py-10 text-center text-sm text-txt-muted">
-                  Loading clients...
-                </td>
+      {loading ? (
+        <div className="rounded-xl border border-border bg-surface py-20 text-center text-sm text-txt-muted">
+          Loading clients...
+        </div>
+      ) : clients.length === 0 ? (
+        <div className="rounded-xl border border-border bg-surface py-20 text-center text-sm text-txt-muted">
+          No clients yet.{" "}
+          <Link href="/clients/new" className="text-accent hover:underline">
+            Create one
+          </Link>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-xl border border-border bg-surface py-20 text-center">
+          <p className="text-sm text-txt-secondary">No clients match your filters</p>
+          <button
+            onClick={clearFilters}
+            className="mt-2 text-[0.78rem] font-medium text-accent hover:underline cursor-pointer"
+          >
+            Clear filters
+          </button>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-border bg-surface">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
+                  Name
+                </th>
+                <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
+                  Contact
+                </th>
+                <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
+                  Email
+                </th>
+                <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted text-center">
+                  Campaigns
+                </th>
+                <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
+                  Status
+                </th>
               </tr>
-            ) : clients.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-5 py-10 text-center text-sm text-txt-muted">
-                  No clients yet.{" "}
-                  <Link href="/clients/new" className="text-accent hover:underline">
-                    Create one
-                  </Link>
-                </td>
-              </tr>
-            ) : (
-              clients.map((client) => (
+            </thead>
+            <tbody className="divide-y divide-border">
+              {paged.map((client) => (
                 <tr
                   key={client.id}
                   className="group cursor-pointer transition-colors hover:bg-cream/60"
@@ -127,11 +251,56 @@ export default function ClientsPage() {
                     </span>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-border px-5 py-3">
+              <span className="text-xs text-txt-muted">
+                Showing {page * PAGE_SIZE + 1}&ndash;{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 0}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-txt-muted transition-colors hover:bg-cream hover:text-charcoal disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M8.5 3L4.5 7l4 4" /></svg>
+                </button>
+                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 7) pageNum = i;
+                  else if (page < 4) pageNum = i;
+                  else if (page > totalPages - 5) pageNum = totalPages - 7 + i;
+                  else pageNum = page - 3 + i;
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setPage(pageNum)}
+                      className={`h-8 w-8 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                        pageNum === page
+                          ? "bg-charcoal text-white"
+                          : "text-txt-muted hover:bg-cream hover:text-charcoal"
+                      }`}
+                    >
+                      {pageNum + 1}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setPage(page + 1)}
+                  disabled={page >= totalPages - 1}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-txt-muted transition-colors hover:bg-cream hover:text-charcoal disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M5.5 3L9.5 7l-4 4" /></svg>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

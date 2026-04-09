@@ -132,6 +132,8 @@ function compareNullable(
   return String(a).localeCompare(String(b)) * mult;
 }
 
+const PAGE_SIZE = 20;
+
 export default function CampaignsPage() {
   const router = useRouter();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -145,6 +147,9 @@ export default function CampaignsPage() {
   // Sort
   const [sortKey, setSortKey] = useState<SortKey>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  // Pagination
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     fetch("/api/admin/campaigns")
@@ -185,6 +190,12 @@ export default function CampaignsPage() {
       compareNullable(a[sortKey], b[sortKey], sortDir),
     );
   }, [campaigns, statusFilter, clientFilter, search, sortKey, sortDir]);
+
+  // Reset page when filters change
+  useEffect(() => { setPage(0); }, [statusFilter, clientFilter, search, sortKey, sortDir]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -335,7 +346,7 @@ export default function CampaignsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filtered.map((campaign) => (
+              {paged.map((campaign) => (
                 <tr
                   key={campaign.id}
                   className="group cursor-pointer transition-colors hover:bg-cream/60"
@@ -384,6 +395,51 @@ export default function CampaignsPage() {
               ))}
             </tbody>
           </table>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-border px-5 py-3">
+              <span className="text-xs text-txt-muted">
+                Showing {page * PAGE_SIZE + 1}&ndash;{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 0}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-txt-muted transition-colors hover:bg-cream hover:text-charcoal disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M8.5 3L4.5 7l4 4" /></svg>
+                </button>
+                {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 7) pageNum = i;
+                  else if (page < 4) pageNum = i;
+                  else if (page > totalPages - 5) pageNum = totalPages - 7 + i;
+                  else pageNum = page - 3 + i;
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setPage(pageNum)}
+                      className={`h-8 w-8 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                        pageNum === page
+                          ? "bg-charcoal text-white"
+                          : "text-txt-muted hover:bg-cream hover:text-charcoal"
+                      }`}
+                    >
+                      {pageNum + 1}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setPage(page + 1)}
+                  disabled={page >= totalPages - 1}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-txt-muted transition-colors hover:bg-cream hover:text-charcoal disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M5.5 3L9.5 7l-4 4" /></svg>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
