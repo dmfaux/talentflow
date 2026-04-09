@@ -17,7 +17,7 @@ type ProviderFactory = (modelId: string) => LanguageModel;
 
 const singletons: Partial<Record<ProviderName, ProviderFactory>> = {};
 
-function getProviderFactory(name: ProviderName): ProviderFactory {
+export function getProviderFactory(name: ProviderName): ProviderFactory {
   if (!singletons[name]) {
     singletons[name] = createProviderFactory(name);
   }

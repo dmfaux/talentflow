@@ -108,6 +108,7 @@ export async function PATCH(
       "employment_type",
       "status",
       "html_template",
+      "design_brief",
       "gating_config",
       "scoring_rubric",
       "salary_range_min",

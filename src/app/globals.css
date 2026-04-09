@@ -151,6 +151,16 @@ body {
   50% { transform: translateY(-6px); }
 }
 
+@keyframes floatUp {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-40px); }
+}
+
+@keyframes scanLine {
+  from { top: 0; }
+  to { top: 100%; }
+}
+
 /* ─── Scroll-triggered reveal ─── */
 .animate-on-scroll {
   opacity: 0;

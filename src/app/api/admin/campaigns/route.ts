@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
         employment_type: body.employment_type ?? null,
         status: body.status ?? "draft",
         html_template: body.html_template ?? null,
+        design_brief: body.design_brief ?? null,
         gating_config: body.gating_config,
         scoring_rubric: body.scoring_rubric,
         campaign_start: body.campaign_start

@@ -58,6 +58,7 @@ export const campaigns = pgTable(
     employment_type: text("employment_type"),
     status: text("status").notNull().default("draft"),
     html_template: text("html_template"),
+    design_brief: text("design_brief"),
     gating_config: jsonb("gating_config").notNull(),
     scoring_rubric: jsonb("scoring_rubric").notNull(),
     campaign_start: timestamp("campaign_start"),

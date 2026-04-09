@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 
 interface Campaign {
@@ -39,6 +39,72 @@ const STATUS_STYLES: Record<string, string> = {
   closed: "bg-red-light text-red",
   archived: "bg-cream text-txt-muted",
 };
+
+function NewCampaignDropdown() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light"
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M7 2v10M2 7h10" />
+        </svg>
+        New Campaign
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={`ml-0.5 transition-transform ${open ? "rotate-180" : ""}`}>
+          <path d="M2.5 4L5 6.5L7.5 4" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-20 mt-1.5 w-52 overflow-hidden rounded-lg border border-border bg-white shadow-lg animate-[scaleIn_150ms_ease-out]" style={{ transformOrigin: "top right" }}>
+          <Link
+            href="/campaigns/new"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 px-3.5 py-2.5 text-[0.8rem] text-charcoal transition-colors hover:bg-cream"
+          >
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="1.5" width="11" height="12" rx="1.5" />
+              <path d="M5 5h5M5 7.5h5M5 10h3" />
+            </svg>
+            Campaign Wizard
+          </Link>
+          <Link
+            href="/campaigns/new/from-job-spec"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 px-3.5 py-2.5 text-[0.8rem] text-charcoal transition-colors hover:bg-cream"
+          >
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8.5 1.5H4a1.5 1.5 0 0 0-1.5 1.5v9A1.5 1.5 0 0 0 4 13.5h7a1.5 1.5 0 0 0 1.5-1.5V5.5L8.5 1.5z" />
+              <path d="M8.5 1.5V5.5h4" />
+              <path d="M6 8.5l1.5 2L10 7.5" />
+            </svg>
+            From Job Spec
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function daysRemaining(end: string | null): string {
   if (!end) return "—";
@@ -153,15 +219,7 @@ export default function CampaignsPage() {
                 : `${campaigns.length} total`}
           </p>
         </div>
-        <Link
-          href="/campaigns/new"
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M7 2v10M2 7h10" />
-          </svg>
-          New Campaign
-        </Link>
+        <NewCampaignDropdown />
       </div>
 
       {/* Toolbar */}

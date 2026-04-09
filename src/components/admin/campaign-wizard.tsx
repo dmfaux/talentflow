@@ -68,6 +68,7 @@ export interface FormData {
   dealbreakers: string[];
   dimension_weights: { skills: number; experience: number; progression: number; tenure: number };
   html_template: string;
+  design_brief: string;
 }
 
 const STEPS = ["Basics", "Gating Questions", "Scoring Rubric", "Landing Page", "Review"] as const;
@@ -93,6 +94,7 @@ const INITIAL: FormData = {
   dealbreakers: [""],
   dimension_weights: { skills: 25, experience: 25, progression: 25, tenure: 25 },
   html_template: "",
+  design_brief: "",
 };
 
 function slugify(s: string) {
@@ -145,7 +147,6 @@ export function CampaignWizard({
   const [slugMessage, setSlugMessage] = useState("");
   const [slugSuggestion, setSlugSuggestion] = useState("");
   // Landing page step state
-  const [designBrief, setDesignBrief] = useState("");
   const [promptCopied, setPromptCopied] = useState(false);
   const [htmlValidation, setHtmlValidation] = useState<{ ok: boolean; errors?: string[] } | null>(null);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
@@ -386,7 +387,7 @@ export function CampaignWizard({
 
     return buildTemplatePrompt({
       name: form.role_title || "Campaign Landing Page",
-      brief: designBrief || `A professional job application landing page for the ${form.role_title || "open"} role at ${client?.name || "the company"}.`,
+      brief: form.design_brief || `A professional job application landing page for the ${form.role_title || "open"} role at ${client?.name || "the company"}.`,
       brandColors,
       logo,
     });
@@ -436,6 +437,7 @@ export function CampaignWizard({
         dimension_weights: form.dimension_weights,
       },
       html_template: form.html_template || null,
+      design_brief: form.design_brief || null,
       status,
     };
 
@@ -892,8 +894,8 @@ export function CampaignWizard({
               <label htmlFor="design_brief" className={labelClass}>Design Brief (optional)</label>
               <textarea
                 id="design_brief"
-                value={designBrief}
-                onChange={(e) => setDesignBrief(e.target.value)}
+                value={form.design_brief}
+                onChange={(e) => updateForm({ design_brief: e.target.value })}
                 placeholder="Describe any specific design preferences — layout style, tone, sections to include..."
                 rows={3}
                 className="w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none"

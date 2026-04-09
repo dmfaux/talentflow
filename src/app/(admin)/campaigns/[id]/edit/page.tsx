@@ -64,6 +64,7 @@ export default async function EditCampaignPage({ params }: Props) {
       tenure: weights.tenure ?? 25,
     },
     html_template: campaign.html_template ?? "",
+    design_brief: campaign.design_brief ?? "",
   };
 
   return (
