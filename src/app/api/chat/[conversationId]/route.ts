@@ -168,9 +168,14 @@ export async function POST(
           return;
         }
 
+        // Only evaluate the first pending topic — this is the one the AI
+        // asked about (it always picks the first from the system prompt).
+        // Evaluating ALL pending topics at once lets the evaluator mark
+        // future topics as "indirectly covered" from rich candidate answers,
+        // closing the conversation before those topics are actually asked.
         const covered = await evaluateTopicCoverage(
           history,
-          pendingTopics
+          [pendingTopics[0]]
         );
         if (covered.length > 0) {
           await updateConversationActivity(conversationId, covered);
