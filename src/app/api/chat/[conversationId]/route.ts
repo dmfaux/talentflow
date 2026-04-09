@@ -199,13 +199,12 @@ async function evaluateTopicCoverage(
   pendingTopics: { index: number; topic: string }[]
 ): Promise<number[]> {
   try {
-    // Use only message history (which ends with the candidate's latest
-    // message). Deliberately exclude the AI's new response — it asks
-    // about the NEXT topic, and including it causes the evaluator to
-    // confuse "asked about" with "answered", closing the conversation
-    // before the candidate can reply.
+    // Only use the last two messages (the assistant's question and the
+    // candidate's reply). Using more history lets the evaluator mark
+    // topics as "indirectly covered" from earlier answers, closing the
+    // conversation before the candidate can answer the current question.
     const transcript = history
-      .slice(-10)
+      .slice(-2)
       .map((m) => `${m.role === "user" ? "CANDIDATE" : "ASSISTANT"}: ${m.content}`)
       .join("\n");
 
@@ -215,24 +214,25 @@ async function evaluateTopicCoverage(
         coveredIndices: z
           .array(z.number())
           .describe(
-            "Indices of topics that the candidate has substantively addressed"
+            "Indices of topics that the candidate has directly answered"
           ),
       }),
-      prompt: `Review this conversation and determine which of the following topics have been answered by the candidate.
+      prompt: `Review this exchange and determine whether the candidate has directly answered the topic below.
 
-A topic is covered when:
-- The candidate has directly responded to a question about this topic, OR
-- The candidate has provided information through answers to OTHER questions that substantively addresses the concern raised in this topic (e.g. a topic asking for "detailed work history" is covered if the candidate described their roles, companies, and tools in response to other questions)
+A topic is covered ONLY when the candidate has directly responded to a question about it in their latest message.
 
-A topic is NOT covered only if the underlying concern has not been addressed at all in the conversation.
+A topic is NOT covered if:
+- The candidate mentioned related information while answering a DIFFERENT question earlier
+- The candidate's latest message doesn't address this topic
+- The topic was only asked about but not answered yet
 
-Topics:
+Topic:
 ${pendingTopics.map((t) => `${t.index}: ${t.topic}`).join("\n")}
 
-Recent conversation:
+Latest exchange:
 ${transcript}
 
-Return the indices of topics where the candidate has provided relevant information — whether directly or indirectly. Do NOT include topics that were only asked about but not yet answered.`,
+Return the index ONLY if the candidate's latest message directly answers this topic.`,
     });
 
     // Filter to only valid pending indices
