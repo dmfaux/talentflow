@@ -22,7 +22,7 @@ export async function createConversation(
   lifecycle: string,
   flags: string[]
 ): Promise<string> {
-  const topics: Topic[] = flags.map((flag) => ({
+  const topics: Topic[] = flags.slice(0, 4).map((flag) => ({
     flag,
     topic: reframeFlag(flag),
     covered: false,
@@ -38,9 +38,10 @@ export async function createConversation(
     .returning({ id: conversations.id });
 
   // Insert initial greeting message
+  const topicCount = topics.length;
   const greeting =
-    flags.length > 0
-      ? `Hi ${candidateName}! Thanks for applying for the ${roleTitle} position at ${companyName}. I have a few follow-up questions about your application — this should only take a few minutes. Let me know when you're ready to start!`
+    topicCount > 0
+      ? `Hi ${candidateName}! Thanks for applying for the ${roleTitle} position at ${companyName}. I just have ${topicCount} quick question${topicCount === 1 ? "" : "s"} to help the team get a clearer picture of your application. Let me know when you're ready!`
       : `Hi ${candidateName}! Thanks for applying for the ${roleTitle} position at ${companyName}. The recruitment team would like to learn a bit more about your background. Let me know when you're ready and we can get started!`;
 
   await db.insert(chatMessages).values({

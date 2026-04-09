@@ -212,11 +212,9 @@ async function evaluateTopicCoverage(
             "Indices of topics that the candidate has substantively addressed"
           ),
       }),
-      prompt: `Review this conversation and determine which of the following topics have been substantively addressed by the candidate (not just acknowledged or asked about).
+      prompt: `Review this conversation and determine which of the following topics have been answered by the candidate.
 
-A topic is substantively addressed when the candidate has provided a **specific** response that includes concrete details such as company names, timeframes, projects, or verifiable context. Generic answers like "I have experience with that" or "I've done that in previous roles" without naming where or when do NOT count as substantively addressed — the assistant should follow up for specifics before the topic is considered covered.
-
-If the assistant has already followed up once asking for specifics and the candidate still gave a generic answer, consider the topic covered (the candidate had their chance).
+A topic is covered when the candidate has responded to the question — even if the answer is brief or vague. The only case where a topic is NOT covered is if the assistant asked the question but the candidate hasn't answered it yet.
 
 Topics:
 ${pendingTopics.map((t) => `${t.index}: ${t.topic}`).join("\n")}
@@ -224,7 +222,7 @@ ${pendingTopics.map((t) => `${t.index}: ${t.topic}`).join("\n")}
 Recent conversation:
 ${transcript}
 
-Return the indices of topics where the candidate has provided a meaningful, specific response OR where the assistant has already followed up for specifics and the candidate responded (even if still generic). Do NOT include topics that were only asked about but not yet answered, or where the candidate gave a vague first answer and the assistant hasn't yet followed up.`,
+Return the indices of topics where the candidate has provided any response. Do NOT include topics that were only asked about but not yet answered.`,
     });
 
     // Filter to only valid pending indices

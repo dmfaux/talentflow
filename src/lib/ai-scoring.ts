@@ -67,7 +67,7 @@ ${gatingAnswers && Object.keys(gatingAnswers).length > 0 ? `## Screening Answers
 2. Score each dimension from 1.0 to 10.0 (one decimal place).
 3. Calculate overall_score as the weighted average using the dimension weights above.
 4. Set confidence to "high" if the CV clearly supports the assessment, "medium" if some information is ambiguous, "low" if key information is missing.
-5. List any ambiguities, red flags, or concerns in the flags array. Leave empty if none.
+5. List up to 4 flags in the flags array — only the most critical ambiguities, red flags, or concerns. Leave empty if none. Each flag must be a specific, bounded question that can be answered in 1-2 sentences — e.g. "CV lists a Bachelor's degree but LinkedIn shows a diploma — which is correct?" rather than "Explore their educational background". Prioritise factual discrepancies and verifiable gaps over subjective concerns.
 
 Respond with exactly this JSON structure:
 {
@@ -80,7 +80,7 @@ Respond with exactly this JSON structure:
   },
   "confidence": "high" | "medium" | "low",
   "rationale": "<2-3 sentence assessment>",
-  "flags": ["<string>", ...],
+  "flags": ["<specific question>", ...] (max 4, most critical only),
   "recommendation": "strong_recommend" | "recommend" | "recommend_with_caveats" | "borderline" | "reject"
 }`;
 }
