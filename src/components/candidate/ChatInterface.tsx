@@ -11,6 +11,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import type { UIMessage } from "ai";
+import { marked } from "marked";
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -773,16 +774,17 @@ export function ChatInterface({
                         </div>
                       ) : (
                         <div
-                          className="rounded-r-2xl rounded-l px-4 py-2.5 text-[0.84rem] leading-relaxed"
+                          className="chat-markdown rounded-r-2xl rounded-l px-4 py-2.5 text-[0.84rem] leading-relaxed"
                           style={{
                             backgroundColor: "#ffffff",
                             borderLeft: `3px solid ${c.primary}`,
                             boxShadow: "0 1px 8px rgba(0,0,0,0.04)",
                             color: c.textBody,
                           }}
-                        >
-                          {displayText}
-                        </div>
+                          dangerouslySetInnerHTML={{
+                            __html: marked.parse(displayText, { async: false, gfm: true, breaks: true }) as string,
+                          }}
+                        />
                       )}
                     </div>
                   </div>
