@@ -112,21 +112,119 @@ export async function sendCandidateEmail(
 
 // ── Email templates ──────────────────────────────────────────────────
 
+/* Warm parchment + deep forest + copper accent palette */
+const C = {
+  bg: "#f0ece4",
+  card: "#ffffff",
+  brand: "#1a3a2a",
+  accent: "#b8875a",
+  text: "#2c2c2c",
+  muted: "#7a756d",
+  faint: "#a09a90",
+  border: "#e8e3da",
+  infoBg: "#f9f7f3",
+} as const;
+
+function emailHeading(label: string, title: string): string {
+  return `
+    <p style="margin:0 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:${C.accent};font-weight:600;">${label}</p>
+    <h1 style="margin:0 0 24px;font-family:Georgia,'Times New Roman',serif;font-size:26px;color:${C.brand};font-weight:normal;line-height:1.3;">${title}</h1>`;
+}
+
+function emailP(html: string, last = false): string {
+  return `<p style="margin:0${last ? "" : " 0 16px"};font-family:Arial,Helvetica,sans-serif;font-size:15px;color:${C.text};line-height:1.65;">${html}</p>`;
+}
+
+function emailNote(html: string): string {
+  return `<p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:${C.muted};line-height:1.6;">${html}</p>`;
+}
+
+function emailBtn(text: string, url: string): string {
+  return `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 0;">
+      <tr><td style="background-color:${C.brand};border-radius:6px;">
+        <a href="${url}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;letter-spacing:0.02em;">${text}&ensp;&#8594;</a>
+      </td></tr>
+    </table>`;
+}
+
+function emailInfoCard(items: [string, string][]): string {
+  const rows = items
+    .map(
+      ([label, value], i) => `
+    <p style="margin:0 0 2px;font-family:Arial,Helvetica,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:${C.muted};">${label}</p>
+    <p style="margin:0${i < items.length - 1 ? " 0 14px" : ""};font-family:Georgia,'Times New Roman',serif;font-size:17px;color:${C.text};">${value}</p>`
+    )
+    .join("");
+
+  return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 4px;">
+      <tr>
+        <td width="3" style="background-color:${C.accent};border-radius:2px 0 0 2px;"></td>
+        <td style="padding:16px 20px;background-color:${C.infoBg};">
+          ${rows}
+        </td>
+      </tr>
+    </table>`;
+}
+
+function emailFallbackLink(url: string): string {
+  return `<p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${C.muted};line-height:1.5;">
+    If the button doesn&rsquo;t work, copy this link into your browser:<br>
+    <a href="${url}" style="color:${C.brand};word-break:break-all;text-decoration:underline;">${url}</a>
+  </p>`;
+}
+
 function wrapTemplate(body: string): string {
   return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f5f4f0;font-family:Georgia,'Times New Roman',serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f4f0;padding:40px 20px;">
-    <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;border:1px solid #e8e8e4;">
-        <tr><td style="padding:32px 36px;">
-          ${body}
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <title>TalentStream</title>
+</head>
+<body style="margin:0;padding:0;background-color:${C.bg};-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${C.bg};">
+    <tr><td align="center" style="padding:48px 16px;">
+
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
+        <!-- Top accent bar -->
+        <tr><td style="height:4px;background-color:${C.brand};border-radius:4px 4px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+
+        <!-- Card -->
+        <tr><td style="background:${C.card};border-left:1px solid ${C.border};border-right:1px solid ${C.border};">
+
+          <!-- Brand header -->
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr><td style="padding:24px 40px;border-bottom:1px solid ${C.border};">
+              <span style="font-family:Georgia,'Times New Roman',serif;font-size:13px;letter-spacing:0.14em;color:${C.brand};text-transform:uppercase;">TalentStream</span>
+            </td></tr>
+          </table>
+
+          <!-- Body -->
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr><td style="padding:36px 40px 40px;">
+              ${body}
+            </td></tr>
+          </table>
+
+        </td></tr>
+
+        <!-- Bottom accent bar -->
+        <tr><td style="height:2px;background-color:${C.brand};border-radius:0 0 4px 4px;font-size:0;line-height:0;">&nbsp;</td></tr>
+      </table>
+
+      <!-- Footer -->
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
+        <tr><td style="padding:20px 40px;text-align:center;">
+          <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${C.faint};line-height:1.5;">
+            Sent by TalentStream&ensp;&middot;&ensp;Automated message &mdash; please do not reply
+          </p>
         </td></tr>
       </table>
-      <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;">
-        Powered by TalentStream
-      </p>
+
     </td></tr>
   </table>
 </body>
@@ -139,18 +237,11 @@ export function applicationReceivedEmail(
   clientName: string
 ): string {
   return wrapTemplate(`
-    <h2 style="margin:0 0 16px;font-size:20px;color:#1B4332;font-weight:normal;font-style:italic;">
-      Application Received
-    </h2>
-    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
-      Hi ${candidateName},
-    </p>
-    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
-      Thank you for applying for the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>. We've received your application and it is now being processed.
-    </p>
-    <p style="margin:0;font-size:15px;color:#666;line-height:1.6;">
-      You'll hear from us soon with an update on the next steps.
-    </p>
+    ${emailHeading("Confirmation", "We&rsquo;ve got your application")}
+    ${emailP(`Hi ${candidateName},`)}
+    ${emailP("Thank you for applying. We&rsquo;ve received your application and it&rsquo;s now being reviewed.")}
+    ${emailInfoCard([["Role", roleTitle], ["Company", clientName]])}
+    ${emailNote("You&rsquo;ll hear from us soon with an update on next steps.")}
   `);
 }
 
@@ -160,18 +251,10 @@ export function gatingPassedEmail(
   clientName: string
 ): string {
   return wrapTemplate(`
-    <h2 style="margin:0 0 16px;font-size:20px;color:#1B4332;font-weight:normal;font-style:italic;">
-      Application Update
-    </h2>
-    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
-      Hi ${candidateName},
-    </p>
-    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
-      Great news — you meet the initial requirements for the <strong>${roleTitle}</strong> role at <strong>${clientName}</strong>. Your CV is now being reviewed by our team.
-    </p>
-    <p style="margin:0;font-size:15px;color:#666;line-height:1.6;">
-      We'll be in touch with the outcome shortly. Thank you for your patience.
-    </p>
+    ${emailHeading("Good news", "You&rsquo;re moving forward")}
+    ${emailP(`Hi ${candidateName},`)}
+    ${emailP(`Great news &mdash; you meet the initial requirements for the <strong>${roleTitle}</strong> role at <strong>${clientName}</strong>. Your application is now being reviewed by the team.`)}
+    ${emailNote("We&rsquo;ll be in touch with the outcome shortly. Thank you for your patience.")}
   `);
 }
 
@@ -180,23 +263,11 @@ export function passwordResetEmail(
   resetUrl: string
 ): string {
   return wrapTemplate(`
-    <h2 style="margin:0 0 16px;font-size:20px;color:#1B4332;font-weight:normal;font-style:italic;">
-      Reset your password
-    </h2>
-    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
-      Hi ${firstName},
-    </p>
-    <p style="margin:0 0 16px;font-size:15px;color:#1a1a1a;line-height:1.6;">
-      We received a request to reset your TalentStream password. Click the button below to choose a new one. This link will expire in 1 hour.
-    </p>
-    <p style="margin:0 0 24px;">
-      <a href="${resetUrl}" style="display:inline-block;background:#0c0c0e;color:#fafaf7;text-decoration:none;padding:12px 20px;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:500;">
-        Reset password
-      </a>
-    </p>
-    <p style="margin:0;font-size:13px;color:#666;line-height:1.6;">
-      If you didn't request this, you can safely ignore this email — your password won't change.
-    </p>
+    ${emailHeading("Account security", "Reset your password")}
+    ${emailP(`Hi ${firstName},`)}
+    ${emailP("We received a request to reset your TalentStream password. Click below to choose a new one. This link expires in 1&nbsp;hour.")}
+    ${emailBtn("Reset password", resetUrl)}
+    ${emailNote("If you didn&rsquo;t request this, you can safely ignore this email &mdash; your password won&rsquo;t change.")}
   `);
 }
 
@@ -206,18 +277,10 @@ export function gatingFailedEmail(
   clientName: string
 ): string {
   return wrapTemplate(`
-    <h2 style="margin:0 0 16px;font-size:20px;color:#1B4332;font-weight:normal;font-style:italic;">
-      Application Update
-    </h2>
-    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
-      Hi ${candidateName},
-    </p>
-    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
-      Thank you for your interest in the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>. Unfortunately, your profile does not meet the specific requirements for this role at this time.
-    </p>
-    <p style="margin:0;font-size:15px;color:#666;line-height:1.6;">
-      We encourage you to apply for future opportunities that may be a better fit. We wish you all the best.
-    </p>
+    ${emailHeading("Application update", "Thank you for applying")}
+    ${emailP(`Hi ${candidateName},`)}
+    ${emailP(`Thank you for your interest in the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>. Unfortunately, your profile does not meet the specific requirements for this role at this time.`)}
+    ${emailNote("We encourage you to apply for future opportunities that may be a better fit. We wish you all the best.")}
   `);
 }
 
@@ -227,18 +290,10 @@ export function rejectionEmail(
   clientName: string
 ): string {
   return wrapTemplate(`
-    <h2 style="margin:0 0 16px;font-size:20px;color:#1B4332;font-weight:normal;font-style:italic;">
-      Application Update
-    </h2>
-    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
-      Hi ${candidateName},
-    </p>
-    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
-      Thank you for your interest in the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>. After careful consideration, we've decided not to move forward with your application at this time.
-    </p>
-    <p style="margin:0;font-size:15px;color:#666;line-height:1.6;">
-      We appreciate the time you invested in applying and encourage you to keep an eye out for future opportunities. We wish you all the best in your career.
-    </p>
+    ${emailHeading("Application update", "Thank you for your interest")}
+    ${emailP(`Hi ${candidateName},`)}
+    ${emailP(`Thank you for your interest in the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>. After careful consideration, we&rsquo;ve decided not to move forward with your application at this time.`)}
+    ${emailNote("We appreciate the time you invested and encourage you to keep an eye out for future opportunities. We wish you all the best in your career.")}
   `);
 }
 
@@ -249,24 +304,12 @@ export function chatInvitationEmail(
   chatUrl: string
 ): string {
   return wrapTemplate(`
-    <h2 style="margin:0 0 16px;font-size:20px;color:#1B4332;font-weight:normal;font-style:italic;">
-      We'd like to chat
-    </h2>
-    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
-      Hi ${candidateName},
-    </p>
-    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
-      We have a few follow-up questions about your application for the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>. This should only take a few minutes.
-    </p>
-    <p style="margin:0 0 24px;">
-      <a href="${chatUrl}" style="display:inline-block;background:#0c0c0e;color:#fafaf7;text-decoration:none;padding:12px 20px;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:500;">
-        Continue to chat
-      </a>
-    </p>
-    <p style="margin:0;font-size:13px;color:#666;line-height:1.6;">
-      If the button doesn't work, copy and paste this link into your browser:<br>
-      <a href="${chatUrl}" style="color:#1B4332;word-break:break-all;">${chatUrl}</a>
-    </p>
+    ${emailHeading("Next step", "We&rsquo;d like to chat")}
+    ${emailP(`Hi ${candidateName},`)}
+    ${emailP("We have a few follow-up questions about your application. This should only take a few minutes.")}
+    ${emailInfoCard([["Role", roleTitle], ["Company", clientName]])}
+    ${emailBtn("Start chat", chatUrl)}
+    ${emailFallbackLink(chatUrl)}
   `);
 }
 
@@ -276,22 +319,10 @@ export function chatAccessEmail(
   magicLinkUrl: string
 ): string {
   return wrapTemplate(`
-    <h2 style="margin:0 0 16px;font-size:20px;color:#1B4332;font-weight:normal;font-style:italic;">
-      Verify your identity
-    </h2>
-    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
-      Hi ${candidateName},
-    </p>
-    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
-      We received a request to access your chat for the <strong>${roleTitle}</strong> application. Click below to verify your identity and continue the conversation. This link expires in 1 hour.
-    </p>
-    <p style="margin:0 0 24px;">
-      <a href="${magicLinkUrl}" style="display:inline-block;background:#0c0c0e;color:#fafaf7;text-decoration:none;padding:12px 20px;border-radius:8px;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:500;">
-        Verify &amp; continue
-      </a>
-    </p>
-    <p style="margin:0;font-size:13px;color:#666;line-height:1.6;">
-      If you didn't request this, you can safely ignore this email.
-    </p>
+    ${emailHeading("Verification", "Confirm your identity")}
+    ${emailP(`Hi ${candidateName},`)}
+    ${emailP(`We received a request to access your chat for the <strong>${roleTitle}</strong> application. Click below to verify your identity and continue. This link expires in 1&nbsp;hour.`)}
+    ${emailBtn("Verify &amp; continue", magicLinkUrl)}
+    ${emailNote("If you didn&rsquo;t request this, you can safely ignore this email.")}
   `);
 }
