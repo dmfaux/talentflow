@@ -4,6 +4,7 @@ import { useState } from "react";
 
 interface LogEntry {
   id: string;
+  scoring_type: string;
   model_version: string;
   score: number | null;
   processing_time_ms: number | null;
@@ -54,6 +55,13 @@ export function AuditLog({ logs }: Props) {
             <div key={log.id} className="px-5 py-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4 text-xs">
+                  <span className={`inline-block rounded-full px-2 py-0.5 text-[0.6rem] font-medium ${
+                    log.scoring_type === "initial"
+                      ? "bg-cream text-txt-secondary"
+                      : "bg-accent/10 text-accent"
+                  }`}>
+                    {log.scoring_type === "initial" ? "Initial" : "Re-assessment"}
+                  </span>
                   <span className="font-mono text-txt-muted">
                     {new Date(log.created_at).toLocaleString("en-ZA")}
                   </span>

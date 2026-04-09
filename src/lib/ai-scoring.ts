@@ -162,6 +162,11 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
     fallback_chain:
       aiResult.attempts.length > 0 ? aiResult.attempts : null,
     scoring_type: "initial",
+    dimensions: result.dimensions,
+    confidence: result.confidence,
+    rationale: result.rationale,
+    flags: result.flags,
+    recommendation: result.recommendation,
   });
 
   // Open chat channel if there are flags
@@ -471,5 +476,10 @@ export async function rescoreWithChatContext(
     fallback_chain:
       aiResult.attempts.length > 0 ? aiResult.attempts : null,
     scoring_type: "chat_rescore",
+    dimensions: result.dimensions,
+    confidence: result.confidence,
+    rationale: result.rationale,
+    flags: result.flags,
+    recommendation: result.recommendation,
   });
 }

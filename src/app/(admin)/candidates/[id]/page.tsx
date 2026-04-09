@@ -6,6 +6,7 @@ import { eq, desc, asc } from "drizzle-orm";
 import { CandidateActions } from "@/components/admin/candidate-actions";
 import { CandidateNotes } from "@/components/admin/candidate-notes";
 import { AuditLog } from "@/components/admin/audit-log";
+import { AssessmentHistory } from "@/components/admin/assessment-history";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -70,18 +71,11 @@ export default async function CandidateDetailPage({ params }: Props) {
     pass_criteria: string[];
   }[];
 
-  // Parse recommendation from scoring log response if available
-  let recommendation: string | null = null;
-  if (candidate.scoringLogs.length > 0) {
-    try {
-      let raw = candidate.scoringLogs[0].full_response;
-      if (raw.startsWith("```")) raw = raw.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
-      const parsed = JSON.parse(raw);
-      recommendation = parsed.recommendation ?? null;
-    } catch {
-      // ignore
-    }
-  }
+  // Get recommendation from the most recent scoring log's structured field
+  const validLogs = candidate.scoringLogs.filter((l) => l.score !== null);
+  const recommendation: string | null = validLogs[0]?.recommendation ?? null;
+  const previousScore =
+    validLogs.length > 1 ? validLogs[1]?.score ?? null : null;
 
   const scoreColor =
     candidate.ai_score === null
@@ -176,6 +170,23 @@ export default async function CandidateDetailPage({ params }: Props) {
                     ? candidate.ai_score.toFixed(1)
                     : "\u2014"}
                 </p>
+                {previousScore !== null && candidate.ai_score !== null && (
+                  <p className="mt-0.5 font-mono text-xs text-txt-muted">
+                    was {previousScore.toFixed(1)}{" "}
+                    <span
+                      className={
+                        candidate.ai_score - previousScore > 0
+                          ? "text-green"
+                          : candidate.ai_score - previousScore < 0
+                            ? "text-red"
+                            : ""
+                      }
+                    >
+                      ({candidate.ai_score - previousScore > 0 ? "+" : ""}
+                      {(candidate.ai_score - previousScore).toFixed(1)})
+                    </span>
+                  </p>
+                )}
               </div>
               <div className="flex flex-col items-end gap-1.5">
                 {candidate.ai_confidence && (
@@ -277,54 +288,20 @@ export default async function CandidateDetailPage({ params }: Props) {
 
         {/* Right column — scrolling content */}
         <div className="flex-1 min-w-0 space-y-6">
-          {/* AI Rationale */}
-          {candidate.ai_rationale && (
-            <div className="rounded-xl border border-border bg-surface overflow-hidden">
-              <div className="border-l-[3px] border-accent px-5 py-4">
-                <p className="mb-1 text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-txt-muted">
-                  AI Assessment
-                </p>
-                <p className="text-sm leading-relaxed text-charcoal">
-                  {candidate.ai_rationale}
-                </p>
-              </div>
-              {flags.length > 0 && (
-                <div className="border-t border-border px-5 py-3">
-                  <p className="mb-2 text-[0.63rem] font-semibold uppercase tracking-[0.14em] text-warning">
-                    Flags ({flags.length})
-                  </p>
-                  <ul className="space-y-1">
-                    {flags.map((flag, i) => {
-                      const text =
-                        typeof flag === "string"
-                          ? flag
-                          : flag.message ?? JSON.stringify(flag);
-                      return (
-                        <li
-                          key={i}
-                          className="flex items-start gap-2 text-xs text-txt-secondary"
-                        >
-                          <svg
-                            width="12"
-                            height="12"
-                            viewBox="0 0 12 12"
-                            fill="none"
-                            stroke="#d97706"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            className="mt-0.5 shrink-0"
-                          >
-                            <path d="M6 2v4M6 8.5v.5" />
-                          </svg>
-                          {text}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
+          {/* AI Assessment History */}
+          <AssessmentHistory
+            assessments={validLogs.map((l) => ({
+              id: l.id,
+              scoring_type: l.scoring_type,
+              score: l.score,
+              dimensions: l.dimensions as Record<string, number> | null,
+              confidence: l.confidence,
+              rationale: l.rationale,
+              flags: l.flags as (string | { type?: string; message?: string })[] | null,
+              recommendation: l.recommendation,
+              created_at: l.created_at.toISOString(),
+            }))}
+          />
 
           {/* Gating Answers */}
           {gatingConfig.length > 0 && (
@@ -479,6 +456,7 @@ export default async function CandidateDetailPage({ params }: Props) {
           <AuditLog
             logs={candidate.scoringLogs.map((l) => ({
               id: l.id,
+              scoring_type: l.scoring_type,
               model_version: l.model_version,
               score: l.score,
               processing_time_ms: l.processing_time_ms,

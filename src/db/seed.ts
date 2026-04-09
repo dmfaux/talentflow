@@ -816,7 +816,8 @@ async function main() {
   const insertedCandidates: {
     id: string; campaign_id: string; status: string; email: string;
     name: string; ai_score: number | null; ai_rationale: string | null;
-    ai_flags: unknown; _department: string;
+    ai_dimensions: unknown; ai_confidence: string | null; ai_flags: unknown;
+    _department: string;
   }[] = [];
 
   for (let i = 0; i < candidatesToInsert.length; i += BATCH_SIZE) {
@@ -831,6 +832,8 @@ async function main() {
       name: schema.candidates.name,
       ai_score: schema.candidates.ai_score,
       ai_rationale: schema.candidates.ai_rationale,
+      ai_dimensions: schema.candidates.ai_dimensions,
+      ai_confidence: schema.candidates.ai_confidence,
       ai_flags: schema.candidates.ai_flags,
     });
     // Re-attach the department for downstream use
@@ -860,6 +863,11 @@ async function main() {
         score: cand.ai_score,
         processing_time_ms: randInt(2800, 8500),
         scoring_type: "initial",
+        dimensions: cand.ai_dimensions,
+        confidence: cand.ai_confidence ?? "medium",
+        rationale: cand.ai_rationale,
+        flags: cand.ai_flags ?? [],
+        recommendation: cand.ai_score >= 8.5 ? "strong_recommend" : cand.ai_score >= 7.5 ? "recommend" : cand.ai_score >= 6 ? "recommend_with_caveats" : cand.ai_score >= 5 ? "borderline" : "reject",
       });
 
       // Some follow_up candidates get a rescore
@@ -880,6 +888,11 @@ async function main() {
           score: rescored,
           processing_time_ms: randInt(3200, 9000),
           scoring_type: "rescore_chat",
+          dimensions: cand.ai_dimensions,
+          confidence: "high",
+          rationale: "Re-scored with additional context from candidate chat. Clarifications strengthened the assessment.",
+          flags: [],
+          recommendation: rescored >= 7.5 ? "recommend" : "recommend_with_caveats",
         });
       }
     }

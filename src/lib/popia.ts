@@ -61,6 +61,13 @@ export async function handleDataAccessRequest(email: string) {
       messages: {
         columns: { channel: true, direction: true, content: true, created_at: true },
       },
+      scoringLogs: {
+        columns: {
+          score: true, dimensions: true, confidence: true,
+          rationale: true, flags: true, recommendation: true,
+          scoring_type: true, created_at: true,
+        },
+      },
     },
   });
 
@@ -95,6 +102,18 @@ export async function handleDataAccessRequest(email: string) {
         rationale: r.ai_rationale,
         flags: r.ai_flags,
       },
+      ai_assessment_history: r.scoringLogs
+        ?.filter((l) => l.score !== null)
+        .map((l) => ({
+          score: l.score,
+          dimensions: l.dimensions,
+          confidence: l.confidence,
+          rationale: l.rationale,
+          flags: l.flags,
+          recommendation: l.recommendation,
+          scoring_type: l.scoring_type,
+          assessed_at: l.created_at,
+        })) ?? [],
       messages: r.messages.map((m) => ({
         channel: m.channel,
         direction: m.direction,
