@@ -176,6 +176,18 @@ export async function POST(
         if (covered.length > 0) {
           await updateConversationActivity(conversationId, covered);
         }
+
+        // Safety net: if the bot wrapped up the conversation but the topic
+        // evaluator missed some topics (e.g. a "provide your CV" topic that
+        // can't be resolved via chat), force-mark them so the rescore fires.
+        if (covered.length < pendingTopics.length && isWrapUpMessage(cleanText)) {
+          const uncoveredIndices = pendingTopics
+            .map((t) => t.index)
+            .filter((i) => !covered.includes(i));
+          if (uncoveredIndices.length > 0) {
+            await updateConversationActivity(conversationId, uncoveredIndices);
+          }
+        }
       }
     } catch (err) {
       console.error("Chat post-processing failed:", err);
@@ -283,6 +295,27 @@ ${transcript}`,
     console.error("detectWithdrawal failed:", err);
     return false;
   }
+}
+
+/**
+ * Detect whether the assistant's message is a conversation wrap-up (farewell)
+ * rather than an ongoing question. The chat prompt instructs the bot to always
+ * end with a question when topics remain, so a wrap-up message will contain
+ * farewell language and no trailing question.
+ */
+function isWrapUpMessage(text: string): boolean {
+  const lower = text.toLowerCase();
+  const hasWrapUpLanguage =
+    lower.includes("be in touch") ||
+    lower.includes("will review") ||
+    lower.includes("that covers everything") ||
+    lower.includes("all the best") ||
+    lower.includes("wish you well") ||
+    lower.includes("good luck") ||
+    lower.includes("thanks for your time") ||
+    lower.includes("thank you for your time");
+  const endsWithQuestion = /\?\s*$/.test(text.trim());
+  return hasWrapUpLanguage && !endsWithQuestion;
 }
 
 /**

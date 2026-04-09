@@ -58,6 +58,7 @@ ${rubric.dealbreakers.map((d) => `- ${d}`).join("\n") || "- None specified"}
 - Tenure Patterns: ${weights.tenure}%
 
 ## Candidate CV
+The following text was extracted from the candidate's uploaded CV document:
 ${cvText}
 
 ${gatingAnswers && Object.keys(gatingAnswers).length > 0 ? `## Screening Answers\n${JSON.stringify(gatingAnswers, null, 2)}` : ""}
@@ -68,6 +69,7 @@ ${gatingAnswers && Object.keys(gatingAnswers).length > 0 ? `## Screening Answers
 3. Calculate overall_score as the weighted average using the dimension weights above.
 4. Set confidence to "high" if the CV clearly supports the assessment, "medium" if some information is ambiguous, "low" if key information is missing.
 5. List up to 4 flags in the flags array — only the most critical ambiguities, red flags, or concerns. Leave empty if none. Each flag must be a specific, bounded question that can be answered in 1-2 sentences — e.g. "CV lists a Bachelor's degree but LinkedIn shows a diploma — which is correct?" rather than "Explore their educational background". Prioritise factual discrepancies and verifiable gaps over subjective concerns.
+6. A CV document was uploaded and its extracted text is shown above. Do NOT claim that no CV or document was provided. If the text appears to be a job description, role profile, or other non-CV content rather than the candidate's personal work history, note this in your rationale and flag it as e.g. "Uploaded document appears to be a role profile/job description rather than a personal CV — can the candidate provide their actual CV with work history?"
 
 Respond with exactly this JSON structure:
 {
@@ -274,6 +276,7 @@ ${rubric.dealbreakers.map((d) => `- ${d}`).join("\n") || "- None specified"}
 - Tenure Patterns: ${weights.tenure}%
 
 ## Candidate CV
+The following text was extracted from the candidate's uploaded CV document:
 ${cvText}
 
 ${gatingAnswers && Object.keys(gatingAnswers).length > 0 ? `## Screening Answers\n${JSON.stringify(gatingAnswers, null, 2)}` : ""}
