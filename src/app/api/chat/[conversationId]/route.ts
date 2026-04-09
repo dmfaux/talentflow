@@ -170,7 +170,6 @@ export async function POST(
 
         const covered = await evaluateTopicCoverage(
           history,
-          cleanText,
           pendingTopics
         );
         if (covered.length > 0) {
@@ -192,14 +191,16 @@ export async function POST(
  */
 async function evaluateTopicCoverage(
   history: { role: string; content: string }[],
-  latestAssistantMessage: string,
   pendingTopics: { index: number; topic: string }[]
 ): Promise<number[]> {
   try {
-    const transcript = [
-      ...history.slice(-10), // last 10 messages for context
-      { role: "assistant", content: latestAssistantMessage },
-    ]
+    // Use only message history (which ends with the candidate's latest
+    // message). Deliberately exclude the AI's new response — it asks
+    // about the NEXT topic, and including it causes the evaluator to
+    // confuse "asked about" with "answered", closing the conversation
+    // before the candidate can reply.
+    const transcript = history
+      .slice(-10)
       .map((m) => `${m.role === "user" ? "CANDIDATE" : "ASSISTANT"}: ${m.content}`)
       .join("\n");
 
