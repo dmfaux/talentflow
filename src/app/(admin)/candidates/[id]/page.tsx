@@ -207,11 +207,13 @@ export default async function CandidateDetailPage({ params }: Props) {
                 const barColor =
                   value === null
                     ? "bg-cream"
-                    : value >= 8.5
-                      ? "bg-green/20"
-                      : value >= 7
-                        ? "bg-gold/20"
-                        : "bg-cream";
+                    : value >= 8
+                      ? "bg-moss"
+                      : value >= 6
+                        ? "bg-gold"
+                        : value >= 4
+                          ? "bg-saffron"
+                          : "bg-red";
                 return (
                   <div key={key}>
                     <div className="mb-1 flex items-center justify-between">

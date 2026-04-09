@@ -203,7 +203,7 @@ export default async function ReportPage({ params }: Props) {
                         </div>
                         <div className="h-2 rounded-full bg-cream overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-green/20"
+                            className={`h-full rounded-full ${value === null ? "bg-cream" : value >= 8 ? "bg-moss" : value >= 6 ? "bg-gold" : value >= 4 ? "bg-saffron" : "bg-red"}`}
                             style={{ width: `${pct}%` }}
                           />
                         </div>
