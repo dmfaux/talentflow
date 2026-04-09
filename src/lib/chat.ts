@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { chatMessages, conversations } from "@/db/schema";
+import { candidates, chatMessages, conversations } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { reframeFlag } from "./ai/chat-prompt";
 import { getQueue } from "./queue";
@@ -142,5 +142,31 @@ export async function updateConversationActivity(
         )
       );
   }
+}
+
+// ── Withdraw conversation ──────────────────────────────────────────
+
+export async function withdrawConversation(
+  conversationId: string
+): Promise<void> {
+  const conv = await db.query.conversations.findFirst({
+    where: eq(conversations.id, conversationId),
+  });
+
+  if (!conv || conv.status === "closed") return;
+
+  await db
+    .update(conversations)
+    .set({
+      status: "closed",
+      closed_reason: "candidate_withdrawn",
+      updated_at: new Date(),
+    })
+    .where(eq(conversations.id, conversationId));
+
+  await db
+    .update(candidates)
+    .set({ status: "withdrawn", updated_at: new Date() })
+    .where(eq(candidates.id, conv.candidate_id));
 }
 

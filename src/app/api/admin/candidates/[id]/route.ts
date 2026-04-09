@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { candidates } from "@/db/schema";
 import { error, requireApiAuth, success } from "@/lib/api";
+import { getQueue } from "@/lib/queue";
 import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
@@ -59,6 +60,13 @@ export async function PATCH(
       .set(updates)
       .where(eq(candidates.id, id))
       .returning();
+
+    if (body.status === "rejected") {
+      await getQueue().enqueue(
+        { type: "send-email", candidateId: id, emailKind: "rejected" },
+        { deduplicationId: `rejected-${id}` }
+      );
+    }
 
     return success(row);
   } catch (err) {

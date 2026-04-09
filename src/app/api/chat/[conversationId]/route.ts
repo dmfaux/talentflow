@@ -6,6 +6,7 @@ import { verifyChatAuth } from "@/lib/chat-auth";
 import {
   reactivateConversation,
   updateConversationActivity,
+  withdrawConversation,
 } from "@/lib/chat";
 import { buildChatSystemPrompt } from "@/lib/ai/chat-prompt";
 import { getChatModel } from "@/lib/ai/chat-provider";
@@ -159,6 +160,14 @@ export async function POST(
         .filter((_, i) => !topics[i].covered);
 
       if (pendingTopics.length > 0) {
+        // Check for withdrawal before topic evaluation — if candidate
+        // confirmed they want to withdraw, close and skip further processing
+        const withdrawn = await detectWithdrawal(history, cleanText);
+        if (withdrawn) {
+          await withdrawConversation(conversationId);
+          return;
+        }
+
         const covered = await evaluateTopicCoverage(
           history,
           cleanText,
@@ -224,6 +233,57 @@ Return the indices of topics where the candidate has provided a meaningful, spec
   } catch (err) {
     console.error("evaluateTopicCoverage failed:", err);
     return [];
+  }
+}
+
+/**
+ * Detect whether the candidate has confirmed they want to withdraw from the
+ * process. Only triggers on an explicit confirmation — not on vague
+ * frustration or requests to pause.
+ */
+async function detectWithdrawal(
+  history: { role: string; content: string }[],
+  latestAssistantMessage: string
+): Promise<boolean> {
+  try {
+    const transcript = [
+      ...history.slice(-6),
+      { role: "assistant", content: latestAssistantMessage },
+    ]
+      .map(
+        (m) =>
+          `${m.role === "user" ? "CANDIDATE" : "ASSISTANT"}: ${m.content}`
+      )
+      .join("\n");
+
+    const { object } = await generateObject({
+      model: getChatModel(),
+      schema: z.object({
+        withdrawn: z
+          .boolean()
+          .describe(
+            "True ONLY if the candidate has explicitly confirmed they want to withdraw from the recruitment process"
+          ),
+      }),
+      prompt: `Review this conversation excerpt and determine whether the candidate has explicitly confirmed they want to withdraw from the recruitment process.
+
+Return true ONLY if the candidate clearly and unambiguously stated they want to withdraw, quit, or be removed from consideration. This means:
+- The assistant asked them to confirm withdrawal AND the candidate confirmed (e.g. "yes, please withdraw me", "I'd like to withdraw")
+- OR the candidate proactively and clearly stated they want to withdraw (e.g. "I want to withdraw my application")
+
+Return false if:
+- The candidate only said they want to stop chatting, take a break, or come back later
+- The candidate expressed frustration but didn't explicitly withdraw
+- The assistant asked about withdrawal but the candidate hasn't responded yet or said they'd continue
+
+Recent conversation:
+${transcript}`,
+    });
+
+    return object.withdrawn;
+  } catch (err) {
+    console.error("detectWithdrawal failed:", err);
+    return false;
   }
 }
 

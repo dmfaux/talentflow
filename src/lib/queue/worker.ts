@@ -6,6 +6,7 @@ import {
   chatInvitationEmail,
   gatingFailedEmail,
   gatingPassedEmail,
+  rejectionEmail,
   sendCandidateEmail,
 } from "../email";
 import { generateChatToken } from "../chat-auth";
@@ -79,6 +80,14 @@ async function handleEmailJob(
         email,
         `Application update — ${roleTitle}`,
         gatingFailedEmail(name, roleTitle, clientName),
+        candidateId
+      );
+      break;
+    case "rejected":
+      await sendCandidateEmail(
+        email,
+        `Application update — ${roleTitle}`,
+        rejectionEmail(name, roleTitle, clientName),
         candidateId
       );
       break;

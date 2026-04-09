@@ -221,6 +221,27 @@ export function gatingFailedEmail(
   `);
 }
 
+export function rejectionEmail(
+  candidateName: string,
+  roleTitle: string,
+  clientName: string
+): string {
+  return wrapTemplate(`
+    <h2 style="margin:0 0 16px;font-size:20px;color:#1B4332;font-weight:normal;font-style:italic;">
+      Application Update
+    </h2>
+    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
+      Hi ${candidateName},
+    </p>
+    <p style="margin:0 0 12px;font-size:15px;color:#1a1a1a;line-height:1.6;">
+      Thank you for your interest in the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>. After careful consideration, we've decided not to move forward with your application at this time.
+    </p>
+    <p style="margin:0;font-size:15px;color:#666;line-height:1.6;">
+      We appreciate the time you invested in applying and encourage you to keep an eye out for future opportunities. We wish you all the best in your career.
+    </p>
+  `);
+}
+
 export function chatInvitationEmail(
   candidateName: string,
   roleTitle: string,

@@ -10,7 +10,7 @@ export type JobPayload =
   | {
       type: "send-email";
       candidateId: string;
-      emailKind: "gating_failed" | "gating_passed" | "application_received";
+      emailKind: "gating_failed" | "gating_passed" | "application_received" | "rejected";
     }
   | { type: "send-chat-invitation"; candidateId: string }
   | { type: "rescore-after-chat"; candidateId: string; conversationId: string };
