@@ -323,10 +323,9 @@ body {
   text-transform: uppercase;
 }
 
-/* ─── Chat markdown (user + assistant bubbles) ─── */
+/* ─── Chat markdown (assistant bubbles) ─── */
 .chat-markdown p { margin: 0; }
 .chat-markdown p + p { margin-top: 0.9em; }
-.chat-markdown br { display: block; content: ""; margin-top: 0.25em; }
 .chat-markdown strong { font-weight: 600; }
 .chat-markdown em { font-style: italic; }
 .chat-markdown ul, .chat-markdown ol { margin: 0.5em 0; padding-left: 1.4em; }

@@ -13,7 +13,7 @@
     "db:seed:admin": "tsx src/db/seed-admin.ts",
     "db:studio": "drizzle-kit studio",
     "storage:init": "tsx scripts/init-storage.ts",
-    "jobs:poll": "while true; do curl -s -X POST http://localhost:3000/api/jobs/process; sleep 10; done"
+    "jobs:poll": "while true; do curl -s -X POST http://localhost:3000/api/jobs/process; echo '\r'; sleep 10; done"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.68",

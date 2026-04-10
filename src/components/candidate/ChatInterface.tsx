@@ -633,25 +633,17 @@ export function ChatInterface({
           </span>
         </header>
 
-        {/* Messages area */}
-        <div
-          ref={scrollRef}
-          className="relative flex-1 overflow-y-auto scroll-smooth"
-        >
-          {/* Subtle grid texture */}
-          <div className="paper-grid pointer-events-none absolute inset-0 opacity-30" />
-          {/* Top fade */}
+        {/* Messages area (wrapper holds the fades so they stay pinned to the
+            visible viewport, not to the top/bottom of the scrollable content) */}
+        <div className="relative flex-1 min-h-0">
           <div
-            className="pointer-events-none absolute inset-x-0 top-0 z-20 h-6"
-            style={{ background: `linear-gradient(${c.chatBg}, transparent)` }}
-          />
-          {/* Bottom fade */}
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-6"
-            style={{ background: `linear-gradient(transparent, ${c.chatBg})` }}
-          />
+            ref={scrollRef}
+            className="relative h-full overflow-y-auto scroll-smooth"
+          >
+            {/* Subtle grid texture */}
+            <div className="paper-grid pointer-events-none absolute inset-0 opacity-30" />
 
-          <div className="relative z-10 mx-auto max-w-2xl px-4 py-8 sm:px-6">
+            <div className="relative z-10 mx-auto max-w-2xl px-4 py-8 sm:px-6">
             {/* Loading spinner */}
             {initialLoading && (
               <div className="flex items-center justify-center py-24">
@@ -764,16 +756,15 @@ export function ChatInterface({
                       {/* Message bubble */}
                       {isUser ? (
                         <div
-                          className="chat-markdown rounded-2xl rounded-br-md px-4 py-2.5 text-[0.84rem] leading-relaxed"
+                          className="rounded-2xl rounded-br-md px-4 py-2.5 text-[0.84rem] leading-relaxed whitespace-pre-wrap break-words"
                           style={{
                             backgroundColor: c.userBubbleBg,
                             color: c.userBubbleText,
                             boxShadow: `0 2px 12px rgba(${hexToRgb(c.primary).join(",")},0.18)`,
                           }}
-                          dangerouslySetInnerHTML={{
-                            __html: marked.parse(displayText, { async: false, gfm: true, breaks: true }) as string,
-                          }}
-                        />
+                        >
+                          {displayText}
+                        </div>
                       ) : (
                         <div
                           className="chat-markdown rounded-r-2xl rounded-l px-4 py-2.5 text-[0.84rem] leading-relaxed"
@@ -834,7 +825,19 @@ export function ChatInterface({
                   </div>
                 )}
             </div>
+            </div>
           </div>
+          {/* Top fade — pinned to visible viewport, outside the scroll container
+              so it doesn't drift with scroll position. */}
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 z-20 h-6"
+            style={{ background: `linear-gradient(${c.chatBg}, transparent)` }}
+          />
+          {/* Bottom fade — same rationale. */}
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-6"
+            style={{ background: `linear-gradient(transparent, ${c.chatBg})` }}
+          />
         </div>
 
         {/* Error banner */}
@@ -866,7 +869,7 @@ export function ChatInterface({
                 >
                   Enter
                 </kbd>{" "}
-                to send · Enter for a new line · Markdown supported
+                to send · Enter for a new line
               </p>
             )}
             <div
