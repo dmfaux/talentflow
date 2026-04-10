@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { Logo } from "@/components/brand/logo";
 
 export default function ResetPasswordConfirmPage() {
   const router = useRouter();
@@ -57,11 +58,9 @@ export default function ResetPasswordConfirmPage() {
 
       <div className="relative w-full max-w-[380px]">
         <div className="rounded-2xl border border-charcoal/[0.06] bg-warm-white p-10 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_30px_rgba(0,0,0,0.04)]">
-          <div className="mb-10 text-center">
-            <h1 className="font-serif text-[2rem] italic leading-none tracking-tight text-charcoal">
-              TalentStream
-            </h1>
-            <p className="mt-2 text-[0.7rem] font-medium uppercase tracking-[0.25em] text-muted">
+          <div className="mb-10 flex flex-col items-center">
+            <Logo size="xl" />
+            <p className="mt-3 text-[0.7rem] font-medium uppercase tracking-[0.25em] text-muted">
               New password
             </p>
           </div>

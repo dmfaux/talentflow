@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
+import { Logo } from "@/components/brand/logo";
 
 function LoginForm() {
   const router = useRouter();
@@ -60,11 +61,8 @@ function LoginForm() {
 
       <div className="relative w-full max-w-[400px]">
         {/* Brand above card */}
-        <Link href="/" className="mb-6 flex items-center justify-center gap-2.5 group">
-          <span className="relative w-2 h-2 rounded-full bg-vermillion pulse-dot" aria-hidden />
-          <span className="font-display text-[1.45rem] text-ink tracking-[-0.02em] leading-none">
-            Talent<span className="font-display-italic text-cobalt">Stream</span>
-          </span>
+        <Link href="/" className="mb-6 flex items-center justify-center group" aria-label="TalentStream">
+          <Logo size="lg" />
         </Link>
 
         {/* Card */}

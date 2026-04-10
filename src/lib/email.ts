@@ -112,38 +112,52 @@ export async function sendCandidateEmail(
 
 // ── Email templates ──────────────────────────────────────────────────
 
-/* Warm parchment + deep forest + copper accent palette */
+/* Brand palette — cobalt primary, vermillion accent, cream surface, charcoal ink.
+ * Kept in lockstep with src/app/globals.css --color-* tokens so email visuals
+ * stay aligned with the in-app brand. */
 const C = {
-  bg: "#f0ece4",
-  card: "#ffffff",
-  brand: "#1a3a2a",
-  accent: "#b8875a",
-  text: "#2c2c2c",
-  muted: "#7a756d",
-  faint: "#a09a90",
-  border: "#e8e3da",
-  infoBg: "#f9f7f3",
+  bg: "#f0f3f7", // cream — canvas
+  card: "#ffffff", // paper
+  cobalt: "#2c5bff", // primary, CTAs, links
+  cobaltDeep: "#1a45d4", // button hover / second-layer
+  cobaltTint: "#e8eeff", // info card fill
+  vermillion: "#05dbd6", // editorial accent for eyebrow labels
+  ink: "#11123c", // primary text
+  inkSoft: "#2f3941", // secondary text / body
+  inkMuted: "#5a6b7a", // notes / helper text
+  inkFaint: "#9fb5c4", // footer
+  border: "#d1dce6", // rules
 } as const;
+
+/* Font stacks — Google fonts aren't reliably loaded across email clients, so
+ * these stacks fall back to widely-available system equivalents that match the
+ * in-app feel (editorial serif headlines, clean sans body). */
+const FONT_DISPLAY =
+  "'Fraunces', Georgia, 'Times New Roman', 'DejaVu Serif', serif";
+const FONT_SANS =
+  "'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif";
 
 function emailHeading(label: string, title: string): string {
   return `
-    <p style="margin:0 0 6px;font-family:Arial,Helvetica,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:${C.accent};font-weight:600;">${label}</p>
-    <h1 style="margin:0 0 24px;font-family:Georgia,'Times New Roman',serif;font-size:26px;color:${C.brand};font-weight:normal;line-height:1.3;">${title}</h1>`;
+    <p style="margin:0 0 10px;font-family:${FONT_SANS};font-size:11px;text-transform:uppercase;letter-spacing:0.16em;color:${C.cobalt};font-weight:600;">
+      <span style="display:inline-block;width:18px;height:1px;background-color:${C.vermillion};vertical-align:middle;margin-right:10px;"></span>${label}
+    </p>
+    <h1 class="ts-headline" style="margin:0 0 24px;font-family:${FONT_DISPLAY};font-size:30px;color:${C.ink};font-weight:400;line-height:1.12;letter-spacing:-0.015em;">${title}</h1>`;
 }
 
 function emailP(html: string, last = false): string {
-  return `<p style="margin:0${last ? "" : " 0 16px"};font-family:Arial,Helvetica,sans-serif;font-size:15px;color:${C.text};line-height:1.65;">${html}</p>`;
+  return `<p style="margin:0${last ? "" : " 0 16px"};font-family:${FONT_SANS};font-size:15px;color:${C.inkSoft};line-height:1.7;">${html}</p>`;
 }
 
 function emailNote(html: string): string {
-  return `<p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:${C.muted};line-height:1.6;">${html}</p>`;
+  return `<p style="margin:20px 0 0;padding-top:18px;border-top:1px solid ${C.border};font-family:${FONT_SANS};font-size:13px;color:${C.inkMuted};line-height:1.65;">${html}</p>`;
 }
 
 function emailBtn(text: string, url: string): string {
   return `
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 0;">
-      <tr><td style="background-color:${C.brand};border-radius:6px;">
-        <a href="${url}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-family:Arial,Helvetica,sans-serif;font-size:14px;font-weight:600;letter-spacing:0.02em;">${text}&ensp;&#8594;</a>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 4px;">
+      <tr><td style="background-color:${C.cobalt};border-radius:8px;">
+        <a href="${url}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-family:${FONT_SANS};font-size:14px;font-weight:600;letter-spacing:0.01em;">${text}&ensp;&#8594;</a>
       </td></tr>
     </table>`;
 }
@@ -152,16 +166,16 @@ function emailInfoCard(items: [string, string][]): string {
   const rows = items
     .map(
       ([label, value], i) => `
-    <p style="margin:0 0 2px;font-family:Arial,Helvetica,sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:${C.muted};">${label}</p>
-    <p style="margin:0${i < items.length - 1 ? " 0 14px" : ""};font-family:Georgia,'Times New Roman',serif;font-size:17px;color:${C.text};">${value}</p>`
+    <p style="margin:0 0 3px;font-family:${FONT_SANS};font-size:10px;text-transform:uppercase;letter-spacing:0.14em;color:${C.inkMuted};font-weight:600;">${label}</p>
+    <p style="margin:0${i < items.length - 1 ? " 0 14px" : ""};font-family:${FONT_DISPLAY};font-size:18px;color:${C.ink};line-height:1.3;">${value}</p>`
     )
     .join("");
 
   return `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 4px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:22px 0 6px;">
       <tr>
-        <td width="3" style="background-color:${C.accent};border-radius:2px 0 0 2px;"></td>
-        <td style="padding:16px 20px;background-color:${C.infoBg};">
+        <td width="3" style="background-color:${C.cobalt};border-radius:2px 0 0 2px;font-size:0;line-height:0;">&nbsp;</td>
+        <td style="padding:18px 22px;background-color:${C.cobaltTint};border-radius:0 4px 4px 0;">
           ${rows}
         </td>
       </tr>
@@ -181,58 +195,111 @@ function escapeHtml(s: string): string {
 }
 
 function emailFallbackLink(url: string): string {
-  return `<p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${C.muted};line-height:1.5;">
+  return `<p style="margin:14px 0 0;font-family:${FONT_SANS};font-size:12px;color:${C.inkMuted};line-height:1.55;">
     If the button doesn&rsquo;t work, copy this link into your browser:<br>
-    <a href="${url}" style="color:${C.brand};word-break:break-all;text-decoration:underline;">${url}</a>
+    <a href="${url}" style="color:${C.cobalt};word-break:break-all;text-decoration:underline;">${url}</a>
   </p>`;
 }
 
+/* Email-safe wordmark + mark built from HTML tables, since SVG is inconsistent
+ * across clients (Gmail in particular strips inline SVG). The mark is a 4-bar
+ * descending funnel (cobalt) tied to the in-app Logo component, followed by the
+ * lowercase "talentstream" wordmark with "stream" in cobalt. */
+function brandHeader(): string {
+  const bar = (width: number, opacity: string) =>
+    `<tr><td height="3" width="${width}" style="background-color:${C.cobalt};opacity:${opacity};border-radius:2px;font-size:0;line-height:3px;mso-line-height-rule:exactly;">&nbsp;</td><td style="font-size:0;line-height:0;">&nbsp;</td></tr>
+    <tr><td height="3" colspan="2" style="font-size:0;line-height:3px;mso-line-height-rule:exactly;">&nbsp;</td></tr>`;
+
+  return `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;">
+      <tr>
+        <!-- Mark: 4 descending cobalt bars = candidate funnel -->
+        <td valign="middle" style="padding-right:12px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="26" style="border-collapse:separate;">
+            ${bar(26, "1")}
+            ${bar(20, "0.78")}
+            ${bar(13, "0.58")}
+            <tr>
+              <td height="3" width="7" style="background-color:${C.cobalt};opacity:0.4;border-radius:2px;font-size:0;line-height:3px;mso-line-height-rule:exactly;">&nbsp;</td>
+              <td valign="middle" style="padding-left:3px;font-size:0;line-height:0;">
+                <span style="display:inline-block;width:5px;height:5px;border-radius:50%;background-color:${C.vermillion};"></span>
+              </td>
+            </tr>
+          </table>
+        </td>
+        <!-- Wordmark -->
+        <td valign="middle">
+          <span style="font-family:${FONT_SANS};font-size:19px;font-weight:700;letter-spacing:-0.03em;color:${C.ink};line-height:1;">
+            talent<span style="color:${C.cobalt};">stream</span>
+          </span>
+        </td>
+      </tr>
+    </table>`;
+}
+
 function wrapTemplate(body: string): string {
-  return `<!DOCTYPE html>
-<html lang="en">
+  return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="color-scheme" content="light">
   <meta name="supported-color-schemes" content="light">
   <title>TalentStream</title>
+  <!--[if mso]>
+  <style type="text/css">
+    table, td, div, h1, p { font-family: Georgia, 'Times New Roman', serif; }
+  </style>
+  <![endif]-->
+  <style type="text/css">
+    @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+    body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+    table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
+    img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }
+    a { color:${C.cobalt}; }
+    @media (max-width: 620px) {
+      .ts-card { width:100% !important; max-width:100% !important; }
+      .ts-pad { padding-left:28px !important; padding-right:28px !important; }
+      .ts-headline { font-size:26px !important; }
+    }
+  </style>
 </head>
-<body style="margin:0;padding:0;background-color:${C.bg};-webkit-font-smoothing:antialiased;">
+<body style="margin:0;padding:0;background-color:${C.bg};-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${C.bg};">
-    <tr><td align="center" style="padding:48px 16px;">
+    <tr><td align="center" style="padding:56px 16px;">
 
-      <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
-        <!-- Top accent bar -->
-        <tr><td style="height:4px;background-color:${C.brand};border-radius:4px 4px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+      <table role="presentation" class="ts-card" width="580" cellpadding="0" cellspacing="0" border="0" style="max-width:580px;width:100%;">
+
+        <!-- Top accent bar — cobalt -->
+        <tr><td style="height:3px;background-color:${C.cobalt};border-radius:6px 6px 0 0;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</td></tr>
 
         <!-- Card -->
-        <tr><td style="background:${C.card};border-left:1px solid ${C.border};border-right:1px solid ${C.border};">
+        <tr><td style="background:${C.card};border-left:1px solid ${C.border};border-right:1px solid ${C.border};border-bottom:1px solid ${C.border};border-radius:0 0 6px 6px;">
 
           <!-- Brand header -->
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-            <tr><td style="padding:24px 40px;border-bottom:1px solid ${C.border};">
-              <span style="font-family:Georgia,'Times New Roman',serif;font-size:13px;letter-spacing:0.14em;color:${C.brand};text-transform:uppercase;">TalentStream</span>
+            <tr><td class="ts-pad" style="padding:26px 44px 24px;border-bottom:1px solid ${C.border};">
+              ${brandHeader()}
             </td></tr>
           </table>
 
           <!-- Body -->
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-            <tr><td style="padding:36px 40px 40px;">
+            <tr><td class="ts-pad" style="padding:40px 44px 44px;">
               ${body}
             </td></tr>
           </table>
 
         </td></tr>
-
-        <!-- Bottom accent bar -->
-        <tr><td style="height:2px;background-color:${C.brand};border-radius:0 0 4px 4px;font-size:0;line-height:0;">&nbsp;</td></tr>
       </table>
 
       <!-- Footer -->
-      <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
-        <tr><td style="padding:20px 40px;text-align:center;">
-          <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:${C.faint};line-height:1.5;">
-            Sent by TalentStream&ensp;&middot;&ensp;Automated message &mdash; please do not reply
+      <table role="presentation" width="580" cellpadding="0" cellspacing="0" border="0" style="max-width:580px;width:100%;">
+        <tr><td style="padding:22px 44px;text-align:center;">
+          <p style="margin:0;font-family:${FONT_SANS};font-size:11px;color:${C.inkFaint};line-height:1.55;letter-spacing:0.02em;">
+            Sent by TalentStream&ensp;&middot;&ensp;AI-powered recruitment campaigns<br>
+            Automated message &mdash; please do not reply
           </p>
         </td></tr>
       </table>

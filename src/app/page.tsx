@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Logo } from "@/components/brand/logo";
 
 /* ─────────────────────────────────────────────
    HOOKS
@@ -113,11 +114,8 @@ function Navbar() {
         }`}
       >
         <div className="mx-auto max-w-[1240px] px-6 sm:px-10 flex items-center justify-between h-16 sm:h-[68px]">
-          <a href="#" className="flex items-center gap-2.5 group">
-            <span className="relative w-2 h-2 rounded-full bg-vermillion pulse-dot" aria-hidden />
-            <span className="font-display text-[1.35rem] sm:text-[1.5rem] text-ink tracking-[-0.02em] leading-none">
-              Talent<span className="font-display-italic text-cobalt">Stream</span>
-            </span>
+          <a href="#" className="group" aria-label="TalentStream">
+            <Logo size="lg" />
           </a>
 
           <div className="hidden md:flex items-center gap-10">
@@ -866,12 +864,7 @@ function Footer() {
       <div className="mx-auto max-w-[1240px] px-6 sm:px-10 py-14">
         <div className="grid sm:grid-cols-12 gap-10 mb-14">
           <div className="sm:col-span-5">
-            <div className="flex items-center gap-2.5">
-              <span className="w-2 h-2 rounded-full bg-vermillion" />
-              <span className="font-display text-[1.4rem] text-ink tracking-[-0.02em] leading-none">
-                Talent<span className="font-display-italic text-cobalt">Stream</span>
-              </span>
-            </div>
+            <Logo size="lg" animate={false} />
             <p className="mt-4 text-[0.88rem] text-ink-muted leading-[1.55] max-w-[380px]">
               AI-powered recruitment campaigns. Built for South African corporates. Hosted in South Africa, on Azure.
             </p>
