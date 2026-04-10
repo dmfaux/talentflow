@@ -169,6 +169,13 @@
       "when": 1775728300571,
       "tag": "0023_lively_ultragirl",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1775812657104,
+      "tag": "0024_dapper_lady_deathstrike",
+      "breakpoints": true
     }
   ]
 }
