@@ -260,7 +260,8 @@ export function ChatInterface({
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) {
+    // Shift+Enter sends, Enter inserts a newline (default textarea behavior).
+    if (e.key === "Enter" && e.shiftKey) {
       e.preventDefault();
       send();
     }
@@ -763,15 +764,16 @@ export function ChatInterface({
                       {/* Message bubble */}
                       {isUser ? (
                         <div
-                          className="rounded-2xl rounded-br-md px-4 py-2.5 text-[0.84rem] leading-relaxed"
+                          className="chat-markdown rounded-2xl rounded-br-md px-4 py-2.5 text-[0.84rem] leading-relaxed"
                           style={{
                             backgroundColor: c.userBubbleBg,
                             color: c.userBubbleText,
                             boxShadow: `0 2px 12px rgba(${hexToRgb(c.primary).join(",")},0.18)`,
                           }}
-                        >
-                          {displayText}
-                        </div>
+                          dangerouslySetInnerHTML={{
+                            __html: marked.parse(displayText, { async: false, gfm: true, breaks: true }) as string,
+                          }}
+                        />
                       ) : (
                         <div
                           className="chat-markdown rounded-r-2xl rounded-l px-4 py-2.5 text-[0.84rem] leading-relaxed"
@@ -845,6 +847,28 @@ export function ChatInterface({
         {/* Floating composer */}
         <div className="px-4 pb-4 pt-2 sm:px-6">
           <div className="mx-auto max-w-2xl">
+            {!isClosed && (
+              <p
+                className="mb-1.5 px-1 text-[0.65rem] leading-relaxed"
+                style={{ color: c.textFaint }}
+              >
+                Press{" "}
+                <kbd
+                  className="rounded border px-1 py-px font-mono text-[0.6rem]"
+                  style={{ borderColor: c.textFaint, color: c.textMuted }}
+                >
+                  Shift
+                </kbd>{" "}
+                +{" "}
+                <kbd
+                  className="rounded border px-1 py-px font-mono text-[0.6rem]"
+                  style={{ borderColor: c.textFaint, color: c.textMuted }}
+                >
+                  Enter
+                </kbd>{" "}
+                to send · Enter for a new line · Markdown supported
+              </p>
+            )}
             <div
               className="flex items-end gap-3 rounded-2xl bg-white px-4 py-3"
               style={{
