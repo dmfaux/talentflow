@@ -113,6 +113,7 @@ export async function PATCH(
       "scoring_rubric",
       "salary_range_min",
       "salary_range_max",
+      "ghost_ttl_days",
     ] as const;
 
     for (const field of allowedFields) {

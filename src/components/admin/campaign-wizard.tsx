@@ -68,6 +68,8 @@ export interface FormData {
   dealbreakers: string[];
   dimension_weights: { skills: number; experience: number; progression: number; tenure: number };
   min_score: number;
+  max_auto_advance_score: number;
+  ghost_ttl_days: number;
   html_template: string;
   design_brief: string;
 }
@@ -95,6 +97,8 @@ const INITIAL: FormData = {
   dealbreakers: [""],
   dimension_weights: { skills: 25, experience: 25, progression: 25, tenure: 25 },
   min_score: 5,
+  max_auto_advance_score: 8,
+  ghost_ttl_days: 10,
   html_template: "",
   design_brief: "",
 };
@@ -257,6 +261,18 @@ export function CampaignWizard({
       const w = form.dimension_weights;
       const total = w.skills + w.experience + w.progression + w.tenure;
       if (total !== 100) errs.weights = `Weights must sum to 100% (currently ${total}%)`;
+
+      // The high-water mark must sit above the floor — otherwise the gate
+      // collapses and every borderline candidate either auto-advances or
+      // auto-rejects without a chat.
+      if (form.max_auto_advance_score <= form.min_score) {
+        errs.max_auto_advance_score = `Auto-advance threshold (${form.max_auto_advance_score}) must be higher than the minimum score (${form.min_score})`;
+      }
+      if (form.ghost_ttl_days < 4) {
+        // Nudge fires at ttl - 3 days; we need at least 1 day between
+        // nudge and expire so the candidate has a realistic last chance.
+        errs.ghost_ttl_days = "Follow-up window must be at least 4 days";
+      }
     }
 
     if (s === 3) {
@@ -438,7 +454,9 @@ export function CampaignWizard({
         dealbreakers: form.dealbreakers.filter((s) => s.trim()),
         dimension_weights: form.dimension_weights,
         min_score: form.min_score,
+        max_auto_advance_score: form.max_auto_advance_score,
       },
+      ghost_ttl_days: form.ghost_ttl_days,
       html_template: form.html_template || null,
       design_brief: form.design_brief || null,
       status,
@@ -902,6 +920,11 @@ export function CampaignWizard({
                 <span className="text-sm text-txt-muted">out of 10</span>
               </div>
               {errors.min_score && <p className="mt-1.5 text-xs text-red">{errors.min_score}</p>}
+              {form.min_score >= form.max_auto_advance_score && (
+                <p className="mt-1.5 text-xs text-red">
+                  Minimum score must be below the auto-advance threshold ({form.max_auto_advance_score}).
+                </p>
+              )}
               {form.min_score > 8 && (
                 <div className="mt-3 rounded-lg border border-amber-400 bg-amber-50 px-4 py-3">
                   <div className="flex items-start gap-2">
@@ -920,6 +943,61 @@ export function CampaignWizard({
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Auto-advance score threshold (high-water mark) */}
+            <div>
+              <label className={labelClass}>Auto-Advance Threshold</label>
+              <p className="mb-2 text-xs text-txt-muted">
+                Candidates scoring at or above this value skip the follow-up chat and are marked as scored automatically — they&apos;re strong enough that a chat wouldn&apos;t change the outcome. Must be higher than the minimum score.
+              </p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  step={0.5}
+                  value={form.max_auto_advance_score}
+                  onChange={(e) => {
+                    const v = Math.max(1, Math.min(10, parseFloat(e.target.value) || 1));
+                    updateForm({ max_auto_advance_score: v });
+                  }}
+                  className="h-10 w-24 rounded-lg border border-border bg-cream/40 px-3 text-center font-mono text-sm text-charcoal outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20"
+                />
+                <span className="text-sm text-txt-muted">out of 10</span>
+              </div>
+              {errors.max_auto_advance_score && (
+                <p className="mt-1.5 text-xs text-red">{errors.max_auto_advance_score}</p>
+              )}
+            </div>
+
+            {/* Follow-up chat window (ghost handling) */}
+            <div>
+              <label className={labelClass}>Follow-Up Chat Window</label>
+              <p className="mb-2 text-xs text-txt-muted">
+                How long to wait for a ghosting candidate to respond before closing their application. A reminder email fires 3 days before this cutoff.
+              </p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min={4}
+                  max={30}
+                  step={1}
+                  value={form.ghost_ttl_days}
+                  onChange={(e) => {
+                    const v = Math.max(4, Math.min(30, parseInt(e.target.value) || 4));
+                    updateForm({ ghost_ttl_days: v });
+                  }}
+                  className="h-10 w-24 rounded-lg border border-border bg-cream/40 px-3 text-center font-mono text-sm text-charcoal outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20"
+                />
+                <span className="text-sm text-txt-muted">days</span>
+              </div>
+              {errors.ghost_ttl_days && (
+                <p className="mt-1.5 text-xs text-red">{errors.ghost_ttl_days}</p>
+              )}
+              <p className="mt-1.5 text-[0.7rem] text-txt-muted">
+                Ghost candidates transition to <span className="font-mono">no_response</span> — a blameless terminal state, distinct from <span className="font-mono">rejected</span>, with its own email template.
+              </p>
             </div>
           </div>
         )}
@@ -1082,6 +1160,8 @@ export function CampaignWizard({
                   Weights: Skills {form.dimension_weights.skills}% · Experience {form.dimension_weights.experience}% · Progression {form.dimension_weights.progression}% · Tenure {form.dimension_weights.tenure}%
                 </p>
                 <p><span className="text-txt-muted">Min. score threshold:</span> <span className="text-charcoal font-mono">{form.min_score}</span><span className="text-txt-muted"> / 10</span>{form.min_score > 8 && <span className="ml-2 text-xs font-medium text-amber-600">Very high</span>}</p>
+                <p><span className="text-txt-muted">Auto-advance threshold:</span> <span className="text-charcoal font-mono">{form.max_auto_advance_score}</span><span className="text-txt-muted"> / 10 (skips chat)</span></p>
+                <p><span className="text-txt-muted">Follow-up chat window:</span> <span className="text-charcoal font-mono">{form.ghost_ttl_days}</span><span className="text-txt-muted"> days (nudge at day {form.ghost_ttl_days - 3})</span></p>
               </div>
             </div>
 

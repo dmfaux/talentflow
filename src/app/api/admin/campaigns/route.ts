@@ -117,6 +117,9 @@ export async function POST(request: NextRequest) {
         design_brief: body.design_brief ?? null,
         gating_config: body.gating_config,
         scoring_rubric: body.scoring_rubric,
+        ...(typeof body.ghost_ttl_days === "number"
+          ? { ghost_ttl_days: body.ghost_ttl_days }
+          : {}),
         campaign_start: body.campaign_start
           ? new Date(body.campaign_start)
           : body.status === "active"

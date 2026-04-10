@@ -22,6 +22,7 @@ interface ScoringRubric {
     tenure?: number;
   };
   min_score?: number;
+  max_auto_advance_score?: number;
 }
 
 export default async function EditCampaignPage({ params }: Props) {
@@ -65,6 +66,8 @@ export default async function EditCampaignPage({ params }: Props) {
       tenure: weights.tenure ?? 25,
     },
     min_score: rubric.min_score ?? 5,
+    max_auto_advance_score: rubric.max_auto_advance_score ?? 8,
+    ghost_ttl_days: campaign.ghost_ttl_days ?? 10,
     html_template: campaign.html_template ?? "",
     design_brief: campaign.design_brief ?? "",
   };

@@ -158,6 +158,7 @@ export async function POST(request: NextRequest) {
           dealbreakers: result.dealbreakers,
           dimension_weights: result.dimension_weights,
           min_score: 5,
+          max_auto_advance_score: 8,
         },
         salary_range_min: result.salary_range_min ?? null,
         salary_range_max: result.salary_range_max ?? null,

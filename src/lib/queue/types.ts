@@ -10,10 +10,20 @@ export type JobPayload =
   | {
       type: "send-email";
       candidateId: string;
-      emailKind: "gating_failed" | "gating_passed" | "application_received" | "rejected";
+      emailKind:
+        | "gating_failed"
+        | "gating_passed"
+        | "application_received"
+        | "rejected"
+        | "rejection_confirmation"
+        | "no_response";
+      /** Optional verbatim admin note — only used by some email kinds. */
+      adminReason?: string;
     }
   | { type: "send-chat-invitation"; candidateId: string }
-  | { type: "rescore-after-chat"; candidateId: string; conversationId: string };
+  | { type: "rescore-after-chat"; candidateId: string; conversationId: string }
+  | { type: "chat-nudge"; candidateId: string }
+  | { type: "chat-expire"; candidateId: string };
 
 export interface JobQueue {
   enqueue(payload: JobPayload, options?: EnqueueOptions): Promise<void>;

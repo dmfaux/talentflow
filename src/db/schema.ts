@@ -66,6 +66,7 @@ export const campaigns = pgTable(
     salary_range_min: integer("salary_range_min"),
     salary_range_max: integer("salary_range_max"),
     chat_lifecycle: text("chat_lifecycle").notNull().default("dormant"),
+    ghost_ttl_days: integer("ghost_ttl_days").notNull().default(10),
     created_at: timestamp("created_at").defaultNow().notNull(),
     updated_at: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -101,6 +102,14 @@ export const candidates = pgTable(
     ai_flags: jsonb("ai_flags"),
     status: text("status").notNull().default("new"),
     rejection_reason: text("rejection_reason"),
+    /** Set when an admin triggers rejection of an actively-chatting candidate.
+     *  The rejection email is queued with a delay; if the candidate completes
+     *  the chat and triggers a re-score before the job fires, this is cleared
+     *  and the queued email self-checks and no-ops. */
+    pending_rejection_at: timestamp("pending_rejection_at"),
+    /** Set when the chat-nudge job has fired for a ghosting candidate, so the
+     *  nudge isn't sent twice. */
+    nudge_sent_at: timestamp("nudge_sent_at"),
     follow_up_notes: text("follow_up_notes"),
     shortlist_notes: text("shortlist_notes"),
     source: text("source"),

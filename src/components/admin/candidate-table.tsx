@@ -32,6 +32,9 @@ const STATUS_STYLES: Record<string, string> = {
   shortlisted: "text-gold",
   rejected: "text-red",
   withdrawn: "text-txt-muted",
+  // Distinct from `rejected` — these candidates never engaged with the
+  // follow-up chat, so no evaluation decision was made about them.
+  no_response: "text-txt-muted",
 };
 
 const CONFIDENCE_STYLES: Record<string, string> = {
@@ -40,7 +43,7 @@ const CONFIDENCE_STYLES: Record<string, string> = {
   low: "bg-red-light text-red",
 };
 
-const STATUSES = ["all", "gating_passed", "scored", "shortlisted", "rejected"] as const;
+const STATUSES = ["all", "gating_passed", "scored", "follow_up", "shortlisted", "rejected", "no_response"] as const;
 const SORT_OPTIONS = [
   { value: "score_desc", label: "Score (high to low)" },
   { value: "score_asc", label: "Score (low to high)" },

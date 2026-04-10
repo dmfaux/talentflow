@@ -23,7 +23,12 @@ interface ScoringRubric {
     progression: number;
     tenure: number;
   };
+  /** Floor: candidates below this score with no flags are auto-rejected.
+   *  Default 5. */
   min_score?: number;
+  /** Ceiling: candidates at or above this score skip the follow-up chat and
+   *  land directly in `scored`, regardless of flags. Default 8. */
+  max_auto_advance_score?: number;
 }
 
 // ── Prompt builder ───────────────────────────────────────────────────
@@ -69,7 +74,7 @@ ${gatingAnswers && Object.keys(gatingAnswers).length > 0 ? `## Screening Answers
 2. Score each dimension from 1.0 to 10.0 (one decimal place).
 3. Calculate overall_score as the weighted average using the dimension weights above.
 4. Set confidence to "high" if the CV clearly supports the assessment, "medium" if some information is ambiguous, "low" if key information is missing.
-5. List up to 4 flags in the flags array — only the most critical ambiguities, red flags, or concerns. Leave empty if none. Each flag must be a specific, bounded question that can be answered in 1-2 sentences — e.g. "CV lists a Bachelor's degree but LinkedIn shows a diploma — which is correct?" rather than "Explore their educational background". Prioritise factual discrepancies and verifiable gaps over subjective concerns.
+5. **Flags are exceptional, not routine.** The expected default is an empty array — most candidates should receive zero flags. Only raise a flag when ALL of these hold: (a) it cites a specific item from the rubric above by name or close paraphrase — a must-have, nice-to-have, dealbreaker, or one of the four weighted dimensions; (b) it cannot be resolved from the CV text alone; (c) the answer would plausibly move the score. Maximum 2 flags. Do NOT flag formatting, grammar, stylistic concerns, communication tone, or anything that can be answered by re-reading the CV. Each flag must be a specific, bounded question answerable in 1-2 sentences — e.g. "The rubric requires 5+ years of Python but the CV lists Python as a skill without duration — roughly how long have you used Python professionally?" rather than "Tell me about your Python experience".
 6. A CV document was uploaded and its extracted text is shown above. Do NOT claim that no CV or document was provided. If the text appears to be a job description, role profile, or other non-CV content rather than the candidate's personal work history, note this in your rationale and flag it as e.g. "Uploaded document appears to be a role profile/job description rather than a personal CV — can the candidate provide their actual CV with work history?"
 
 Respond with exactly this JSON structure:
@@ -83,7 +88,7 @@ Respond with exactly this JSON structure:
   },
   "confidence": "high" | "medium" | "low",
   "rationale": "<2-3 sentence assessment>",
-  "flags": ["<specific question>", ...] (max 4, most critical only),
+  "flags": [] (empty is the expected default; max 2; see rule 5 above),
   "recommendation": "strong_recommend" | "recommend" | "recommend_with_caveats" | "borderline" | "reject"
 }`;
 }
@@ -135,17 +140,29 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
   const processingTimeMs = Date.now() - startTime;
   const result: ScoringResult = aiResult.output;
 
-  // Determine status based on flags and minimum score threshold
+  // Determine status from the score and any flags raised.
+  //
+  // Three thresholds are at play:
+  //   - max_auto_advance_score (ceiling, default 8): strong candidates skip
+  //     the chat entirely and go directly to `scored`, even if flags exist.
+  //   - min_score (floor, default 5): weak candidates with no flags are
+  //     auto-rejected. Weak candidates WITH flags still get a chat, since
+  //     the chat might resolve the concerns and lift the score.
+  //   - Otherwise: flags → follow_up chat, no flags → scored.
   const hasFlags = Array.isArray(result.flags) && result.flags.length > 0;
   const minScore = rubric.min_score ?? 5;
+  const maxAutoAdvance = rubric.max_auto_advance_score ?? 8;
+  const aboveMaxScore = result.overall_score >= maxAutoAdvance;
   const belowMinScore = result.overall_score < minScore;
 
-  // If below min score and no flags to follow up on, auto-reject
-  const status = belowMinScore && !hasFlags
-    ? "rejected"
-    : hasFlags
-      ? "follow_up"
-      : "scored";
+  const status: "scored" | "follow_up" | "rejected" =
+    aboveMaxScore
+      ? "scored"
+      : belowMinScore && !hasFlags
+        ? "rejected"
+        : hasFlags
+          ? "follow_up"
+          : "scored";
 
   // Write results to candidate
   await db
@@ -200,8 +217,11 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
     return;
   }
 
-  // Open chat channel if there are flags
-  if (hasFlags) {
+  // Open chat channel only when the candidate actually needs one.
+  // Guarding on `status` (not `hasFlags`) ensures the high-water-mark
+  // auto-advance path doesn't trigger a redundant chat invitation for a
+  // strong-scoring candidate who happens to have flags attached.
+  if (status === "follow_up") {
     getQueue()
       .enqueue(
         { type: "send-chat-invitation", candidateId },

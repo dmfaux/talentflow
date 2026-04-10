@@ -26,18 +26,38 @@ export function CandidateActions({ candidateId, status, hasCv }: Props) {
         body: JSON.stringify({ status: newStatus, ...extra }),
       });
       if (res.ok) {
+        const { data } = await res.json();
+        const tier = data?.tier as "B1" | "B2" | undefined;
         toast(
           newStatus === "shortlisted" ? "Candidate added to shortlist" :
-          newStatus === "rejected" ? "Candidate rejected" :
-          "Status updated",
+          newStatus === "rejected"
+            ? tier === "B2"
+              ? "Rejection posted in chat — confirmation email will send in 24 hours"
+              : tier === "B1"
+                ? "Rejection posted in chat — confirmation email sent"
+                : "Candidate rejected"
+            : "Status updated",
           newStatus === "shortlisted" ? "success" : newStatus === "rejected" ? "warning" : "info"
         );
+        setConfirmReject(false);
+        setRejectionReason("");
+      } else if (res.status === 409 && newStatus === "rejected") {
+        // Tier A: candidate is inside the grace window.
+        const body = await res.json().catch(() => ({}));
+        toast(
+          body.error ??
+            "Candidate was invited to chat but hasn't responded yet — try again in a few days.",
+          "error"
+        );
+        // Keep the dialog open so the admin sees the message without
+        // losing whatever they typed in the reason field.
+      } else {
+        const body = await res.json().catch(() => ({}));
+        toast(body.error ?? "Failed to update candidate", "error");
       }
       router.refresh();
     } finally {
       setLoading("");
-      setConfirmReject(false);
-      setRejectionReason("");
     }
   }
 
@@ -53,9 +73,9 @@ export function CandidateActions({ candidateId, status, hasCv }: Props) {
     }
   }
 
-  const canShortlist = !["shortlisted", "rejected", "withdrawn", "gating_failed"].includes(status);
-  const canReject = !["rejected", "withdrawn", "gating_failed"].includes(status);
-  const canOpenChat = !["gating_failed", "withdrawn", "rejected"].includes(status);
+  const canShortlist = !["shortlisted", "rejected", "withdrawn", "gating_failed", "no_response"].includes(status);
+  const canReject = !["rejected", "withdrawn", "gating_failed", "no_response"].includes(status);
+  const canOpenChat = !["gating_failed", "withdrawn", "rejected", "no_response"].includes(status);
 
   async function openChat() {
     setLoading("open-chat");
@@ -130,13 +150,15 @@ export function CandidateActions({ candidateId, status, hasCv }: Props) {
           <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-xl">
             <h3 className="text-base font-semibold text-charcoal">Reject Candidate</h3>
             <p className="mt-2 text-sm leading-relaxed text-txt-secondary">
-              Please provide a reason for rejecting this candidate.
+              {status === "follow_up"
+                ? "This will post a closing message in the candidate's chat and send a confirmation email. Please provide a reason — it will be shared with the candidate verbatim if you fill it in."
+                : "Please provide a reason for rejecting this candidate."}
             </p>
             <textarea
               rows={3}
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
-              placeholder="Reason for rejection..."
+              placeholder={status === "follow_up" ? "Reason (will be shared with the candidate)..." : "Reason for rejection..."}
               className="mt-3 w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none"
             />
             <div className="mt-4 flex items-center justify-end gap-3">

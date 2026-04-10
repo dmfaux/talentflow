@@ -168,6 +168,18 @@ function emailInfoCard(items: [string, string][]): string {
     </table>`;
 }
 
+/** Minimal HTML escape for admin-supplied free text that is embedded in email
+ *  bodies. Covers the five characters that matter inside HTML attribute and
+ *  element content contexts. */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function emailFallbackLink(url: string): string {
   return `<p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${C.muted};line-height:1.5;">
     If the button doesn&rsquo;t work, copy this link into your browser:<br>
@@ -324,5 +336,68 @@ export function chatAccessEmail(
     ${emailP(`We received a request to access your chat for the <strong>${roleTitle}</strong> application. Click below to verify your identity and continue. This link expires in 1&nbsp;hour.`)}
     ${emailBtn("Verify &amp; continue", magicLinkUrl)}
     ${emailNote("If you didn&rsquo;t request this, you can safely ignore this email.")}
+  `);
+}
+
+// ── Nudge / no-response / rejection-confirmation templates ─────────
+
+/** Reminder fired partway through the follow-up window for ghost candidates.
+ *  Honest, not an ultimatum — frames the close as "we'll assume you're no
+ *  longer interested", matching the blameless no_response terminal state. */
+export function chatNudgeEmail(
+  candidateName: string,
+  roleTitle: string,
+  clientName: string,
+  chatUrl: string,
+  closeByDate: string
+): string {
+  return wrapTemplate(`
+    ${emailHeading("Reminder", "We&rsquo;d still love to hear from you")}
+    ${emailP(`Hi ${candidateName},`)}
+    ${emailP(`We&rsquo;re still interested in your application for the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>, but we haven&rsquo;t heard back from our earlier chat invitation.`)}
+    ${emailP(`If we don&rsquo;t hear from you by <strong>${closeByDate}</strong>, we&rsquo;ll assume you&rsquo;re no longer interested and close your application for this role.`)}
+    ${emailBtn("Continue chat", chatUrl)}
+    ${emailFallbackLink(chatUrl)}
+  `);
+}
+
+/** Terminal email for candidates who never engaged with the follow-up chat.
+ *  Blameless by design — no judgment on the candidate, just a statement that
+ *  the application is being closed. Kept distinct from rejectionEmail so the
+ *  candidate understands no evaluation decision was made. */
+export function noResponseEmail(
+  candidateName: string,
+  roleTitle: string,
+  clientName: string
+): string {
+  return wrapTemplate(`
+    ${emailHeading("Application update", "We&rsquo;ve closed your application")}
+    ${emailP(`Hi ${candidateName},`)}
+    ${emailP(`We reached out with a few follow-up questions about your application for the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>, but we haven&rsquo;t heard back &mdash; so we&rsquo;ve closed your application for this role.`)}
+    ${emailNote("Thank you for your interest. We wish you the very best in your search and hope to see you apply for a future opportunity.")}
+  `);
+}
+
+/** Backstop confirmation email after an in-chat rejection has been delivered.
+ *  Short and plain — the warmth (such as it is) already happened in the chat.
+ *  This exists so the candidate has a written record if they never reopen the
+ *  conversation. Admin's optional reason is rendered verbatim after HTML
+ *  escaping. */
+export function rejectionConfirmationEmail(
+  candidateName: string,
+  roleTitle: string,
+  clientName: string,
+  adminReason?: string
+): string {
+  const cleaned = adminReason?.trim();
+  const reasonBlock = cleaned
+    ? emailP(`They asked us to share the following note: &ldquo;${escapeHtml(cleaned)}&rdquo;`)
+    : "";
+  return wrapTemplate(`
+    ${emailHeading("Application update", "Confirming our earlier message")}
+    ${emailP(`Hi ${candidateName},`)}
+    ${emailP(`This is a written confirmation of the message shared with you in your chat: the recruitment team for the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong> has decided not to move forward with your application.`)}
+    ${reasonBlock}
+    ${emailNote("We appreciate the time you invested and wish you the very best in your career.")}
   `);
 }

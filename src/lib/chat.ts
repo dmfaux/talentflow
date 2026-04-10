@@ -145,6 +145,58 @@ export async function updateConversationActivity(
   }
 }
 
+// ── Close chat on admin rejection (templated, no AI) ──────────────
+
+/**
+ * Posts a fully-templated assistant message informing the candidate that
+ * the recruitment team has decided not to move forward, closes the chat,
+ * and tags the close reason. Called from the admin-reject PATCH route for
+ * candidates currently in a live chat.
+ *
+ * This function does NOT compose anything with an AI — the message is a
+ * fixed scaffold with an optional admin-supplied note appended verbatim.
+ * See Q1a decision in the design discussion for why.
+ *
+ * The caller is responsible for updating `candidates.status` — this
+ * function only touches the conversation/chat surface.
+ */
+export async function closeChatWithRejection(
+  conversationId: string,
+  roleTitle: string,
+  companyName: string,
+  adminReason?: string
+): Promise<void> {
+  const conv = await db.query.conversations.findFirst({
+    where: eq(conversations.id, conversationId),
+  });
+
+  if (!conv || conv.status === "closed") return;
+
+  const cleanedReason = adminReason?.trim();
+  const reasonSentence = cleanedReason
+    ? ` They've asked me to share the following note: "${cleanedReason}".`
+    : "";
+
+  const message =
+    `Thank you for your time on this application. The recruitment team for ${roleTitle} at ${companyName} has reached a decision and won't be moving forward with your application.${reasonSentence} We wish you the very best in your search.`;
+
+  await db.insert(chatMessages).values({
+    conversation_id: conversationId,
+    role: "assistant",
+    content: message,
+  });
+
+  await db
+    .update(conversations)
+    .set({
+      status: "closed",
+      closed_reason: "rejected_by_admin",
+      last_activity_at: new Date(),
+      updated_at: new Date(),
+    })
+    .where(eq(conversations.id, conversationId));
+}
+
 // ── Withdraw conversation ──────────────────────────────────────────
 
 export async function withdrawConversation(
