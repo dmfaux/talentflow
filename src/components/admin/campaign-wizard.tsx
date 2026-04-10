@@ -67,6 +67,7 @@ export interface FormData {
   nice_to_haves: string[];
   dealbreakers: string[];
   dimension_weights: { skills: number; experience: number; progression: number; tenure: number };
+  min_score: number;
   html_template: string;
   design_brief: string;
 }
@@ -93,6 +94,7 @@ const INITIAL: FormData = {
   nice_to_haves: [""],
   dealbreakers: [""],
   dimension_weights: { skills: 25, experience: 25, progression: 25, tenure: 25 },
+  min_score: 5,
   html_template: "",
   design_brief: "",
 };
@@ -435,6 +437,7 @@ export function CampaignWizard({
         nice_to_haves: form.nice_to_haves.filter((s) => s.trim()),
         dealbreakers: form.dealbreakers.filter((s) => s.trim()),
         dimension_weights: form.dimension_weights,
+        min_score: form.min_score,
       },
       html_template: form.html_template || null,
       design_brief: form.design_brief || null,
@@ -876,6 +879,48 @@ export function CampaignWizard({
                 Total: {form.dimension_weights.skills + form.dimension_weights.experience + form.dimension_weights.progression + form.dimension_weights.tenure}%
               </p>
             </div>
+
+            {/* Minimum score threshold */}
+            <div>
+              <label className={labelClass}>Minimum Score Threshold</label>
+              <p className="mb-2 text-xs text-txt-muted">
+                Candidates who score below this threshold after follow-up will be automatically rejected. Scale: 1–10.
+              </p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  step={0.5}
+                  value={form.min_score}
+                  onChange={(e) => {
+                    const v = Math.max(1, Math.min(10, parseFloat(e.target.value) || 1));
+                    updateForm({ min_score: v });
+                  }}
+                  className="h-10 w-24 rounded-lg border border-border bg-cream/40 px-3 text-center font-mono text-sm text-charcoal outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20"
+                />
+                <span className="text-sm text-txt-muted">out of 10</span>
+              </div>
+              {errors.min_score && <p className="mt-1.5 text-xs text-red">{errors.min_score}</p>}
+              {form.min_score > 8 && (
+                <div className="mt-3 rounded-lg border border-amber-400 bg-amber-50 px-4 py-3">
+                  <div className="flex items-start gap-2">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="mt-0.5 shrink-0 text-amber-600">
+                      <path d="M8 1.5L1 13.5h14L8 1.5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M8 6v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                      <circle cx="8" cy="11" r="0.75" fill="currentColor" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-semibold text-amber-800">Very high threshold</p>
+                      <p className="mt-0.5 text-xs leading-relaxed text-amber-700">
+                        A minimum score above 8 will automatically reject the majority of candidates, including many who may be strong fits for the role.
+                        Only exceptional candidates will pass this bar. This setting is likely to significantly reduce your candidate pipeline and may cause you to miss qualified talent.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1036,6 +1081,7 @@ export function CampaignWizard({
                 <p className="font-mono text-xs text-txt-muted">
                   Weights: Skills {form.dimension_weights.skills}% · Experience {form.dimension_weights.experience}% · Progression {form.dimension_weights.progression}% · Tenure {form.dimension_weights.tenure}%
                 </p>
+                <p><span className="text-txt-muted">Min. score threshold:</span> <span className="text-charcoal font-mono">{form.min_score}</span><span className="text-txt-muted"> / 10</span>{form.min_score > 8 && <span className="ml-2 text-xs font-medium text-amber-600">Very high</span>}</p>
               </div>
             </div>
 

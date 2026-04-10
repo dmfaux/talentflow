@@ -23,6 +23,7 @@ interface ScoringRubric {
     progression: number;
     tenure: number;
   };
+  min_score?: number;
 }
 
 // ── Prompt builder ───────────────────────────────────────────────────
@@ -134,9 +135,17 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
   const processingTimeMs = Date.now() - startTime;
   const result: ScoringResult = aiResult.output;
 
-  // Determine status based on flags
+  // Determine status based on flags and minimum score threshold
   const hasFlags = Array.isArray(result.flags) && result.flags.length > 0;
-  const status = hasFlags ? "follow_up" : "scored";
+  const minScore = rubric.min_score ?? 5;
+  const belowMinScore = result.overall_score < minScore;
+
+  // If below min score and no flags to follow up on, auto-reject
+  const status = belowMinScore && !hasFlags
+    ? "rejected"
+    : hasFlags
+      ? "follow_up"
+      : "scored";
 
   // Write results to candidate
   await db
@@ -148,6 +157,9 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
       ai_confidence: result.confidence,
       ai_flags: result.flags,
       status,
+      ...(status === "rejected" && {
+        rejection_reason: `Auto-rejected: score ${result.overall_score.toFixed(1)} is below the minimum threshold of ${minScore}`,
+      }),
       updated_at: new Date(),
     })
     .where(eq(candidates.id, candidateId));
@@ -170,6 +182,23 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
     flags: result.flags,
     recommendation: result.recommendation,
   });
+
+  // Auto-rejected — send rejection email after 24 hours
+  if (status === "rejected") {
+    const deliverAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    getQueue()
+      .enqueue(
+        { type: "send-email", candidateId, emailKind: "rejected" },
+        { deliverAt, deduplicationId: `rejection-${candidateId}` }
+      )
+      .catch((err) =>
+        console.error(
+          `scoreCandidate: rejection email failed for ${candidateId}:`,
+          err
+        )
+      );
+    return;
+  }
 
   // Open chat channel if there are flags
   if (hasFlags) {
@@ -453,6 +482,11 @@ export async function rescoreWithChatContext(
   const processingTimeMs = Date.now() - startTime;
   const result: ScoringResult = aiResult.output;
 
+  // Check minimum score threshold after follow-up
+  const minScore = rubric.min_score ?? 5;
+  const belowMinScore = result.overall_score < minScore;
+  const newStatus = belowMinScore ? "rejected" : "scored";
+
   // Write updated scores to candidate
   await db
     .update(candidates)
@@ -462,7 +496,10 @@ export async function rescoreWithChatContext(
       ai_rationale: result.rationale,
       ai_confidence: result.confidence,
       ai_flags: result.flags,
-      status: "scored",
+      status: newStatus,
+      ...(newStatus === "rejected" && {
+        rejection_reason: `Auto-rejected: score ${result.overall_score.toFixed(1)} remained below the minimum threshold of ${minScore} after follow-up`,
+      }),
       updated_at: new Date(),
     })
     .where(eq(candidates.id, candidateId));
@@ -485,4 +522,20 @@ export async function rescoreWithChatContext(
     flags: result.flags,
     recommendation: result.recommendation,
   });
+
+  // Send rejection email after 24 hours if auto-rejected after follow-up
+  if (newStatus === "rejected") {
+    const deliverAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    getQueue()
+      .enqueue(
+        { type: "send-email", candidateId, emailKind: "rejected" },
+        { deliverAt, deduplicationId: `rejection-rescore-${candidateId}` }
+      )
+      .catch((err) =>
+        console.error(
+          `rescoreWithChatContext: rejection email failed for ${candidateId}:`,
+          err
+        )
+      );
+  }
 }

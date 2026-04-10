@@ -21,6 +21,7 @@ interface ScoringRubric {
     progression?: number;
     tenure?: number;
   };
+  min_score?: number;
 }
 
 export default async function EditCampaignPage({ params }: Props) {
@@ -63,6 +64,7 @@ export default async function EditCampaignPage({ params }: Props) {
       progression: weights.progression ?? 25,
       tenure: weights.tenure ?? 25,
     },
+    min_score: rubric.min_score ?? 5,
     html_template: campaign.html_template ?? "",
     design_brief: campaign.design_brief ?? "",
   };

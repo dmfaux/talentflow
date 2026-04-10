@@ -157,6 +157,7 @@ export async function POST(request: NextRequest) {
           nice_to_haves: result.nice_to_haves,
           dealbreakers: result.dealbreakers,
           dimension_weights: result.dimension_weights,
+          min_score: 5,
         },
         salary_range_min: result.salary_range_min ?? null,
         salary_range_max: result.salary_range_max ?? null,
