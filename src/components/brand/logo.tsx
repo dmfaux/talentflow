@@ -7,7 +7,6 @@ interface LogoProps {
   wordmark?: boolean;
   href?: string;
   className?: string;
-  eyebrow?: string;
   animate?: boolean;
 }
 
@@ -30,7 +29,6 @@ export function Logo({
   wordmark = true,
   href,
   className = "",
-  eyebrow,
   animate = true,
 }: LogoProps) {
   const content = (
@@ -41,11 +39,6 @@ export function Logo({
           className={`font-sans font-semibold ${TEXT_CLS[size]} text-ink leading-none tracking-[-0.035em] lowercase`}
         >
           talent<span className="text-cobalt">stream</span>
-        </span>
-      )}
-      {eyebrow && (
-        <span className="ml-1 eyebrow text-[0.58rem] text-ink-faint">
-          {eyebrow}
         </span>
       )}
     </span>

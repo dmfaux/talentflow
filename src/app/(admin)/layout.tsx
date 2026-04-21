@@ -14,7 +14,7 @@ export default function AdminLayout({
       {/* Top bar */}
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-rule bg-paper/85 px-6 backdrop-blur-md">
         <Link href="/dashboard" className="group" aria-label="TalentStream admin">
-          <Logo size="md" eyebrow="Admin" />
+          <Logo size="md" />
         </Link>
         <ActiveCampaignCount />
       </header>
