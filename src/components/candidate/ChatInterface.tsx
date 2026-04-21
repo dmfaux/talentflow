@@ -250,6 +250,14 @@ export function ChatInterface({
 
   useEffect(resizeTextarea, [inputValue, resizeTextarea]);
 
+  /* ── Keep focus on textarea after AI responds ─────────────────────── */
+
+  useEffect(() => {
+    if (!isStreaming && convStatus !== "closed" && !initialLoading) {
+      textareaRef.current?.focus();
+    }
+  }, [isStreaming, convStatus, initialLoading]);
+
   /* ── Send message ─────────────────────────────────────────────────── */
 
   function send() {
