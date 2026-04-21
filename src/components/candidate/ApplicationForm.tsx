@@ -41,7 +41,7 @@ const ACCEPTED_CV_MIMES = [
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const POPIA_CONSENT_TEXT =
-  "I consent to the processing of my personal information in accordance with the Protection of Personal Information Act (POPIA). I understand that my data will be used solely to assess my application for this role, stored securely, retained for up to 12 months, and that I have the right to access, correct, or request deletion of my information at any time.";
+  "I consent to the processing of my personal information in accordance with the Protection of Personal Information Act (POPIA). My data is stored securely in South Africa and used solely to assess my application for this role, and will be retained for up to 12 months. I understand and consent, in terms of Section 72 of POPIA, that my application may be transmitted for processing located outside South Africa for automated assessment, and that these processors are contractually bound not to retain, train on, or reuse my data. It is processed in-memory and discarded immediately after the assessment is returned. I retain the right to access, correct, or request deletion of my information at any time.";
 
 // ── Contrast helpers ─────────────────────────────────────────────────
 
