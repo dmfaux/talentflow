@@ -197,7 +197,7 @@ export default function FromJobSpecPage() {
       }
 
       const { data } = await res.json();
-      router.push(`/campaigns/${data.id}/edit`);
+      router.push(`/campaigns/${data.id}/edit?from=job-spec`);
     } catch {
       setErrorMessage("Something went wrong. Please try again.");
       setPhase("error");

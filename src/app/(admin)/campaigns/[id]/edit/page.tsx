@@ -6,9 +6,11 @@ import {
   CampaignWizard,
   type FormData as WizardFormData,
 } from "@/components/admin/campaign-wizard";
+import { JobSpecRedirectToast } from "@/components/admin/job-spec-redirect-toast";
 
 interface Props {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
 }
 
 interface ScoringRubric {
@@ -25,8 +27,9 @@ interface ScoringRubric {
   max_auto_advance_score?: number;
 }
 
-export default async function EditCampaignPage({ params }: Props) {
+export default async function EditCampaignPage({ params, searchParams }: Props) {
   const { id } = await params;
+  const { from } = await searchParams;
 
   const campaign = await db.query.campaigns.findFirst({
     where: eq(campaigns.id, id),
@@ -73,16 +76,16 @@ export default async function EditCampaignPage({ params }: Props) {
   };
 
   return (
-    <CampaignWizard
-      mode="edit"
-      campaignId={campaign.id}
-      initialForm={initialForm}
-      // Open on Review so the user sees everything at a glance and
-      // can click back into whichever step they want to change.
-      initialStep={4}
-      lockClient
-      cancelHref={`/campaigns/${campaign.id}`}
-      breadcrumbLabel={`Edit ${campaign.role_title}`}
-    />
+    <>
+      {from === "job-spec" && <JobSpecRedirectToast />}
+      <CampaignWizard
+        mode="edit"
+        campaignId={campaign.id}
+        initialForm={initialForm}
+        lockClient
+        cancelHref={`/campaigns/${campaign.id}`}
+        breadcrumbLabel={`Edit ${campaign.role_title}`}
+      />
+    </>
   );
 }

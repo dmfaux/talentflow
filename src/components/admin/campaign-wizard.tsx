@@ -17,7 +17,7 @@ export interface CampaignWizardProps {
   campaignId?: string;
   /** Pre-populate the form (edit mode loads campaign data into this). */
   initialForm?: Partial<FormData>;
-  /** Starting step; edit mode typically opens on Review so users can jump around. */
+  /** Starting step (defaults to Basics). */
   initialStep?: number;
   /** Prevent the user from changing the client (e.g., edit mode). */
   lockClient?: boolean;
