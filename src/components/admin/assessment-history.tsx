@@ -116,7 +116,7 @@ export function AssessmentHistory({ assessments }: Props) {
                 </span>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-4">
                 {/* Score + delta */}
                 <div className="flex items-baseline gap-1.5">
                   <span
@@ -142,21 +142,26 @@ export function AssessmentHistory({ assessments }: Props) {
                   )}
                 </div>
 
-                {/* Expand chevron */}
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 14 14"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  className={`text-txt-muted transition-transform ${
-                    isExpanded ? "rotate-180" : ""
-                  }`}
+                {/* Expand toggle — circular button to disambiguate from a trend arrow */}
+                <span
+                  className="flex h-6 w-6 items-center justify-center rounded-full border border-border text-txt-muted"
+                  aria-hidden="true"
                 >
-                  <path d="M3.5 5.5L7 9l3.5-3.5" />
-                </svg>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 14 14"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    className={`transition-transform ${
+                      isExpanded ? "rotate-180" : ""
+                    }`}
+                  >
+                    <path d="M3.5 5.5L7 9l3.5-3.5" />
+                  </svg>
+                </span>
               </div>
             </button>
 
