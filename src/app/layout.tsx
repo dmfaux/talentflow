@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import { Fraunces, Instrument_Sans, JetBrains_Mono } from "next/font/google";
+import { Instrument_Serif, Instrument_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const fraunces = Fraunces({
+// CSS variable name kept as --font-fraunces for compatibility with existing references.
+const instrumentSerif = Instrument_Serif({
   variable: "--font-fraunces",
   subsets: ["latin"],
+  weight: ["400"],
   style: ["normal", "italic"],
-  axes: ["SOFT", "WONK", "opsz"],
 });
 
 const instrumentSans = Instrument_Sans({
@@ -36,7 +37,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${instrumentSans.variable} ${jetBrainsMono.variable} h-full antialiased`}
+      className={`${instrumentSerif.variable} ${instrumentSans.variable} ${jetBrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

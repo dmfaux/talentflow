@@ -133,7 +133,7 @@ const C = {
  * these stacks fall back to widely-available system equivalents that match the
  * in-app feel (editorial serif headlines, clean sans body). */
 const FONT_DISPLAY =
-  "'Fraunces', Georgia, 'Times New Roman', 'DejaVu Serif', serif";
+  "'Instrument Serif', Georgia, 'Times New Roman', 'DejaVu Serif', serif";
 const FONT_SANS =
   "'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif";
 
@@ -253,7 +253,7 @@ function wrapTemplate(body: string): string {
   </style>
   <![endif]-->
   <style type="text/css">
-    @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap');
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
     img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }

@@ -305,13 +305,11 @@ body {
 .font-display {
   font-family: var(--font-fraunces), Georgia, serif;
   font-optical-sizing: auto;
-  font-variation-settings: "SOFT" 30, "WONK" 0;
 }
 .font-display-italic {
   font-family: var(--font-fraunces), Georgia, serif;
   font-style: italic;
   font-optical-sizing: auto;
-  font-variation-settings: "SOFT" 80, "WONK" 1;
 }
 
 /* ─── Section tags (editorial style) ─── */
