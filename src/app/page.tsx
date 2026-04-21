@@ -322,8 +322,8 @@ function Problem() {
   const pains = [
     {
       num: "01",
-      title: "Agencies charge 15–25% of salary for CV forwarding",
-      body: "You're paying a premium for a commodity. Most agencies just search portals and forward unscreened résumés.",
+      title: "Per-placement fees scale with salary, not with effort",
+      body: "Percentage-of-salary pricing ties cost to the role, not the work involved. For high-volume or senior hiring, that adds up fast.",
       tone: "vermillion" as const,
     },
     {
@@ -334,8 +334,8 @@ function Problem() {
     },
     {
       num: "03",
-      title: "Contingency fees reward speed over quality",
-      body: "The agency gets paid on placement, not performance. The incentives are pointing in the wrong direction.",
+      title: "Contingency models pressure speed over fit",
+      body: "When revenue depends on who fills the seat first, depth of assessment is the first thing to give. Everyone involved deserves better tooling.",
       tone: "cobalt" as const,
     },
   ];
@@ -358,13 +358,13 @@ function Problem() {
           <div className="lg:col-span-5 lg:sticky lg:top-28 lg:self-start">
             <div className="animate-on-scroll flex items-center gap-3 mb-5">
               <span className="inline-block w-5 h-px bg-ink" aria-hidden />
-              <span className="eyebrow text-ink-muted">The problem</span>
+              <span className="eyebrow text-ink-muted">The challenge</span>
             </div>
             <h2 className="animate-on-scroll stagger-1 font-display text-ink text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] tracking-[-0.02em] leading-[1.02]">
-              Traditional recruitment is <span className="font-display-italic text-vermillion">broken</span>.
+              Modern hiring needs a new <span className="font-display-italic text-vermillion">co-pilot</span>.
             </h2>
             <p className="animate-on-scroll stagger-2 mt-6 text-ink-muted text-[0.98rem] leading-[1.6] max-w-md">
-              Three structural problems — and why the SaaS-plus-service model we built fixes all of them.
+              Three realities every hiring team faces — and how our SaaS-plus-service model lightens the load.
             </p>
           </div>
 
@@ -483,7 +483,7 @@ function Benefits() {
   const items = [
     {
       title: "Fraction of the cost",
-      body: "A flat campaign fee — not a percentage of salary. Save 40–60% compared to traditional agencies.",
+      body: "A flat campaign fee — not a percentage of salary. Predictable cost, regardless of the role.",
       tone: "cobalt" as const,
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -603,7 +603,7 @@ function Stats() {
   const [ref, inView] = useInView<HTMLDivElement>();
   const stats = [
     { value: useCountUp(14, 1400, inView), suffix: " days", label: "Avg. time to shortlist", tone: "cobalt" as const },
-    { value: useCountUp(58, 1700, inView), suffix: "%", label: "Savings vs. traditional agencies", tone: "moss" as const },
+    { value: useCountUp(58, 1700, inView), suffix: "%", label: "Lower cost than per-placement fees", tone: "moss" as const },
     { value: useCountUp(12, 1300, inView), suffix: "/hr", label: "Candidates scored by AI", tone: "vermillion" as const },
     { value: useCountUp(100, 1600, inView), suffix: "%", label: "POPIA compliant, ZA-hosted", tone: "cobalt" as const },
   ];
@@ -708,10 +708,10 @@ function Pricing() {
             <span className="eyebrow text-vermillion">Pricing</span>
           </div>
           <h2 className="animate-on-scroll stagger-1 font-display text-ink text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] tracking-[-0.02em] leading-[1.02]">
-            Flat fees. No <span className="font-display-italic">placement</span> fees.
+            Flat fees. <span className="font-display-italic">Simple</span> pricing.
           </h2>
           <p className="animate-on-scroll stagger-2 mt-6 text-ink-muted text-[1rem] leading-[1.6] max-w-[520px]">
-            One campaign price, paid upfront. Ad spend passed through at cost. No kickbacks, no percentages, no surprises.
+            One campaign price, paid upfront. Ad spend passed through at cost. Predictable from brief to shortlist.
           </p>
         </div>
 
