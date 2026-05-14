@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { jobs } from "@/db/schema";
+import { candidates, jobs } from "@/db/schema";
 import { handleJob } from "@/lib/queue/worker";
 import type { JobPayload } from "@/lib/queue/types";
 import { eq, sql } from "drizzle-orm";
@@ -16,6 +16,33 @@ export async function POST(request: NextRequest) {
 
   const now = new Date().toISOString();
   const lockUntil = new Date(Date.now() + LOCK_DURATION_MS).toISOString();
+
+  // Backstop: if an earlier processing job was missed or completed without
+  // moving the candidate forward, requeue candidates that are still waiting
+  // at the post-gating stage. Candidates without a saved CV get a short grace
+  // window so this cannot race a normal in-request upload.
+  await db.execute(sql`
+    INSERT INTO jobs (type, payload, deduplication_id)
+    SELECT
+      'candidate-processing',
+      jsonb_build_object('type', 'candidate-processing', 'candidateId', ${candidates.id}),
+      'process-recovery-' || ${candidates.id}::text
+    FROM ${candidates}
+    WHERE ${candidates.status} = 'gating_passed'
+      AND ${candidates.gating_passed} = true
+      AND (
+        ${candidates.cv_url} IS NOT NULL
+        OR ${candidates.created_at} < now() - interval '15 minutes'
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM jobs existing
+        WHERE existing.type = 'candidate-processing'
+          AND existing.status IN ('pending', 'processing')
+          AND existing.payload->>'candidateId' = ${candidates.id}::text
+      )
+    ON CONFLICT DO NOTHING
+  `);
 
   // Atomically claim a batch of ready jobs
   // Use sql.raw() for timestamps to avoid Drizzle converting strings to Date

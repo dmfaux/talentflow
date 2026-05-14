@@ -10,6 +10,7 @@ export interface Topic {
   flag: string;
   topic: string;
   covered: boolean;
+  asked?: boolean;
 }
 
 // ── Create conversation ─────────────────────────────────────────────
@@ -97,6 +98,7 @@ export async function updateConversationActivity(
   for (const idx of coveredIndices) {
     if (topics[idx] && !topics[idx].covered) {
       topics[idx].covered = true;
+      topics[idx].asked = false;
       newCovered++;
     }
   }
@@ -113,6 +115,18 @@ export async function updateConversationActivity(
     closedReason = "topics_complete";
   }
 
+  // Trigger automatic re-score when all topics have been covered
+  if (allCovered) {
+    await getQueue().enqueue(
+      {
+        type: "rescore-after-chat",
+        candidateId: conv.candidate_id,
+        conversationId,
+      },
+      { deduplicationId: `rescore-chat-${conversationId}` }
+    );
+  }
+
   await db
     .update(conversations)
     .set({
@@ -124,25 +138,33 @@ export async function updateConversationActivity(
       ...(closedReason && { closed_reason: closedReason }),
     })
     .where(eq(conversations.id, conversationId));
+}
 
-  // Trigger automatic re-score when all topics have been covered
-  if (allCovered) {
-    getQueue()
-      .enqueue(
-        {
-          type: "rescore-after-chat",
-          candidateId: conv.candidate_id,
-          conversationId,
-        },
-        { deduplicationId: `rescore-chat-${conversationId}` }
-      )
-      .catch((err) =>
-        console.error(
-          `updateConversationActivity: rescore enqueue failed for ${conversationId}:`,
-          err
-        )
-      );
-  }
+// ── Mark topic as asked ─────────────────────────────────────────────
+
+export async function markTopicAsked(
+  conversationId: string,
+  topicIndex: number
+): Promise<void> {
+  const conv = await db.query.conversations.findFirst({
+    where: eq(conversations.id, conversationId),
+  });
+
+  if (!conv) return;
+
+  const topics = (conv.topics ?? []) as Topic[];
+  if (!topics[topicIndex] || topics[topicIndex].covered) return;
+
+  topics[topicIndex].asked = true;
+
+  await db
+    .update(conversations)
+    .set({
+      topics,
+      last_activity_at: new Date(),
+      updated_at: new Date(),
+    })
+    .where(eq(conversations.id, conversationId));
 }
 
 // ── Close chat on admin rejection (templated, no AI) ──────────────
@@ -222,4 +244,3 @@ export async function withdrawConversation(
     .set({ status: "withdrawn", updated_at: new Date() })
     .where(eq(candidates.id, conv.candidate_id));
 }
-

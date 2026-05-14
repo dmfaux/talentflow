@@ -43,7 +43,7 @@ export async function POST(
 
     const candidate = await db.query.candidates.findFirst({
       where: and(eq(candidates.id, candidateId), eq(candidates.campaign_id, campaign.id)),
-      columns: { id: true },
+      columns: { id: true, gating_passed: true },
     });
     if (!candidate) return json({ error: "Candidate not found" }, 404);
 
@@ -52,10 +52,21 @@ export async function POST(
 
     if (blobUrl) {
       await db.update(candidates).set({ cv_url: blobUrl, updated_at: new Date() }).where(eq(candidates.id, candidateId));
-      await getQueue().enqueue(
-        { type: "candidate-processing", candidateId },
-        { deduplicationId: `process-${candidateId}` }
-      );
+      if (candidate.gating_passed) {
+        await getQueue().enqueue(
+          { type: "candidate-processing", candidateId },
+          { deduplicationId: `process-${candidateId}` }
+        );
+        await db
+          .update(candidates)
+          .set({ status: "scoring", updated_at: new Date() })
+          .where(
+            and(
+              eq(candidates.id, candidateId),
+              eq(candidates.status, "gating_passed")
+            )
+          );
+      }
     }
 
     return json({ success: true, url: blobUrl, stored: !!blobUrl }, 201);

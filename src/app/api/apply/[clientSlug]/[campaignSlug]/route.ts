@@ -162,6 +162,15 @@ export async function POST(
         { type: "candidate-processing", candidateId },
         { deduplicationId: `process-${candidateId}` }
       );
+      await db
+        .update(candidates)
+        .set({ status: "scoring", updated_at: new Date() })
+        .where(
+          and(
+            eq(candidates.id, candidateId),
+            eq(candidates.status, "gating_passed")
+          )
+        );
     } else {
       // Queue soft rejection email — delivered after 24 hours
       const deliverAt = new Date(Date.now() + 24 * 60 * 60 * 1000);

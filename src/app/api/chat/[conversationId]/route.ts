@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { chatMessages, conversations } from "@/db/schema";
 import { verifyChatAuth } from "@/lib/chat-auth";
 import {
+  markTopicAsked,
   reactivateConversation,
   updateConversationActivity,
   withdrawConversation,
@@ -104,7 +105,23 @@ export async function POST(
   // Build system prompt with full candidate context
   const campaign = candidate.campaign;
   const client = campaign.client;
-  const topics = (conv.topics ?? []) as Topic[];
+  let topics = (conv.topics ?? []) as Topic[];
+
+  const firstPendingTopic = topics
+    .map((topic, index) => ({ ...topic, index }))
+    .find((topic) => !topic.covered);
+
+  if (
+    firstPendingTopic &&
+    shouldMarkTopicCovered(history, userText, firstPendingTopic)
+  ) {
+    await updateConversationActivity(conversationId, [firstPendingTopic.index]);
+    topics = topics.map((topic, index) =>
+      index === firstPendingTopic.index
+        ? { ...topic, covered: true, asked: false }
+        : topic
+    );
+  }
 
   const systemPrompt = buildChatSystemPrompt({
     candidateName: candidate.name,
@@ -154,32 +171,18 @@ export async function POST(
         });
       }
 
-      // Evaluate topic coverage separately — works with any model
+      const withdrawn = await detectWithdrawal(history, cleanText);
+      if (withdrawn) {
+        await withdrawConversation(conversationId);
+        return;
+      }
+
       const pendingTopics = topics
-        .map((t, i) => ({ index: i, topic: t.topic }))
-        .filter((_, i) => !topics[i].covered);
+        .map((t, i) => ({ index: i, topic: t.topic, covered: t.covered }))
+        .filter((t) => !t.covered);
 
-      if (pendingTopics.length > 0) {
-        // Check for withdrawal before topic evaluation — if candidate
-        // confirmed they want to withdraw, close and skip further processing
-        const withdrawn = await detectWithdrawal(history, cleanText);
-        if (withdrawn) {
-          await withdrawConversation(conversationId);
-          return;
-        }
-
-        // Only evaluate the first pending topic — this is the one the AI
-        // asked about (it always picks the first from the system prompt).
-        // Evaluating ALL pending topics at once lets the evaluator mark
-        // future topics as "indirectly covered" from rich candidate answers,
-        // closing the conversation before those topics are actually asked.
-        const covered = await evaluateTopicCoverage(
-          history,
-          [pendingTopics[0]]
-        );
-        if (covered.length > 0) {
-          await updateConversationActivity(conversationId, covered);
-        }
+      if (pendingTopics.length > 0 && cleanText.trim()) {
+        await markTopicAsked(conversationId, pendingTopics[0].index);
       }
     } catch (err) {
       console.error("Chat post-processing failed:", err);
@@ -189,59 +192,45 @@ export async function POST(
   return result.toTextStreamResponse();
 }
 
-/**
- * Evaluate which topics have been substantively addressed using a
- * separate focused AI call. Runs after the streamed response is complete
- * so it doesn't affect user-perceived latency.
- */
-async function evaluateTopicCoverage(
+function shouldMarkTopicCovered(
   history: { role: string; content: string }[],
-  pendingTopics: { index: number; topic: string }[]
-): Promise<number[]> {
-  try {
-    // Only use the last two messages (the assistant's question and the
-    // candidate's reply). Using more history lets the evaluator mark
-    // topics as "indirectly covered" from earlier answers, closing the
-    // conversation before the candidate can answer the current question.
-    const transcript = history
-      .slice(-2)
-      .map((m) => `${m.role === "user" ? "CANDIDATE" : "ASSISTANT"}: ${m.content}`)
-      .join("\n");
+  userText: string,
+  topic: Topic & { index: number }
+): boolean {
+  if (isExplicitWithdrawalRequest(userText)) return false;
+  if (isQuestionOnly(userText)) return false;
+  if (topic.asked) return true;
 
-    const { object } = await generateObject({
-      model: getChatModel(),
-      schema: z.object({
-        coveredIndices: z
-          .array(z.number())
-          .describe(
-            "Indices of topics that the candidate has directly answered"
-          ),
-      }),
-      prompt: `Review this exchange and determine whether the candidate has directly answered the topic below.
+  const previousAssistant = [...history]
+    .reverse()
+    .find((message) => message.role === "assistant");
 
-A topic is covered ONLY when the candidate has directly responded to a question about it in their latest message.
+  if (!previousAssistant) return false;
 
-A topic is NOT covered if:
-- The candidate mentioned related information while answering a DIFFERENT question earlier
-- The candidate's latest message doesn't address this topic
-- The topic was only asked about but not answered yet
+  return looksLikeTopicQuestion(previousAssistant.content);
+}
 
-Topic:
-${pendingTopics.map((t) => `${t.index}: ${t.topic}`).join("\n")}
+function isExplicitWithdrawalRequest(text: string): boolean {
+  return /\b(withdraw|withdrawn|remove me from consideration|no longer want to (continue|proceed)|not interested in (continuing|proceeding))\b/i.test(
+    text
+  );
+}
 
-Latest exchange:
-${transcript}
-
-Return the index ONLY if the candidate's latest message directly answers this topic.`,
-    });
-
-    // Filter to only valid pending indices
-    const validIndices = new Set(pendingTopics.map((t) => t.index));
-    return object.coveredIndices.filter((i) => validIndices.has(i));
-  } catch (err) {
-    console.error("evaluateTopicCoverage failed:", err);
-    return [];
+function isQuestionOnly(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed.includes("?")) return false;
+  if (/^(yes|yeah|yep|no|nope|sure|correct|that's right|that is right)\b/i.test(trimmed)) {
+    return false;
   }
+
+  return /^(what|when|where|why|who|how|can|could|would|will|is|are|do|does|did)\b/i.test(trimmed);
+}
+
+function looksLikeTopicQuestion(text: string): boolean {
+  if (/let me know when (you're|you are) ready/i.test(text)) return false;
+  if (text.includes("?")) return true;
+
+  return /\b(confirm|clarify|could you|can you|would you|are you|do you)\b/i.test(text);
 }
 
 /**
