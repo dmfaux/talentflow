@@ -8,18 +8,17 @@ export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
   const redirect = request.nextUrl.searchParams.get("redirect") ?? "/";
 
-  if (!token) {
-    return NextResponse.redirect(
-      new URL(`${redirect}?error=invalid_link`, request.url)
-    );
-  }
+  // Resolve the redirect target as a URL so an existing query string (e.g. the
+  // ?t=<conversationId> request-access carries for the fallback flow) survives
+  // when we attach our own param/fragment, instead of forming a malformed
+  // double-"?".
+  const target = new URL(redirect, request.url);
 
-  const candidateId = await verifyMagicLinkToken(token);
+  const candidateId = token ? await verifyMagicLinkToken(token) : null;
 
   if (!candidateId) {
-    return NextResponse.redirect(
-      new URL(`${redirect}?error=invalid_link`, request.url)
-    );
+    target.searchParams.set("error", "invalid_link");
+    return NextResponse.redirect(target);
   }
 
   // Generate a new persistent chat token for this candidate
@@ -29,8 +28,7 @@ export async function GET(request: NextRequest) {
     .set({ chat_token_hash: newToken.hash, updated_at: new Date() })
     .where(eq(candidates.id, candidateId));
 
-  // Redirect to chat page with token in URL fragment (picked up by client JS)
-  return NextResponse.redirect(
-    new URL(`${redirect}#chat_token=${newToken.raw}`, request.url)
-  );
+  // Hand the token to the client via the URL fragment (picked up by client JS)
+  target.hash = `chat_token=${newToken.raw}`;
+  return NextResponse.redirect(target);
 }

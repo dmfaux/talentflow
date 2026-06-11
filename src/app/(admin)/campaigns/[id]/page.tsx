@@ -108,11 +108,14 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
   if (confidenceFilter) conditions.push(eq(candidates.ai_confidence, confidenceFilter));
 
   const where = and(...conditions);
+  // Unscored candidates have a null ai_score; Postgres sorts nulls first for
+  // DESC by default, which would float not-yet-scored candidates above the top
+  // scorers in the default view. Force them to the bottom.
   const orderBy =
-    sort === "score_asc" ? [asc(candidates.ai_score)]
+    sort === "score_asc" ? [sql`${candidates.ai_score} asc nulls last`]
     : sort === "date_desc" ? [desc(candidates.created_at)]
     : sort === "date_asc" ? [asc(candidates.created_at)]
-    : [desc(candidates.ai_score)];
+    : [sql`${candidates.ai_score} desc nulls last`];
 
   const [candidateRows, countResult] = await Promise.all([
     db.select().from(candidates).where(where).orderBy(...orderBy).limit(limit).offset(offset),

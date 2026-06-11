@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { campaigns, candidates, chatTokens, clients } from "@/db/schema";
 import { generateMagicLinkToken } from "@/lib/chat-auth";
+import { getActiveConversation } from "@/lib/chat";
 import { chatAccessEmail, sendCandidateEmail } from "@/lib/email";
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
@@ -47,11 +48,20 @@ export async function POST(request: NextRequest) {
       expires_at: token.expiresAt,
     });
 
+    // Carry the active conversation id through the magic-link round-trip. The
+    // invitation email links with ?t=<id>, but a candidate authenticating via
+    // this fallback (new device / cleared storage) has no id in the URL — and
+    // the chat page resolves the conversation only from ?t=, so without this
+    // the verified candidate lands on "no active conversation".
+    const conversation = await getActiveConversation(candidate.id);
+
     // Build magic link URL
     const origin =
       process.env.NEXT_PUBLIC_APP_URL ??
       request.nextUrl.origin;
-    const redirect = `/c/${clientSlug}/${campaignSlug}/chat`;
+    const redirect = conversation
+      ? `/c/${clientSlug}/${campaignSlug}/chat?t=${conversation.id}`
+      : `/c/${clientSlug}/${campaignSlug}/chat`;
     const magicLinkUrl = `${origin}/api/chat/verify?token=${token.raw}&redirect=${encodeURIComponent(redirect)}`;
 
     // Send email
