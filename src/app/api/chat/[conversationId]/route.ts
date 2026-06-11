@@ -4,9 +4,8 @@ import { db } from "@/db";
 import { chatMessages, conversations } from "@/db/schema";
 import { verifyChatAuth } from "@/lib/chat-auth";
 import {
-  markTopicAsked,
   reactivateConversation,
-  updateConversationActivity,
+  recordTopicProgress,
   withdrawConversation,
 } from "@/lib/chat";
 import { buildChatSystemPrompt } from "@/lib/ai/chat-prompt";
@@ -111,13 +110,18 @@ export async function POST(
     .map((topic, index) => ({ ...topic, index }))
     .find((topic) => !topic.covered);
 
+  // Decide coverage now so this response's prompt reflects it, but persist
+  // it only in after() — once withdrawal has been ruled out and the
+  // assistant reply is saved, so the re-score reads a complete transcript
+  // and a withdrawal can never be converted into a completed conversation.
+  let coveredIndex: number | undefined;
   if (
     firstPendingTopic &&
     shouldMarkTopicCovered(history, userText, firstPendingTopic)
   ) {
-    await updateConversationActivity(conversationId, [firstPendingTopic.index]);
+    coveredIndex = firstPendingTopic.index;
     topics = topics.map((topic, index) =>
-      index === firstPendingTopic.index
+      index === coveredIndex
         ? { ...topic, covered: true, asked: false }
         : topic
     );
@@ -177,13 +181,19 @@ export async function POST(
         return;
       }
 
-      const pendingTopics = topics
-        .map((t, i) => ({ index: i, topic: t.topic, covered: t.covered }))
-        .filter((t) => !t.covered);
+      // The topic the assistant should have just raised is the first one
+      // still pending after this message's coverage. Only flag it as asked
+      // when the reply actually poses a question — an answer to a side
+      // question must not arm the topic for coverage.
+      const nextPendingIndex = topics.findIndex((t) => !t.covered);
+      const askedIndex =
+        nextPendingIndex !== -1 &&
+        cleanText.trim() &&
+        looksLikeTopicQuestion(cleanText)
+          ? nextPendingIndex
+          : undefined;
 
-      if (pendingTopics.length > 0 && cleanText.trim()) {
-        await markTopicAsked(conversationId, pendingTopics[0].index);
-      }
+      await recordTopicProgress(conversationId, { coveredIndex, askedIndex });
     } catch (err) {
       console.error("Chat post-processing failed:", err);
     }
@@ -199,6 +209,7 @@ function shouldMarkTopicCovered(
 ): boolean {
   if (isExplicitWithdrawalRequest(userText)) return false;
   if (isQuestionOnly(userText)) return false;
+  if (isStallOrAcknowledgement(userText)) return false;
   if (topic.asked) return true;
 
   const previousAssistant = [...history]
@@ -219,11 +230,51 @@ function isExplicitWithdrawalRequest(text: string): boolean {
 function isQuestionOnly(text: string): boolean {
   const trimmed = text.trim();
   if (!trimmed.includes("?")) return false;
-  if (/^(yes|yeah|yep|no|nope|sure|correct|that's right|that is right)\b/i.test(trimmed)) {
+
+  // A leading acknowledgement doesn't make a message an answer — "Sure,
+  // can you clarify if that's monthly?" is still a question. Strip the
+  // interjection and classify what follows.
+  const withoutAck = trimmed.replace(
+    /^(yes|yeah|yep|no|nope|sure|ok(?:ay)?|correct|that's right|that is right)\b[,.!\s]*/i,
+    ""
+  );
+  if (
+    !/^(what|when|where|why|who|which|how|can|could|would|will|is|are|do|does|did|should|shall)\b/i.test(
+      withoutAck
+    )
+  ) {
     return false;
   }
 
-  return /^(what|when|where|why|who|how|can|could|would|will|is|are|do|does|did)\b/i.test(trimmed);
+  // Substantial content after the question mark means the message is an
+  // answer that happens to open with a question ("Would R45k work? I
+  // currently earn R40k and have 6 years experience"), not question-only.
+  const afterQuestion = trimmed.slice(trimmed.indexOf("?") + 1).trim();
+  if (afterQuestion.split(/\s+/).filter(Boolean).length >= 5) return false;
+
+  return true;
+}
+
+/**
+ * Pure stall/acknowledgement messages carry no answer content and must not
+ * cover a topic. Bare affirmations ("yes", "no", "sure") are deliberately
+ * NOT treated as stalls — topics are often posed as yes/no questions and a
+ * bare affirmative is a real answer.
+ */
+function isStallOrAcknowledgement(text: string): boolean {
+  const trimmed = text.trim();
+  return (
+    /^(thanks?|thank you|great|cool|nice|got it|sounds good|good to know|no problem|alright|noted|hm+|mm+|uh+|brb)[.!,\s]*$/i.test(
+      trimmed
+    ) ||
+    /^(ok(?:ay)?[,.!\s]+)?(one|just a|gimme a|give me a)\s+(sec(?:ond)?|minute|moment|bit)\b/i.test(
+      trimmed
+    ) ||
+    /^(hold on|hang on|wait|let me (?:think|check|get back))\b/i.test(trimmed) ||
+    /^(sorry[,.!\s]+)?(i (?:don'?t|do not) understand|what do you mean|i'?m not sure what)/i.test(
+      trimmed
+    )
+  );
 }
 
 function looksLikeTopicQuestion(text: string): boolean {

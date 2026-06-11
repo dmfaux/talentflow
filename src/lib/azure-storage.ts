@@ -17,12 +17,14 @@ const CONTENT_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
-function isConfigured(): boolean {
+export function isStorageConfigured(): boolean {
   return !!(
     process.env.AZURE_STORAGE_CONNECTION_STRING &&
     process.env.AZURE_STORAGE_CONTAINER_NAME
   );
 }
+
+const isConfigured = isStorageConfigured;
 
 let blobServiceClient: BlobServiceClient | null = null;
 

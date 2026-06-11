@@ -176,6 +176,13 @@
       "when": 1775812657104,
       "tag": "0024_dapper_lady_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1781160274498,
+      "tag": "0025_scope_jobs_dedup_to_active",
+      "breakpoints": true
     }
   ]
 }

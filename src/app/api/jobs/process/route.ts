@@ -17,32 +17,67 @@ export async function POST(request: NextRequest) {
   const now = new Date().toISOString();
   const lockUntil = new Date(Date.now() + LOCK_DURATION_MS).toISOString();
 
-  // Backstop: if an earlier processing job was missed or completed without
-  // moving the candidate forward, requeue candidates that are still waiting
-  // at the post-gating stage. Candidates without a saved CV get a short grace
-  // window so this cannot race a normal in-request upload.
+  // Reclaim jobs whose worker died mid-run: a 'processing' row with an
+  // expired lock means the claimer never reported back. Retryable jobs go
+  // back to 'pending'; exhausted ones are dead-lettered instead of being
+  // reclaimed forever.
   await db.execute(sql`
-    INSERT INTO jobs (type, payload, deduplication_id)
-    SELECT
-      'candidate-processing',
-      jsonb_build_object('type', 'candidate-processing', 'candidateId', ${candidates.id}),
-      'process-recovery-' || ${candidates.id}::text
-    FROM ${candidates}
-    WHERE ${candidates.status} = 'gating_passed'
-      AND ${candidates.gating_passed} = true
-      AND (
-        ${candidates.cv_url} IS NOT NULL
-        OR ${candidates.created_at} < now() - interval '15 minutes'
-      )
-      AND NOT EXISTS (
-        SELECT 1
-        FROM jobs existing
-        WHERE existing.type = 'candidate-processing'
-          AND existing.status IN ('pending', 'processing')
-          AND existing.payload->>'candidateId' = ${candidates.id}::text
-      )
-    ON CONFLICT DO NOTHING
+    UPDATE jobs
+    SET status = CASE WHEN attempts >= max_attempts THEN 'dead' ELSE 'pending' END,
+        last_error = COALESCE(last_error, 'worker lock expired'),
+        locked_until = NULL
+    WHERE status = 'processing'
+      AND locked_until < ${sql.raw(`'${now}'::timestamptz`)}
   `);
+
+  // Backstop: if an earlier processing job was lost, died, or completed
+  // without moving the candidate forward, requeue candidates that are still
+  // waiting at the post-gating stage or that have sat in 'scoring' with no
+  // live job. Candidates without a saved CV get a grace window so this
+  // cannot race a normal deferred upload. Only meaningful when the jobs
+  // table is the queue — with Service Bus the table cannot see in-flight
+  // messages, so requeuing here would double-process.
+  if (process.env.QUEUE_PROVIDER !== "servicebus") {
+    await db.execute(sql`
+      INSERT INTO jobs (type, payload, deduplication_id)
+      SELECT
+        'candidate-processing',
+        jsonb_build_object('type', 'candidate-processing', 'candidateId', ${candidates.id}),
+        'process-recovery-' || ${candidates.id}::text
+      FROM ${candidates}
+      WHERE (
+          (
+            ${candidates.status} = 'gating_passed'
+            AND ${candidates.gating_passed} = true
+            AND (
+              ${candidates.cv_url} IS NOT NULL
+              OR ${candidates.created_at} < now() - interval '15 minutes'
+            )
+          )
+          OR (
+            ${candidates.status} = 'scoring'
+            AND ${candidates.updated_at} < now() - interval '15 minutes'
+          )
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM jobs existing
+          WHERE existing.type = 'candidate-processing'
+            AND existing.status IN ('pending', 'processing')
+            AND existing.payload->>'candidateId' = ${candidates.id}::text
+        )
+        -- Throttle: at most one recovery attempt per candidate per window,
+        -- so a candidate the job keeps skipping (e.g. storage unconfigured)
+        -- doesn't requeue on every tick.
+        AND NOT EXISTS (
+          SELECT 1
+          FROM jobs recent
+          WHERE recent.deduplication_id = 'process-recovery-' || ${candidates.id}::text
+            AND recent.created_at > now() - interval '15 minutes'
+        )
+      ON CONFLICT DO NOTHING
+    `);
+  }
 
   // Atomically claim a batch of ready jobs
   // Use sql.raw() for timestamps to avoid Drizzle converting strings to Date

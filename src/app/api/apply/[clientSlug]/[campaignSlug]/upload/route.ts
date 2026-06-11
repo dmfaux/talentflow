@@ -53,19 +53,11 @@ export async function POST(
     if (blobUrl) {
       await db.update(candidates).set({ cv_url: blobUrl, updated_at: new Date() }).where(eq(candidates.id, candidateId));
       if (candidate.gating_passed) {
+        // The worker owns the move to 'scoring' once it starts processing.
         await getQueue().enqueue(
           { type: "candidate-processing", candidateId },
           { deduplicationId: `process-${candidateId}` }
         );
-        await db
-          .update(candidates)
-          .set({ status: "scoring", updated_at: new Date() })
-          .where(
-            and(
-              eq(candidates.id, candidateId),
-              eq(candidates.status, "gating_passed")
-            )
-          );
       }
     }
 

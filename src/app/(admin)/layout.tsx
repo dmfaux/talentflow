@@ -16,7 +16,12 @@ export default function AdminLayout({
         <Link href="/dashboard" className="group" aria-label="TalentStream admin">
           <Logo size="md" />
         </Link>
-        <ActiveCampaignCount />
+        <div className="flex items-center">
+          <div id="admin-header-default" className="flex items-center">
+            <ActiveCampaignCount />
+          </div>
+          <div id="admin-header-slot" className="flex items-center" />
+        </div>
       </header>
 
       <div className="flex">

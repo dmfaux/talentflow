@@ -400,7 +400,14 @@ export async function rescoreWithChatContext(
     return;
   }
 
-  if (candidate.status !== "follow_up") {
+  // A candidate the admin rejected mid-chat (pending_rejection_at set) is
+  // still eligible: completing the chat re-score is the documented way an
+  // in-flight rejection gets cancelled — the delayed rejection email
+  // self-checks the status and no-ops once we write a new one.
+  const pendingRejection =
+    candidate.status === "rejected" && candidate.pending_rejection_at !== null;
+
+  if (candidate.status !== "follow_up" && !pendingRejection) {
     console.warn(
       `rescoreWithChatContext: candidate ${candidateId} is ${candidate.status}, not follow_up — skipping`
     );
@@ -507,7 +514,9 @@ export async function rescoreWithChatContext(
   const belowMinScore = result.overall_score < minScore;
   const newStatus = belowMinScore ? "rejected" : "scored";
 
-  // Write updated scores to candidate
+  // Write updated scores to candidate. Clearing pending_rejection_at
+  // cancels any in-flight admin rejection — the queued rejection email
+  // self-checks the candidate status before sending.
   await db
     .update(candidates)
     .set({
@@ -517,6 +526,7 @@ export async function rescoreWithChatContext(
       ai_confidence: result.confidence,
       ai_flags: result.flags,
       status: newStatus,
+      pending_rejection_at: null,
       ...(newStatus === "rejected" && {
         rejection_reason: `Auto-rejected: score ${result.overall_score.toFixed(1)} remained below the minimum threshold of ${minScore} after follow-up`,
       }),

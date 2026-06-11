@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -422,6 +422,13 @@ export const jobs = pgTable(
   },
   (table) => [
     index("jobs_poll_idx").on(table.status, table.deliver_at),
-    uniqueIndex("jobs_dedup_idx").on(table.deduplication_id),
+    // Dedup only applies while a job is in flight — once a job completes or
+    // dies, its deduplication_id becomes reusable so the same logical work
+    // can legitimately be enqueued again later.
+    uniqueIndex("jobs_dedup_idx")
+      .on(table.deduplication_id)
+      .where(
+        sql`${table.deduplication_id} IS NOT NULL AND ${table.status} IN ('pending', 'processing')`
+      ),
   ]
 );

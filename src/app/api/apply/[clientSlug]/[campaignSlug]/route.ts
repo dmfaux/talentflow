@@ -143,11 +143,13 @@ export async function POST(
       .set({ chat_token_hash: chatToken.hash })
       .where(eq(candidates.id, candidateId));
 
+    let cvStored = false;
     if (cvFile) {
       const buffer = Buffer.from(await cvFile.arrayBuffer());
       const blobUrl = await uploadCV(clientSlug, campaignSlug, candidateId, buffer, cvFile.name);
       if (blobUrl) {
         await db.update(candidates).set({ cv_url: blobUrl, updated_at: new Date() }).where(eq(candidates.id, candidateId));
+        cvStored = true;
       }
     }
 
@@ -157,20 +159,17 @@ export async function POST(
     const queue = getQueue();
 
     if (gatingPassed) {
-      // Queue CV processing for immediate pickup
-      await queue.enqueue(
-        { type: "candidate-processing", candidateId },
-        { deduplicationId: `process-${candidateId}` }
-      );
-      await db
-        .update(candidates)
-        .set({ status: "scoring", updated_at: new Date() })
-        .where(
-          and(
-            eq(candidates.id, candidateId),
-            eq(candidates.status, "gating_passed")
-          )
+      // Queue CV processing only once a CV is actually stored. Candidates
+      // who upload via the separate upload endpoint are enqueued there, and
+      // the worker backstop picks up anyone whose upload never arrives. The
+      // candidate stays in 'gating_passed' until the worker starts — the
+      // worker owns the move to 'scoring'.
+      if (cvStored) {
+        await queue.enqueue(
+          { type: "candidate-processing", candidateId },
+          { deduplicationId: `process-${candidateId}` }
         );
+      }
     } else {
       // Queue soft rejection email — delivered after 24 hours
       const deliverAt = new Date(Date.now() + 24 * 60 * 60 * 1000);

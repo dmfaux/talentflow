@@ -80,91 +80,100 @@ export async function reactivateConversation(
     .where(eq(conversations.id, conversationId));
 }
 
-// ── Update activity & track topic coverage ──────────────────────────
+// ── Record per-message topic progress ───────────────────────────────
 
-export async function updateConversationActivity(
+export interface TopicProgress {
+  /** Index of the topic the candidate's latest message covered. */
+  coveredIndex?: number;
+  /** Index of the topic the assistant's reply asked about. */
+  askedIndex?: number;
+}
+
+/**
+ * Persist a message's topic progress in one atomic read-modify-write.
+ * The conversation row is locked for the duration of the transaction so
+ * concurrent requests for the same conversation cannot interleave between
+ * read and write (e.g. a slow post-stream callback racing the next
+ * message's processing).
+ *
+ * When the final topic is covered the conversation is closed (where the
+ * lifecycle calls for it) and an automatic re-score is enqueued — after
+ * the row update commits, so a queue failure cannot lose conversation
+ * state, and only on the call that performed the final transition so a
+ * later message cannot enqueue a duplicate re-score.
+ */
+export async function recordTopicProgress(
   conversationId: string,
-  coveredIndices: number[]
+  progress: TopicProgress
 ): Promise<void> {
-  const conv = await db.query.conversations.findFirst({
-    where: eq(conversations.id, conversationId),
+  const completed = await db.transaction(async (tx) => {
+    const [conv] = await tx
+      .select()
+      .from(conversations)
+      .where(eq(conversations.id, conversationId))
+      .for("update");
+
+    if (!conv) return null;
+
+    const topics = (conv.topics ?? []) as Topic[];
+    let coveredThisCall = false;
+
+    if (progress.coveredIndex !== undefined) {
+      const topic = topics[progress.coveredIndex];
+      if (topic && !topic.covered) {
+        topic.covered = true;
+        topic.asked = false;
+        coveredThisCall = true;
+      }
+    }
+
+    if (progress.askedIndex !== undefined) {
+      const topic = topics[progress.askedIndex];
+      if (topic && !topic.covered) topic.asked = true;
+    }
+
+    const allCovered = topics.length > 0 && topics.every((t) => t.covered);
+    const shouldClose =
+      allCovered &&
+      conv.lifecycle === "topics_complete" &&
+      conv.status !== "closed";
+
+    await tx
+      .update(conversations)
+      .set({
+        topics,
+        topics_covered_count: topics.filter((t) => t.covered).length,
+        last_activity_at: new Date(),
+        updated_at: new Date(),
+        ...(shouldClose && {
+          status: "closed",
+          closed_reason: "topics_complete",
+        }),
+      })
+      .where(eq(conversations.id, conversationId));
+
+    return allCovered && coveredThisCall
+      ? { candidateId: conv.candidate_id }
+      : null;
   });
 
-  if (!conv) return;
+  if (!completed) return;
 
-  const topics = (conv.topics ?? []) as Topic[];
-  let newCovered = 0;
-
-  for (const idx of coveredIndices) {
-    if (topics[idx] && !topics[idx].covered) {
-      topics[idx].covered = true;
-      topics[idx].asked = false;
-      newCovered++;
-    }
-  }
-
-  const totalCovered = (conv.topics_covered_count ?? 0) + newCovered;
-  const allCovered = topics.length > 0 && topics.every((t) => t.covered);
-
-  // Check if lifecycle dictates closing
-  let newStatus = conv.status;
-  let closedReason: string | null = null;
-
-  if (allCovered && conv.lifecycle === "topics_complete") {
-    newStatus = "closed";
-    closedReason = "topics_complete";
-  }
-
-  // Trigger automatic re-score when all topics have been covered
-  if (allCovered) {
+  try {
     await getQueue().enqueue(
       {
         type: "rescore-after-chat",
-        candidateId: conv.candidate_id,
+        candidateId: completed.candidateId,
         conversationId,
       },
       { deduplicationId: `rescore-chat-${conversationId}` }
     );
+  } catch (err) {
+    console.error(
+      `recordTopicProgress: rescore enqueue failed for ${conversationId}:`,
+      err
+    );
   }
-
-  await db
-    .update(conversations)
-    .set({
-      topics,
-      topics_covered_count: totalCovered,
-      last_activity_at: new Date(),
-      updated_at: new Date(),
-      ...(newStatus !== conv.status && { status: newStatus }),
-      ...(closedReason && { closed_reason: closedReason }),
-    })
-    .where(eq(conversations.id, conversationId));
-}
-
-// ── Mark topic as asked ─────────────────────────────────────────────
-
-export async function markTopicAsked(
-  conversationId: string,
-  topicIndex: number
-): Promise<void> {
-  const conv = await db.query.conversations.findFirst({
-    where: eq(conversations.id, conversationId),
-  });
-
-  if (!conv) return;
-
-  const topics = (conv.topics ?? []) as Topic[];
-  if (!topics[topicIndex] || topics[topicIndex].covered) return;
-
-  topics[topicIndex].asked = true;
-
-  await db
-    .update(conversations)
-    .set({
-      topics,
-      last_activity_at: new Date(),
-      updated_at: new Date(),
-    })
-    .where(eq(conversations.id, conversationId));
 }
 
 // ── Close chat on admin rejection (templated, no AI) ──────────────

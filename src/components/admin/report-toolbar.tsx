@@ -1,9 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
-export function ReportToolbar() {
+interface Props {
+  campaignId: string;
+}
+
+export function ReportToolbar({ campaignId }: Props) {
   const [copied, setCopied] = useState(false);
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const target = document.getElementById("admin-header-slot");
+    const defaultContent = document.getElementById("admin-header-default");
+    if (defaultContent) defaultContent.style.display = "none";
+    setSlot(target);
+    return () => {
+      if (defaultContent) defaultContent.style.display = "";
+    };
+  }, []);
 
   function handlePrint() {
     window.print();
@@ -15,11 +31,8 @@ export function ReportToolbar() {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  // TODO: Generate a public share link with a time-limited token
-  // so clients can view the report without admin auth.
-
-  return (
-    <div className="fixed top-4 right-4 z-50 flex items-center gap-2 print:hidden">
+  const toolbar = (
+    <div className="flex items-center gap-2 print:hidden">
       <button
         onClick={copyLink}
         className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-4 text-[0.78rem] font-medium text-txt-secondary shadow-sm transition-colors hover:bg-cream hover:text-charcoal cursor-pointer"
@@ -39,6 +52,16 @@ export function ReportToolbar() {
           </>
         )}
       </button>
+      <a
+        href={`/api/admin/campaigns/${campaignId}/cvs.zip`}
+        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-4 text-[0.78rem] font-medium text-txt-secondary shadow-sm transition-colors hover:bg-cream hover:text-charcoal cursor-pointer"
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M7 2v7M4 6l3 3 3-3" />
+          <path d="M2.5 10.5v1a1 1 0 001 1h7a1 1 0 001-1v-1" />
+        </svg>
+        Download CVs
+      </a>
       <button
         onClick={handlePrint}
         className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-[0.78rem] font-medium text-white shadow-sm transition-colors hover:bg-accent-light cursor-pointer"
@@ -51,4 +74,7 @@ export function ReportToolbar() {
       </button>
     </div>
   );
+
+  if (!slot) return null;
+  return createPortal(toolbar, slot);
 }
