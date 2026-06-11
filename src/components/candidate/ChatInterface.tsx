@@ -33,6 +33,8 @@ interface Props {
   salaryMin: number | null;
   salaryMax: number | null;
   logoUrl: string | null;
+  /** Surface the logo is designed for: "light" | "dark" | "transparent". */
+  logoBackground: string;
   brandColours: BrandColours;
 }
 
@@ -142,6 +144,7 @@ export function ChatInterface({
   salaryMin,
   salaryMax,
   logoUrl,
+  logoBackground,
   brandColours,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -268,8 +271,8 @@ export function ChatInterface({
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    // Shift+Enter sends, Enter inserts a newline (default textarea behavior).
-    if (e.key === "Enter" && e.shiftKey) {
+    // Enter sends, Shift+Enter inserts a newline (default textarea behavior).
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       send();
     }
@@ -386,7 +389,15 @@ export function ChatInterface({
             {logoUrl ? (
               <div
                 className="inline-flex items-center rounded-xl px-3 py-2"
-                style={{ backgroundColor: "rgba(255,255,255,0.1)" }}
+                style={{
+                  // A logo designed for light surfaces needs a solid white
+                  // chip — translucent white over the dark sidebar gradient
+                  // washes dark logo artwork out to near-invisible.
+                  backgroundColor:
+                    logoBackground === "light"
+                      ? "#ffffff"
+                      : "rgba(255,255,255,0.1)",
+                }}
               >
                 <img
                   src={logoUrl}
@@ -868,6 +879,13 @@ export function ChatInterface({
                   className="rounded border px-1 py-px font-mono text-[0.6rem]"
                   style={{ borderColor: c.textFaint, color: c.textMuted }}
                 >
+                  Enter
+                </kbd>{" "}
+                to send ·{" "}
+                <kbd
+                  className="rounded border px-1 py-px font-mono text-[0.6rem]"
+                  style={{ borderColor: c.textFaint, color: c.textMuted }}
+                >
                   Shift
                 </kbd>{" "}
                 +{" "}
@@ -877,7 +895,7 @@ export function ChatInterface({
                 >
                   Enter
                 </kbd>{" "}
-                to send · Enter for a new line
+                for a new line
               </p>
             )}
             <div

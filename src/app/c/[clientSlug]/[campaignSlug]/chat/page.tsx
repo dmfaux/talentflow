@@ -25,6 +25,7 @@ async function getCampaignForChat(clientSlug: string, campaignSlug: string) {
       brand_accent_color: clients.brand_accent_color,
       brand_text_color: clients.brand_text_color,
       branding_logo_url: clients.branding_logo_url,
+      logo_background: clients.logo_background,
       logo_position: clients.logo_position,
     })
     .from(campaigns)
@@ -80,6 +81,7 @@ export default async function ChatPage({ params }: Props) {
       salaryMin={campaign.salary_range_min}
       salaryMax={campaign.salary_range_max}
       logoUrl={campaign.branding_logo_url}
+      logoBackground={campaign.logo_background ?? "light"}
       brandColours={{
         primary: campaign.brand_primary_color ?? "#11123c",
         secondary: campaign.brand_secondary_color ?? "#f0f3f7",

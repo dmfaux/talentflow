@@ -22,6 +22,8 @@ interface Props {
   salaryMin: number | null;
   salaryMax: number | null;
   logoUrl: string | null;
+  /** Surface the logo is designed for: "light" | "dark" | "transparent". */
+  logoBackground: string;
   brandColours: BrandColours;
 }
 
@@ -36,6 +38,7 @@ export function ChatPageClient({
   salaryMin,
   salaryMax,
   logoUrl,
+  logoBackground,
   brandColours,
 }: Props) {
   const storageKey = `ts_chat_${clientSlug}_${campaignSlug}`;
@@ -113,6 +116,7 @@ export function ChatPageClient({
       salaryMin={salaryMin}
       salaryMax={salaryMax}
       logoUrl={logoUrl}
+      logoBackground={logoBackground}
       brandColours={brandColours}
     />
   );
