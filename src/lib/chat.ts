@@ -83,8 +83,8 @@ export async function reactivateConversation(
 // ── Record per-message topic progress ───────────────────────────────
 
 export interface TopicProgress {
-  /** Index of the topic the candidate's latest message covered. */
-  coveredIndex?: number;
+  /** Indices of the topics the candidate's latest message covered. */
+  coveredIndices?: number[];
   /** Index of the topic the assistant's reply asked about. */
   askedIndex?: number;
 }
@@ -118,8 +118,8 @@ export async function recordTopicProgress(
     const topics = (conv.topics ?? []) as Topic[];
     let coveredThisCall = false;
 
-    if (progress.coveredIndex !== undefined) {
-      const topic = topics[progress.coveredIndex];
+    for (const index of progress.coveredIndices ?? []) {
+      const topic = topics[index];
       if (topic && !topic.covered) {
         topic.covered = true;
         topic.asked = false;
