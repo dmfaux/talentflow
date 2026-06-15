@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Instrument_Serif, Instrument_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { DevPortBanner } from "@/components/dev-port-banner";
 
 // CSS variable name kept as --font-fraunces for compatibility with existing references.
 const instrumentSerif = Instrument_Serif({
@@ -39,7 +40,10 @@ export default function RootLayout({
       lang="en"
       className={`${instrumentSerif.variable} ${instrumentSans.variable} ${jetBrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {process.env.NODE_ENV !== "production" && <DevPortBanner />}
+        {children}
+      </body>
     </html>
   );
 }

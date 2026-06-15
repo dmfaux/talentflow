@@ -80,6 +80,8 @@ body {
   font-feature-settings: "ss01", "ss02";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Clears the fixed dev-only port strap when present; 0 otherwise. See DevPortBanner. */
+  padding-top: var(--dev-banner-h, 0px);
 }
 
 /* ─────────────────────────────────────────────

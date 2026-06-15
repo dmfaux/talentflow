@@ -107,7 +107,7 @@ function Navbar() {
   return (
     <>
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        className={`fixed top-[var(--dev-banner-h,0px)] left-0 right-0 z-50 transition-all duration-300 ${
           scrolled
             ? "bg-canvas/92 backdrop-blur-md border-b border-rule"
             : "bg-transparent border-b border-transparent"
