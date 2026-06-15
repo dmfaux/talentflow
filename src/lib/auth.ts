@@ -1,63 +1,66 @@
 import bcrypt from "bcryptjs";
 import { randomBytes, createHash } from "crypto";
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT } from "jose";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getAuthSecret, verifyJwt } from "./token";
 
 const COOKIE_NAME = "admin_session";
 const TOKEN_EXPIRY = "8h";
 const BCRYPT_WORK_FACTOR = 12;
 
+export type OrgRole = "owner" | "org_admin";
+
 export type SessionPayload = {
   userId: string;
-  securityGroup: string;
-  clientId: string;
+  orgId: string | null; // null ⇒ operator
+  orgRole: OrgRole | null; // null for operators and non-org_role members
+  isOperator: boolean;
 };
 
-function getSecret() {
-  const secret = process.env.ADMIN_AUTH_SECRET;
-  if (!secret) throw new Error("ADMIN_AUTH_SECRET is not set");
-  return new TextEncoder().encode(secret);
-}
-
 export async function signToken(payload: SessionPayload): Promise<string> {
+  // Signing only ever runs server-side (login), never in edge proxy, so
+  // SignJWT lives here rather than in the edge-safe token.ts.
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(TOKEN_EXPIRY)
-    .sign(getSecret());
+    .sign(getAuthSecret());
 }
 
 export async function verifyToken(token: string): Promise<boolean> {
-  try {
-    await jwtVerify(token, getSecret());
-    return true;
-  } catch {
-    return false;
-  }
+  return (await verifyJwt(token)) !== null;
 }
 
 export async function getSession(): Promise<SessionPayload | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
   if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, getSecret());
-    if (
-      typeof payload.userId === "string" &&
-      typeof payload.securityGroup === "string" &&
-      typeof payload.clientId === "string"
-    ) {
-      return {
-        userId: payload.userId,
-        securityGroup: payload.securityGroup,
-        clientId: payload.clientId,
-      };
-    }
-    return null;
-  } catch {
+
+  const payload = await verifyJwt(token);
+  if (!payload) return null;
+
+  // Parse the new claim shape. Operators carry orgId/orgRole NULL, so those
+  // are validated as `string | null` rather than the old exact-3-string reject.
+  if (
+    typeof payload.userId !== "string" ||
+    typeof payload.isOperator !== "boolean"
+  ) {
     return null;
   }
+  const orgId = payload.orgId;
+  const orgRole = payload.orgRole;
+  if (orgId !== null && typeof orgId !== "string") return null;
+  if (orgRole !== null && orgRole !== "owner" && orgRole !== "org_admin") {
+    return null;
+  }
+
+  return {
+    userId: payload.userId,
+    orgId,
+    orgRole,
+    isOperator: payload.isOperator,
+  };
 }
 
 export async function requireAuth(): Promise<SessionPayload> {

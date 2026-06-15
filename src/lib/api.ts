@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { verifyToken, getSession, COOKIE_NAME, SessionPayload } from "./auth";
+import { verifyToken, getSession, COOKIE_NAME } from "./auth";
+import { tenantFromSession, type TenantContext } from "./tenant";
 
 export function success(data: unknown, status = 200) {
   return NextResponse.json({ data }, { status });
@@ -19,12 +20,16 @@ export async function requireApiAuth(): Promise<NextResponse | null> {
   return null;
 }
 
-export async function getApiSession(): Promise<
-  { session: SessionPayload; response: null } | { session: null; response: NextResponse }
+/** Route-handler analog of requireTenant: resolves the effective TenantContext
+ *  or returns a 401 response (no redirect). Mirrors the discriminated-union
+ *  shape so call sites can `if (response) return response`. The per-route swap
+ *  from requireApiAuth → getApiTenant + orgScope is S4/S5, not this slice. */
+export async function getApiTenant(): Promise<
+  | { ctx: TenantContext; response: null }
+  | { ctx: null; response: NextResponse }
 > {
   const session = await getSession();
-  if (!session) {
-    return { session: null, response: error("Unauthorized", 401) };
-  }
-  return { session, response: null };
+  if (!session) return { ctx: null, response: error("Unauthorized", 401) };
+  const ctx = await tenantFromSession(session);
+  return { ctx, response: null };
 }

@@ -3,12 +3,20 @@ import { AdminSidebar } from "@/components/admin/sidebar";
 import { ActiveCampaignCount } from "@/components/admin/active-campaign-count";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { Logo } from "@/components/brand/logo";
+import { requireTenant } from "@/lib/tenant";
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Enforce tenant context once per shell. Redirects to /login if there is no
+  // valid session — the structural guard that replaces middleware-only auth.
+  // A non-acting operator resolves with effectiveOrgId === null and is let
+  // through in S2 (no scoping yet → no lockout); S7's operator console
+  // redirects operators here instead.
+  await requireTenant();
+
   return (
     <div className="min-h-screen bg-canvas font-sans">
       {/* Top bar */}

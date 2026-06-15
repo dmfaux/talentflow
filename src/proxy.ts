@@ -1,23 +1,8 @@
-import { jwtVerify } from "jose";
 import { NextRequest, NextResponse } from "next/server";
+import { verifyJwt } from "@/lib/token";
 
 const COOKIE_NAME = "admin_session";
 const PUBLIC_ADMIN_PATHS = ["/", "/login"];
-
-function getSecret() {
-  const secret = process.env.ADMIN_AUTH_SECRET;
-  if (!secret) throw new Error("ADMIN_AUTH_SECRET is not set");
-  return new TextEncoder().encode(secret);
-}
-
-async function isValidToken(token: string): Promise<boolean> {
-  try {
-    await jwtVerify(token, getSecret());
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function isLocalDev(hostname: string): boolean {
   return (
@@ -27,7 +12,7 @@ function isLocalDev(hostname: string): boolean {
   );
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Skip internals, API, and static assets
@@ -71,9 +56,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Protect admin routes
+  // Protect admin routes. This is an optimistic signature check only; the
+  // canonical tenant guard is requireTenant() in (admin)/layout.tsx — the
+  // proxy must not read the DB (see Next.js Proxy docs).
   const token = request.cookies.get(COOKIE_NAME)?.value;
-  if (!token || !(await isValidToken(token))) {
+  if (!token || (await verifyJwt(token)) === null) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
@@ -85,9 +72,9 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Run middleware on all routes except:
+     * Run proxy on all routes except:
      * - /_next (Next.js internals)
-     * - /api (handled inside middleware with early return)
+     * - /api (handled inside proxy with early return)
      * - Static files with extensions
      */
     "/((?!_next/|.*\\.).*)",

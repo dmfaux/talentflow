@@ -1,7 +1,7 @@
-import { COOKIE_NAME, signToken, verifyPassword } from "@/lib/auth";
+import { COOKIE_NAME, signToken, verifyPassword, type OrgRole } from "@/lib/auth";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -17,15 +17,21 @@ export async function POST(request: NextRequest) {
     { status: 401 }
   );
 
-  const [user] = await db
+  // Resolve by email WITHOUT .limit(1). Under per-org email uniqueness the V1
+  // convention is "globally-unique tenant email" (operators are globally unique
+  // by index), but that is an application convention, not a DB constraint — so
+  // fail CLOSED if it is ever violated: select login-eligible (active) users
+  // and reject a collision (>1 match) with the generic 401 rather than silently
+  // picking one row. Write-time enforcement of the convention is S5/S8.
+  const matches = await db
     .select()
     .from(users)
-    .where(eq(users.email, normalizedEmail))
-    .limit(1);
+    .where(and(eq(users.email, normalizedEmail), eq(users.is_active, true)));
 
-  if (!user || !user.is_active) {
+  if (matches.length !== 1) {
     return invalidCredentials;
   }
+  const user = matches[0];
 
   if (!(await verifyPassword(password, user.password_hash))) {
     return invalidCredentials;
@@ -33,8 +39,9 @@ export async function POST(request: NextRequest) {
 
   const token = await signToken({
     userId: user.id,
-    securityGroup: user.security_group,
-    clientId: user.client_id,
+    orgId: user.org_id, // null for operators
+    orgRole: user.org_role as OrgRole | null,
+    isOperator: user.is_operator,
   });
 
   const response = NextResponse.json({ success: true });
