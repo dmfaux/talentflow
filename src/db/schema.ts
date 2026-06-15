@@ -13,12 +13,36 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-// ── Clients ──────────────────────────────────────────────────────────
+// ── Organizations (tenant level above clients=brands) ───────────────
+
+export const organizations = pgTable(
+  "organizations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    tier: text("tier").notNull().default("standard"), // moved up from clients (copy)
+    billing_email: text("billing_email"), // moved up from clients (copy)
+    status: text("status").notNull().default("active"), // active | suspended | deleted
+    suspended_at: timestamp("suspended_at"),
+    deleted_at: timestamp("deleted_at"),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("organizations_slug_idx").on(table.slug)]
+);
+
+// ── Clients (= brands) ──────────────────────────────────────────────
 
 export const clients = pgTable(
   "clients",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    // DB-level NOT NULL is enforced by migration 0026 (+ sole-org trigger);
+    // the model omits .notNull() until S5 so existing insert sites typecheck.
+    org_id: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }),
     slug: text("slug").notNull().unique(),
     name: text("name").notNull(),
     tier: text("tier").notNull().default("standard"),
@@ -38,7 +62,33 @@ export const clients = pgTable(
     created_at: timestamp("created_at").defaultNow().notNull(),
     updated_at: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [uniqueIndex("clients_slug_idx").on(table.slug)]
+  (table) => [
+    uniqueIndex("clients_slug_idx").on(table.slug),
+    index("clients_org_id_idx").on(table.org_id),
+  ]
+);
+
+// ── Memberships (per-brand role for a user) ─────────────────────────
+
+export const memberships = pgTable(
+  "memberships",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    user_id: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    client_id: uuid("client_id")
+      .notNull()
+      .references(() => clients.id, { onDelete: "cascade" }),
+    brand_role: text("brand_role").notNull(), // brand_admin | recruiter | viewer
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    unique("memberships_user_client_unique").on(table.user_id, table.client_id),
+    index("memberships_user_id_idx").on(table.user_id),
+    index("memberships_client_id_idx").on(table.client_id),
+  ]
 );
 
 // ── Campaigns ────────────────────────────────────────────────────────
@@ -49,7 +99,10 @@ export const campaigns = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     client_id: uuid("client_id")
       .notNull()
-      .references(() => clients.id),
+      .references(() => clients.id, { onDelete: "cascade" }),
+    org_id: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }), // DB NOT NULL via 0026; model nullable until S5
     slug: text("slug").notNull(),
     role_title: text("role_title").notNull(),
     role_description: text("role_description"),
@@ -74,6 +127,9 @@ export const campaigns = pgTable(
     unique("campaigns_client_id_slug_unique").on(table.client_id, table.slug),
     index("campaigns_client_id_idx").on(table.client_id),
     index("campaigns_status_idx").on(table.status),
+    index("campaigns_org_id_idx").on(table.org_id),
+    index("campaigns_org_status_idx").on(table.org_id, table.status),
+    index("campaigns_org_created_idx").on(table.org_id, table.created_at),
   ]
 );
 
@@ -85,7 +141,10 @@ export const candidates = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     campaign_id: uuid("campaign_id")
       .notNull()
-      .references(() => campaigns.id),
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    org_id: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }), // DB NOT NULL via 0026; model nullable until S5
     name: text("name").notNull(),
     email: text("email").notNull(),
     phone: text("phone"),
@@ -123,6 +182,9 @@ export const candidates = pgTable(
     index("candidates_campaign_id_idx").on(table.campaign_id),
     index("candidates_status_idx").on(table.status),
     index("candidates_email_idx").on(table.email),
+    index("candidates_org_id_idx").on(table.org_id),
+    index("candidates_org_status_idx").on(table.org_id, table.status),
+    index("candidates_org_created_idx").on(table.org_id, table.created_at),
   ]
 );
 
@@ -134,7 +196,10 @@ export const scoringLogs = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     candidate_id: uuid("candidate_id")
       .notNull()
-      .references(() => candidates.id),
+      .references(() => candidates.id, { onDelete: "cascade" }),
+    org_id: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }), // DB NOT NULL via 0026; model nullable until S5
     provider: text("provider"),
     model_version: text("model_version").notNull(),
     full_prompt: text("full_prompt").notNull(),
@@ -153,6 +218,8 @@ export const scoringLogs = pgTable(
   },
   (table) => [
     index("scoring_logs_candidate_id_idx").on(table.candidate_id),
+    index("scoring_logs_org_id_idx").on(table.org_id),
+    index("scoring_logs_org_created_idx").on(table.org_id, table.created_at),
   ]
 );
 
@@ -164,7 +231,12 @@ export const users = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     client_id: uuid("client_id")
       .notNull()
-      .references(() => clients.id),
+      .references(() => clients.id, { onDelete: "cascade" }),
+    org_id: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }), // NULLABLE: operators have no org (DB + model nullable)
+    org_role: text("org_role"), // owner | org_admin | null
+    is_operator: boolean("is_operator").notNull().default(false),
     first_name: text("first_name").notNull(),
     last_name: text("last_name").notNull(),
     email: text("email").notNull(),
@@ -175,8 +247,16 @@ export const users = pgTable(
     updated_at: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex("users_email_idx").on(table.email),
+    // Global email unique (users_email_idx) is dropped in 0026. Email is now
+    // unique per-org for tenant users via (org_id, email); NULLs are distinct
+    // in a multi-column unique, so that does NOT constrain operators (org_id
+    // NULL) — the partial unique on email WHERE is_operator does.
+    uniqueIndex("users_org_email_idx").on(table.org_id, table.email),
+    uniqueIndex("users_operator_email_idx")
+      .on(table.email)
+      .where(sql`${table.is_operator}`),
     index("users_client_id_idx").on(table.client_id),
+    index("users_org_id_idx").on(table.org_id),
   ]
 );
 
@@ -188,7 +268,7 @@ export const passwordResetTokens = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     user_id: uuid("user_id")
       .notNull()
-      .references(() => users.id),
+      .references(() => users.id, { onDelete: "cascade" }),
     token_hash: text("token_hash").notNull(),
     expires_at: timestamp("expires_at").notNull(),
     used_at: timestamp("used_at"),
@@ -208,7 +288,10 @@ export const messages = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     candidate_id: uuid("candidate_id")
       .notNull()
-      .references(() => candidates.id),
+      .references(() => candidates.id, { onDelete: "cascade" }),
+    org_id: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }), // DB NOT NULL via 0026; model nullable until S5
     channel: text("channel").notNull(),
     direction: text("direction").notNull(),
     content: text("content").notNull(),
@@ -218,7 +301,11 @@ export const messages = pgTable(
     created_at: timestamp("created_at").defaultNow().notNull(),
     updated_at: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [index("messages_candidate_id_idx").on(table.candidate_id)]
+  (table) => [
+    index("messages_candidate_id_idx").on(table.candidate_id),
+    index("messages_org_id_idx").on(table.org_id),
+    index("messages_org_created_idx").on(table.org_id, table.created_at),
+  ]
 );
 
 // ── Conversations (chat) ────────────────────────────────────────────
@@ -229,7 +316,10 @@ export const conversations = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     candidate_id: uuid("candidate_id")
       .notNull()
-      .references(() => candidates.id),
+      .references(() => candidates.id, { onDelete: "cascade" }),
+    org_id: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }), // DB NOT NULL via 0026; model nullable until S5
     status: text("status").notNull().default("active"),
     lifecycle: text("lifecycle").notNull().default("dormant"),
     topics: jsonb("topics"),
@@ -243,6 +333,8 @@ export const conversations = pgTable(
   (table) => [
     index("conversations_candidate_id_idx").on(table.candidate_id),
     index("conversations_status_idx").on(table.status),
+    index("conversations_org_id_idx").on(table.org_id),
+    index("conversations_org_status_idx").on(table.org_id, table.status),
   ]
 );
 
@@ -254,7 +346,10 @@ export const chatMessages = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     conversation_id: uuid("conversation_id")
       .notNull()
-      .references(() => conversations.id),
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    org_id: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }), // DB NOT NULL via 0026; model nullable until S5
     role: text("role").notNull(),
     content: text("content").notNull(),
     created_at: timestamp("created_at").defaultNow().notNull(),
@@ -262,6 +357,7 @@ export const chatMessages = pgTable(
   (table) => [
     index("chat_messages_conversation_id_idx").on(table.conversation_id),
     index("chat_messages_created_at_idx").on(table.created_at),
+    index("chat_messages_org_id_idx").on(table.org_id),
   ]
 );
 
@@ -273,7 +369,10 @@ export const chatTokens = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     candidate_id: uuid("candidate_id")
       .notNull()
-      .references(() => candidates.id),
+      .references(() => candidates.id, { onDelete: "cascade" }),
+    org_id: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }), // DB NOT NULL via 0026; model nullable until S5
     token_hash: text("token_hash").notNull(),
     expires_at: timestamp("expires_at").notNull(),
     used_at: timestamp("used_at"),
@@ -282,6 +381,7 @@ export const chatTokens = pgTable(
   (table) => [
     uniqueIndex("chat_tokens_hash_idx").on(table.token_hash),
     index("chat_tokens_candidate_id_idx").on(table.candidate_id),
+    index("chat_tokens_org_id_idx").on(table.org_id),
   ]
 );
 
@@ -293,7 +393,10 @@ export const events = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     campaign_id: uuid("campaign_id")
       .notNull()
-      .references(() => campaigns.id),
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    org_id: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }), // DB NOT NULL via 0026; model nullable until S5
     event_type: text("event_type").notNull(),
     session_id: text("session_id").notNull(),
     visitor_id: text("visitor_id"),
@@ -308,22 +411,50 @@ export const events = pgTable(
     index("events_created_at_idx").on(table.created_at),
     index("events_session_id_idx").on(table.session_id),
     index("events_visitor_id_idx").on(table.visitor_id),
+    index("events_org_id_idx").on(table.org_id),
+    index("events_org_created_idx").on(table.org_id, table.created_at),
   ]
 );
 
 // ── Relations ────────────────────────────────────────────────────────
 
-export const clientsRelations = relations(clients, ({ many }) => ({
-  campaigns: many(campaigns),
+export const organizationsRelations = relations(organizations, ({ many }) => ({
+  clients: many(clients),
   users: many(users),
 }));
 
+export const membershipsRelations = relations(memberships, ({ one }) => ({
+  user: one(users, {
+    fields: [memberships.user_id],
+    references: [users.id],
+  }),
+  client: one(clients, {
+    fields: [memberships.client_id],
+    references: [clients.id],
+  }),
+}));
+
+export const clientsRelations = relations(clients, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [clients.org_id],
+    references: [organizations.id],
+  }),
+  campaigns: many(campaigns),
+  users: many(users),
+  memberships: many(memberships),
+}));
+
 export const usersRelations = relations(users, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [users.org_id],
+    references: [organizations.id],
+  }),
   client: one(clients, {
     fields: [users.client_id],
     references: [clients.id],
   }),
   passwordResetTokens: many(passwordResetTokens),
+  memberships: many(memberships),
 }));
 
 export const passwordResetTokensRelations = relations(
@@ -417,11 +548,17 @@ export const jobs = pgTable(
     last_error: text("last_error"),
     locked_until: timestamp("locked_until"),
     deduplication_id: text("deduplication_id"),
+    // Nullable in DB + model: jobs.org_id is populated by S10 (not 0026).
+    // Global jobs and the raw-SQL backstop legitimately leave this NULL.
+    org_id: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }),
     created_at: timestamp("created_at").defaultNow().notNull(),
     completed_at: timestamp("completed_at"),
   },
   (table) => [
     index("jobs_poll_idx").on(table.status, table.deliver_at),
+    index("jobs_org_id_idx").on(table.org_id),
     // Dedup only applies while a job is in flight — once a job completes or
     // dies, its deduplication_id becomes reusable so the same logical work
     // can legitimately be enqueued again later.

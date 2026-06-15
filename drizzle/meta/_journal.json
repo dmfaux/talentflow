@@ -183,6 +183,13 @@
       "when": 1781160274498,
       "tag": "0025_scope_jobs_dedup_to_active",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1781528730483,
+      "tag": "0026_tenant_schema",
+      "breakpoints": true
     }
   ]
 }
