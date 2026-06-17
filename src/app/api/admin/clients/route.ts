@@ -4,9 +4,9 @@ import {
   authorizeApiOrg,
   error,
   getApiTenant,
-  requireApiAuth,
   success,
 } from "@/lib/api";
+import { orgScope } from "@/lib/tenant";
 import { rateLimit } from "@/lib/rate-limit";
 import { slugify, validateSlug } from "@/lib/slug";
 import { isLogoBackground, isLogoPosition, normaliseHexColor } from "@/lib/utils";
@@ -21,13 +21,18 @@ const BRAND_CREATE_LIMIT = 10;
 const BRAND_CREATE_WINDOW_MS = 60 * 1000;
 
 export async function GET() {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  // S9: close the S4 read carry-over — was requireApiAuth() (signature-only,
+  // UNSCOPED, listing every org's brands). Now org-scoped: only the caller's
+  // org's brands (an acting operator sees the acted org's; a non-acting
+  // operator's orgScope is FALSE → empty). Any same-org member may read the list.
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const rows = await db
       .select()
       .from(clients)
+      .where(orgScope(clients, ctx))
       .orderBy(asc(clients.name));
     return success(rows);
   } catch (err) {

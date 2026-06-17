@@ -37,7 +37,12 @@ async function main() {
   const password = requirePassword("SEED_ADMIN_PASSWORD");
   const firstName = requireEnv("SEED_ADMIN_FIRST_NAME").trim();
   const lastName = requireEnv("SEED_ADMIN_LAST_NAME").trim();
-  const clientSlug = requireEnv("SEED_ADMIN_CLIENT_SLUG").trim().toLowerCase();
+  // OPTIONAL now (S9): unset → the Owner is org-level (client_id null, no
+  // membership) seating a clean, EMPTY org the Owner self-serves — the S9
+  // acceptance shape. Set → also find-or-create the brand + brand_admin
+  // membership (back-compat / richer local demo).
+  const clientSlug =
+    process.env.SEED_ADMIN_CLIENT_SLUG?.trim().toLowerCase() || null;
   // Optional, defaults to "demo-org" so a DB that already ran 0026's backfill
   // reuses that org instead of spawning a second one.
   const orgSlug = (process.env.SEED_ADMIN_ORG_SLUG?.trim().toLowerCase()) || "demo-org";
@@ -70,22 +75,29 @@ async function main() {
       org = inserted;
     }
 
-    // 2. Client (brand) — find-or-create by slug, with org_id set explicitly.
-    let brand = await db.query.clients.findFirst({
-      where: eq(clients.slug, clientSlug),
-      columns: { id: true },
-    });
-    if (!brand) {
-      console.log(`Client "${clientSlug}" not found — creating it.`);
-      const [inserted] = await db
-        .insert(clients)
-        .values({ slug: clientSlug, name: clientSlug, org_id: org.id })
-        .returning({ id: clients.id });
-      brand = inserted;
+    // 2. Client (brand) — ONLY when SEED_ADMIN_CLIENT_SLUG is set. Default is
+    //    an empty org (no brand) — the Owner creates the first brand themselves.
+    let brand: { id: string } | null = null;
+    if (clientSlug) {
+      brand =
+        (await db.query.clients.findFirst({
+          where: eq(clients.slug, clientSlug),
+          columns: { id: true },
+        })) ?? null;
+      if (!brand) {
+        console.log(`Client "${clientSlug}" not found — creating it.`);
+        const [inserted] = await db
+          .insert(clients)
+          .values({ slug: clientSlug, name: clientSlug, org_id: org.id })
+          .returning({ id: clients.id });
+        brand = inserted;
+      }
     }
 
     // 3. Owner user — find-or-create. security_group: 'admin' is transitional
-    //    (dropped in S13); org_role: 'owner' is the real authz.
+    //    (dropped in S13); org_role: 'owner' is the real authz. An org-level
+    //    Owner carries client_id null (nullable since S8); the org_role grants
+    //    org-wide reach across every (future) brand.
     let owner = await db.query.users.findFirst({
       where: eq(users.email, email),
       columns: { id: true },
@@ -95,7 +107,7 @@ async function main() {
       const [inserted] = await db
         .insert(users)
         .values({
-          client_id: brand.id,
+          client_id: brand?.id ?? null,
           org_id: org.id,
           org_role: "owner",
           is_operator: false,
@@ -107,28 +119,34 @@ async function main() {
         })
         .returning({ id: users.id });
       owner = inserted;
-      console.log(`Owner user created: ${email} (org: ${orgSlug}, brand: ${clientSlug})`);
+      console.log(
+        `Owner user created: ${email} (org: ${orgSlug}${
+          clientSlug ? `, brand: ${clientSlug}` : ", org-level (no brand)"
+        })`
+      );
     } else {
       console.log(`Owner user ${email} already exists. Skipping creation.`);
     }
 
-    // 4. Membership — brand_admin for the owner on the brand.
-    await db
-      .insert(memberships)
-      .values({
-        user_id: owner.id,
-        client_id: brand.id,
-        brand_role: "brand_admin",
-      })
-      .onConflictDoNothing({
-        target: [memberships.user_id, memberships.client_id],
-      });
+    // 4. Membership — brand_admin for the owner on the brand (only when a brand
+    //    was created). An org-level Owner needs no membership row.
+    if (brand) {
+      await db
+        .insert(memberships)
+        .values({
+          user_id: owner.id,
+          client_id: brand.id,
+          brand_role: "brand_admin",
+        })
+        .onConflictDoNothing({
+          target: [memberships.user_id, memberships.client_id],
+        });
+    }
 
     // 5. Operator user — tenant-less (org_id NULL, org_role NULL, is_operator
-    //    true). client_id is a NOT-NULL placeholder until S13 and carries no
-    //    authz meaning for operators. is_operator MUST be set in this insert so
-    //    the set_org_id_from_client_user trigger's guard fires and leaves
-    //    org_id NULL (don't derive it from the placeholder brand's org).
+    //    true). client_id is NULL (nullable since S8). is_operator MUST be set
+    //    in this insert so the set_org_id_from_client_user trigger's guard fires
+    //    and leaves org_id NULL.
     const existingOperator = await db.query.users.findFirst({
       where: eq(users.email, operatorEmail),
       columns: { id: true },
@@ -138,7 +156,7 @@ async function main() {
       const [inserted] = await db
         .insert(users)
         .values({
-          client_id: brand.id, // vestigial placeholder (NOT NULL until S13)
+          client_id: null,
           org_id: null,
           org_role: null,
           is_operator: true,

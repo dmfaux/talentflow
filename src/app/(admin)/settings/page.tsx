@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { OrgSettingsCard } from "@/components/admin/org-settings-card";
+import { ActiveBrandCard } from "@/components/admin/active-brand-card";
 
 interface AccessRecord {
   candidate_id: string;
@@ -95,8 +97,12 @@ export default function SettingsPage() {
     <div className="max-w-2xl">
       <h1 className="mb-1 text-lg font-semibold text-charcoal">Settings</h1>
       <p className="mb-8 text-xs text-txt-muted">
-        Data privacy, retention, and compliance controls
+        Organization, brand, data privacy, and compliance controls
       </p>
+
+      {/* ── Organization + Active brand (S9) ─────────────────── */}
+      <OrgSettingsCard />
+      <ActiveBrandCard />
 
       {/* ── POPIA Data Requests ─────────────────────────────── */}
       <div className="mb-6 rounded-xl border border-border bg-surface p-6">

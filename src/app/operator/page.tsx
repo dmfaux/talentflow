@@ -89,6 +89,15 @@ export default function OperatorOrganizationsPage() {
             {loading ? "Loading…" : `${total} ${total === 1 ? "org" : "orgs"}${hasFilters ? " matching filters" : " total"}`}
           </p>
         </div>
+        <Link
+          href="/operator/orgs/new"
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-cobalt px-4 text-[0.8rem] font-medium text-white transition-colors hover:bg-cobalt-deep"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M7 2v10M2 7h10" />
+          </svg>
+          New organization
+        </Link>
       </div>
 
       {/* Toolbar */}

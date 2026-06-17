@@ -145,8 +145,11 @@ describe("operator_audit action allow-list", () => {
     }
   });
 
+  it("recognises provision_org (added in S9)", () => {
+    expect(isOperatorAuditAction("provision_org")).toBe(true);
+  });
+
   it("rejects unknown / future-slice actions (until they are added in code)", () => {
-    expect(isOperatorAuditAction("provision_org")).toBe(false); // S9
     expect(isOperatorAuditAction("purge")).toBe(false); // S11
     expect(isOperatorAuditAction("")).toBe(false);
     expect(isOperatorAuditAction(42)).toBe(false);

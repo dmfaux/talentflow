@@ -7,6 +7,16 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+interface OrgOwner {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+}
+interface PendingInvite {
+  email: string;
+  expires_at: string;
+}
 interface OrgDetail {
   id: string;
   name: string;
@@ -18,6 +28,8 @@ interface OrgDetail {
   deleted_at: string | null;
   created_at: string;
   counts: { brands: number; campaigns: number; candidates: number };
+  owner: OrgOwner | null;
+  pendingInvite: PendingInvite | null;
 }
 
 const TIER_OPTIONS: Array<{ value: Tier; label: string; helper: string }> = [
@@ -46,6 +58,7 @@ export default function OperatorOrgDetailPage() {
   const [tier, setTier] = useState<Tier>("standard");
   const [billingEmail, setBillingEmail] = useState("");
   const [saving, setSaving] = useState(false);
+  const [resending, setResending] = useState(false);
 
   useEffect(() => {
     fetch(`/api/operator/organizations/${id}`)
@@ -88,6 +101,29 @@ export default function OperatorOrgDetailPage() {
       toast("Something went wrong", "error");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function resendInvite() {
+    if (!org) return;
+    setResending(true);
+    try {
+      const res = await fetch(`/api/operator/organizations/${id}/resend-invite`, {
+        method: "POST",
+      });
+      const { data, error } = await res.json();
+      if (!res.ok) {
+        toast(error || "Could not resend the invite", "error");
+        return;
+      }
+      setOrg((prev) =>
+        prev ? { ...prev, pendingInvite: data.invite } : prev
+      );
+      toast("Invitation resent", "success");
+    } catch {
+      toast("Something went wrong", "error");
+    } finally {
+      setResending(false);
     }
   }
 
@@ -138,6 +174,69 @@ export default function OperatorOrgDetailPage() {
             <p className="mt-1 font-mono text-2xl text-ink">{c.value}</p>
           </div>
         ))}
+      </div>
+
+      {/* Onboarding — accepted Owner vs pending invite + resend (S9) */}
+      <div className="mb-6 rounded-xl border border-border bg-surface p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="font-serif text-lg text-ink">Onboarding</h2>
+            <p className="mt-0.5 text-xs text-ink-muted">
+              The org Owner — provisioned via an invitation they accept to set a password.
+            </p>
+          </div>
+          {org.owner ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-green-light px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-green">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green" />
+              Owner active
+            </span>
+          ) : org.pendingInvite ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-light px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-warning">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-warning" />
+              Invite pending
+            </span>
+          ) : null}
+        </div>
+
+        <div className="mt-4">
+          {org.owner ? (
+            <div className="flex items-center justify-between rounded-lg border border-border bg-cream/40 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-ink">
+                  {`${org.owner.first_name} ${org.owner.last_name}`.trim() || "Owner"}
+                </p>
+                <p className="font-mono text-xs text-ink-muted">{org.owner.email}</p>
+              </div>
+            </div>
+          ) : org.pendingInvite ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-cream/40 px-4 py-3">
+              <div>
+                <p className="font-mono text-sm text-ink">{org.pendingInvite.email}</p>
+                <p className="mt-0.5 text-[0.7rem] text-ink-muted">
+                  Invite expires{" "}
+                  {new Date(org.pendingInvite.expires_at).toLocaleDateString("en-ZA")}
+                </p>
+              </div>
+              <button
+                onClick={resendInvite}
+                disabled={resending}
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-4 text-[0.8rem] font-medium text-ink-soft transition-colors hover:bg-canvas disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+              >
+                {resending && (
+                  <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                )}
+                Resend invite
+              </button>
+            </div>
+          ) : (
+            <p className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-ink-muted">
+              No owner has been provisioned for this organization yet.
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">

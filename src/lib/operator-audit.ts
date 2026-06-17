@@ -13,6 +13,7 @@ export const OPERATOR_AUDIT_ACTIONS = [
   "impersonate_exit",
   "set_tier",
   "set_billing_email",
+  "provision_org", // S9: operator provisions an org + first Owner (resend reuses this with metadata.resend)
 ] as const;
 
 export type OperatorAuditAction = (typeof OPERATOR_AUDIT_ACTIONS)[number];

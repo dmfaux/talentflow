@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { clients, invitations, organizations, users } from "@/db/schema";
+import { clients, organizations, users } from "@/db/schema";
 import {
   authorizeApiOrg,
   effectiveOrgRole,
@@ -7,18 +7,19 @@ import {
   getApiTenant,
   success,
 } from "@/lib/api";
-import { generateInviteToken, type OrgRole } from "@/lib/auth";
-import { invitationEmail, sendTransactionalEmail } from "@/lib/email";
+import { type OrgRole } from "@/lib/auth";
+import {
+  createInvitationRow,
+  InvitationConflictError,
+  sendInviteEmail,
+} from "@/lib/invitations";
 import { resolveOwnedResource } from "@/lib/tenant";
 import { ROLE_RANK } from "@/lib/rbac";
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
 const BRAND_ROLES = ["brand_admin", "recruiter", "viewer"] as const;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-// Colleague-actioned async, so the 1h reset-token TTL is far too short. 7 days
-// matches the GitHub/Slack/Linear norm; resend re-mints (Resolved Decision 2).
-const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** An org_admin+ actor may grant a target an org_role of rank ≤ their own
  *  (owner → owner/org_admin; org_admin → org_admin, never owner). */
@@ -76,53 +77,26 @@ export async function POST(request: NextRequest) {
       orgRoleToSet = orgRoleRaw;
     }
 
-    // ── Existing-user guards (login resolvability, S2 rule) ─────────
-    // Invites are for NEW users; an existing member is edited via users PATCH.
-    // Email must be globally unique among tenant users or login (which fails
-    // closed on >1 match) breaks for the new user AND the colliding one.
-    const existing = await db.query.users.findFirst({
-      where: and(eq(users.email, email), eq(users.is_operator, false)),
-      columns: { id: true, org_id: true },
-    });
-    if (existing) {
-      return existing.org_id === ctx.effectiveOrgId
-        ? error("A member with this email already exists", 409)
-        : error("This email is already in use", 409);
-    }
-
-    // ── Pending-invite handling: supersede (supports "resend") ──────
-    // The partial unique (org_id, email) WHERE accepted_at IS NULL permits one
-    // live invite; drop any prior pending row so a fresh token is minted.
-    await db
-      .delete(invitations)
-      .where(
-        and(
-          eq(invitations.org_id, ctx.effectiveOrgId!),
-          eq(invitations.email, email),
-          isNull(invitations.accepted_at)
-        )
-      );
-
-    const { raw, hash } = generateInviteToken();
-    const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
-
-    const [inv] = await db
-      .insert(invitations)
-      .values({
-        org_id: ctx.effectiveOrgId!,
+    // ── Mint the invite via the shared verified core (global-email guard
+    //    + pending-supersede + token). Reused by operator provisioning (S9). ──
+    let invitation, rawToken;
+    try {
+      ({ invitation, rawToken } = await createInvitationRow({
+        orgId: ctx.effectiveOrgId!,
         email,
-        client_id: clientIdToSet,
-        org_role: orgRoleToSet,
-        brand_role: brandRoleToSet,
-        token_hash: hash,
-        expires_at: expiresAt,
-        invited_by: ctx.userId,
-      })
-      .returning({
-        id: invitations.id,
-        email: invitations.email,
-        expires_at: invitations.expires_at,
-      });
+        clientId: clientIdToSet,
+        orgRole: orgRoleToSet,
+        brandRole: brandRoleToSet,
+        invitedBy: ctx.userId,
+      }));
+    } catch (e) {
+      if (e instanceof InvitationConflictError) {
+        return e.sameOrg
+          ? error("A member with this email already exists", 409)
+          : error("This email is already in use", 409);
+      }
+      throw e;
+    }
 
     // ── Send the invite (best-effort, like password reset) ──────────
     const [org, inviter] = await Promise.all([
@@ -138,17 +112,10 @@ export async function POST(request: NextRequest) {
     const inviterName = inviter
       ? `${inviter.first_name} ${inviter.last_name}`.trim()
       : "";
-    const acceptUrl = `${request.nextUrl.origin}/accept-invite?token=${raw}`;
+    const acceptUrl = `${request.nextUrl.origin}/accept-invite?token=${rawToken}`;
+    await sendInviteEmail(email, org?.name ?? "TalentStream", inviterName, acceptUrl);
 
-    // Don't surface a send failure as a hard error — the invite row exists and
-    // can be resent (mirrors password-reset/request).
-    await sendTransactionalEmail(
-      email,
-      "You've been invited to TalentStream",
-      invitationEmail(org?.name ?? "TalentStream", inviterName, acceptUrl)
-    );
-
-    return success(inv, 201);
+    return success(invitation, 201);
   } catch (err) {
     console.error("POST /api/admin/members/invite error:", err);
     return error("Internal server error", 500);

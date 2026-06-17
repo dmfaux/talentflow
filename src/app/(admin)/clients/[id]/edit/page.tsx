@@ -2,45 +2,12 @@
 
 import { BrandingSection, type BrandingValues } from "@/components/admin/branding-section";
 import { LiveCampaignPreview } from "@/components/admin/live-campaign-preview";
+import { TierBadge } from "@/components/admin/tier-badge";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
 type Tier = "standard" | "premium" | "enterprise";
-
-const TIER_OPTIONS: Array<{
-  value: Tier;
-  label: string;
-  tagline: string;
-  helper: string;
-  badgeClass: string;
-  badgeStyle?: React.CSSProperties;
-}> = [
-  {
-    value: "standard",
-    label: "Standard",
-    tagline: "Shared templates",
-    helper: "Pay per campaign. Access to the shared template library.",
-    badgeClass: "bg-canvas-2 text-ink-muted",
-  },
-  {
-    value: "premium",
-    label: "Premium",
-    tagline: "One bespoke template",
-    helper:
-      "Includes one bespoke template. Pay per campaign at a reduced rate.",
-    badgeClass: "",
-    badgeStyle: { backgroundColor: "#e8eeff", color: "#1a45d4" },
-  },
-  {
-    value: "enterprise",
-    label: "Enterprise",
-    tagline: "Unlimited & bespoke",
-    helper:
-      "Monthly retainer. Unlimited campaigns, multiple bespoke templates, dedicated support.",
-    badgeClass: "bg-vermillion-soft text-vermillion-deep",
-  },
-];
 
 interface Client {
   id: string;
@@ -110,7 +77,7 @@ export default function EditClientPage() {
           brand_text_color: data.brand_text_color ?? "#11123c",
         });
       })
-      .catch(() => setLoadError("Client not found"))
+      .catch(() => setLoadError("Brand not found"))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -136,8 +103,8 @@ export default function EditClientPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          // tier is operator-only — not sent (the server ignores it anyway).
           name: trimmedName,
-          tier,
           contact_name: (form.get("contact_name") as string) || null,
           contact_email: (form.get("contact_email") as string) || null,
           contact_phone: (form.get("contact_phone") as string) || null,
@@ -172,7 +139,7 @@ export default function EditClientPage() {
   }
 
   if (loadError || !client) {
-    return <div className="py-20 text-center text-sm text-red">{loadError || "Client not found"}</div>;
+    return <div className="py-20 text-center text-sm text-red">{loadError || "Brand not found"}</div>;
   }
 
   const inputClass =
@@ -185,7 +152,7 @@ export default function EditClientPage() {
       {/* Breadcrumb */}
       <div className="mb-6 flex items-center gap-2 text-xs text-txt-muted">
         <Link href="/clients" className="hover:text-charcoal transition-colors">
-          Clients
+          Brands
         </Link>
         <span>/</span>
         <Link href={`/clients/${id}`} className="hover:text-charcoal transition-colors">
@@ -198,7 +165,7 @@ export default function EditClientPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* ── Details ───────────────────────────────────────────── */}
         <div className="rounded-xl border border-border bg-surface p-8">
-          <h1 className="font-display mb-6 text-xl font-medium text-charcoal">Edit Client</h1>
+          <h1 className="font-display mb-6 text-xl font-medium text-charcoal">Edit brand</h1>
 
           {saveError && (
             <div className="mb-5 rounded-lg bg-red-light px-4 py-2.5 text-sm text-red">
@@ -257,43 +224,20 @@ export default function EditClientPage() {
           </div>
         </div>
 
-        {/* ── Subscription Tier ─────────────────────────────────── */}
+        {/* ── Subscription Tier (read-only — operator-set) ──────── */}
         <div className="rounded-xl border border-border bg-surface p-8">
           <h2 className="font-display mb-2 text-base font-medium text-charcoal">
             Subscription Tier
           </h2>
           <p className="mb-5 text-[0.75rem] text-txt-muted">
-            Choose the plan that best fits this client&apos;s needs.
+            The plan is set by TalentStream for the whole organization and
+            can&apos;t be changed here.
           </p>
-          <div className="grid grid-cols-3 gap-2">
-            {TIER_OPTIONS.map((opt) => {
-              const selected = tier === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setTier(opt.value)}
-                  className={`flex flex-col gap-1.5 rounded-lg border px-3 py-2.5 text-left transition-colors cursor-pointer ${
-                    selected
-                      ? "border-cobalt bg-cobalt-tint"
-                      : "border-border bg-paper hover:border-border-strong"
-                  }`}
-                >
-                  <span
-                    className={`inline-flex w-fit items-center rounded px-1.5 py-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.14em] ${opt.badgeClass}`}
-                    style={opt.badgeStyle}
-                  >
-                    {opt.label}
-                  </span>
-                  <span className="text-[0.8rem] font-medium text-charcoal">
-                    {opt.tagline}
-                  </span>
-                  <span className="text-[0.7rem] leading-snug text-txt-muted">
-                    {opt.helper}
-                  </span>
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-3 rounded-lg bg-cream/60 px-4 py-3">
+            <TierBadge tier={tier} size="md" />
+            <span className="text-[0.75rem] text-txt-muted">
+              Contact TalentStream to change your plan.
+            </span>
           </div>
         </div>
 

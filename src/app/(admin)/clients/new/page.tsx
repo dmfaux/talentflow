@@ -2,6 +2,7 @@
 
 import { BrandingSection, type BrandingValues } from "@/components/admin/branding-section";
 import { LiveCampaignPreview } from "@/components/admin/live-campaign-preview";
+import { canManageOrg, useTenant } from "@/components/admin/tenant-provider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
@@ -58,6 +59,7 @@ const INITIAL_BRANDING: BrandingValues = {
 
 export default function NewClientPage() {
   const router = useRouter();
+  const tenant = useTenant();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -105,7 +107,7 @@ export default function NewClientPage() {
     const trimmedName = name.trim();
 
     if (!trimmedName) {
-      setFieldErrors({ name: "Client name is required" });
+      setFieldErrors({ name: "Brand name is required" });
       return;
     }
     if (!slug) {
@@ -140,7 +142,7 @@ export default function NewClientPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error || "Failed to create client");
+        setError(data.error || "Failed to create brand");
         return;
       }
 
@@ -150,6 +152,28 @@ export default function NewClientPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // Brand creation is org_admin+ (server-enforced via manage_brand). Mirror it
+  // cosmetically so a member who reaches this URL gets a clear message, not a
+  // form that 403s on submit.
+  if (!canManageOrg(tenant)) {
+    return (
+      <div className="mx-auto max-w-5xl">
+        <div className="rounded-xl border border-border bg-surface px-5 py-14 text-center">
+          <h1 className="text-sm font-semibold text-charcoal">Not available</h1>
+          <p className="mx-auto mt-1.5 max-w-xs text-xs leading-relaxed text-txt-muted">
+            Only org admins and owners can create brands.
+          </p>
+          <Link
+            href="/clients"
+            className="mt-4 inline-flex h-8 items-center rounded-lg bg-accent px-4 text-[0.75rem] font-medium text-white transition-colors hover:bg-accent-light"
+          >
+            Back to brands
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   const inputClass =
@@ -162,16 +186,16 @@ export default function NewClientPage() {
       {/* Breadcrumb */}
       <div className="mb-6 flex items-center gap-2 text-xs text-txt-muted">
         <Link href="/clients" className="hover:text-charcoal transition-colors">
-          Clients
+          Brands
         </Link>
         <span>/</span>
-        <span className="text-txt-secondary">New Client</span>
+        <span className="text-txt-secondary">New brand</span>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* ── Details ───────────────────────────────────────────── */}
         <div className="rounded-xl border border-border bg-surface p-8">
-          <h1 className="font-display mb-6 text-xl font-medium text-charcoal">New Client</h1>
+          <h1 className="font-display mb-6 text-xl font-medium text-charcoal">New brand</h1>
 
           {error && (
             <div className="mb-5 rounded-lg bg-red-light px-4 py-2.5 text-sm text-red">
@@ -324,7 +348,7 @@ export default function NewClientPage() {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
             )}
-            Create Client
+            Create brand
           </button>
         </div>
       </form>

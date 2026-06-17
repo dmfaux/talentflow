@@ -1,6 +1,8 @@
 "use client";
 
 import { TierBadge } from "@/components/admin/tier-badge";
+import { canManageOrg, useTenant } from "@/components/admin/tenant-provider";
+import { EmptyState } from "@/components/ui/empty-state";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -22,6 +24,8 @@ const PAGE_SIZE = 20;
 
 export default function ClientsPage() {
   const router = useRouter();
+  const tenant = useTenant();
+  const canCreate = canManageOrg(tenant);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -75,7 +79,7 @@ export default function ClientsPage() {
       {/* Page header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-charcoal">Clients</h1>
+          <h1 className="text-lg font-semibold text-charcoal">Brands</h1>
           <p className="mt-0.5 text-xs text-txt-muted">
             {loading
               ? "Loading..."
@@ -84,15 +88,17 @@ export default function ClientsPage() {
                 : `${clients.length} total`}
           </p>
         </div>
-        <Link
-          href="/clients/new"
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M7 2v10M2 7h10" />
-          </svg>
-          New Client
-        </Link>
+        {canCreate && (
+          <Link
+            href="/clients/new"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M7 2v10M2 7h10" />
+            </svg>
+            New brand
+          </Link>
+        )}
       </div>
 
       {/* Toolbar */}
@@ -169,18 +175,19 @@ export default function ClientsPage() {
       {/* Table */}
       {loading ? (
         <div className="rounded-xl border border-border bg-surface py-20 text-center text-sm text-txt-muted">
-          Loading clients...
+          Loading brands...
         </div>
       ) : clients.length === 0 ? (
-        <div className="rounded-xl border border-border bg-surface py-20 text-center text-sm text-txt-muted">
-          No clients yet.{" "}
-          <Link href="/clients/new" className="text-accent hover:underline">
-            Create one
-          </Link>
-        </div>
+        <EmptyState
+          icon="campaigns"
+          title="No brands yet"
+          description="Brands carry their own careers page, branding, and team. Create your first to start running campaigns."
+          actionLabel={canCreate ? "New brand" : undefined}
+          actionHref={canCreate ? "/clients/new" : undefined}
+        />
       ) : filtered.length === 0 ? (
         <div className="rounded-xl border border-border bg-surface py-20 text-center">
-          <p className="text-sm text-txt-secondary">No clients match your filters</p>
+          <p className="text-sm text-txt-secondary">No brands match your filters</p>
           <button
             onClick={clearFilters}
             className="mt-2 text-[0.78rem] font-medium text-accent hover:underline cursor-pointer"

@@ -22,7 +22,12 @@ export const organizations = pgTable(
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
     tier: text("tier").notNull().default("standard"), // moved up from clients (copy)
-    billing_email: text("billing_email"), // moved up from clients (copy)
+    billing_email: text("billing_email"), // moved up from clients (copy) — operator-owned
+    // Tenant-editable org contact (S9), distinct from the operator-owned
+    // billing_email. Both nullable/backfill-free; written via the tenant
+    // PATCH /api/admin/organization (manage_org_settings = org_admin+).
+    contact_name: text("contact_name"),
+    contact_email: text("contact_email"),
     status: text("status").notNull().default("active"), // active | suspended | deleted
     suspended_at: timestamp("suspended_at"),
     deleted_at: timestamp("deleted_at"),
