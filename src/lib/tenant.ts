@@ -1,7 +1,9 @@
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { and, eq, sql, type SQL } from "drizzle-orm";
+import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { getSession, type OrgRole, type SessionPayload } from "@/lib/auth";
+import { decideBrandAccess, type BrandRole } from "@/lib/rbac";
 import { db } from "@/db";
 import { memberships } from "@/db/schema";
 
@@ -91,19 +93,90 @@ export async function requireOrgRole(min: OrgRole): Promise<TenantContext> {
   return ctx;
 }
 
-/** S2 = membership check only (identity-layer concern): owner/org_admin pass
- *  implicitly; everyone else must hold a membership on brandId, else 404. There
- *  is deliberately NO minRole parameter yet — S3 adds `minRole` + rbac.can() so
- *  the brand-role comparison lives with the RBAC matrix, not duplicated here.
- *  The signature evolving (adding minRole) is the contract S15 must preserve. */
+/** RSC / server-action brand guard. Resolves ctx, throws on deny, returns the
+ *  TenantContext on allow (the S2 contract, preserved). S3 adds the optional
+ *  `minRole` — the brand-role comparison itself lives once in rbac.ts
+ *  (`decideBrandAccess`), shared with the API surface so the matrix is verified
+ *  in one place. The evolving `(brandId, minRole?)` signature is the contract
+ *  S15 (Clerk) must preserve.
+ *  - not a member / non-acting operator → notFound() (existence hidden, §5.6)
+ *  - member but rank < minRole          → notFound() for now (see Open Questions
+ *    in the S3 spec: S4 decides whether RSC role-too-low becomes forbidden()). */
 export async function requireBrandAccess(
-  brandId: string
+  brandId: string,
+  minRole: BrandRole = "viewer"
 ): Promise<TenantContext> {
   const ctx = await requireTenant();
-  // Org-level roles span every brand in their org; no per-brand membership
-  // is required for them.
-  if (ctx.orgRole === "owner" || ctx.orgRole === "org_admin") return ctx;
-  const brandMemberships = await getBrandMemberships(ctx.userId);
-  if (!brandMemberships.some((m) => m.clientId === brandId)) notFound();
+  // Owner / org_admin / acting-operator are decided without a membership
+  // lookup; only a plain tenant member needs the per-brand roles.
+  const brandMemberships =
+    ctx.orgRole || (ctx.isOperator && ctx.actingOrgId)
+      ? []
+      : await getBrandMemberships(ctx.userId);
+  const decision = decideBrandAccess(ctx, brandId, brandMemberships, minRole);
+  if (decision === "not_found") notFound();
+  if (decision === "forbidden") notFound(); // ← 404 for now; see S3 Open Questions
   return ctx;
+}
+
+// ── Org-scoping primitives (§5.1) ────────────────────────────────────
+//
+// The reusable enforcement core that S4 (reads) and S5 (writes) call. Pure
+// decisions (`isInScope`) are split from the DB-touching/throwing wrappers so
+// the unit tests need no Postgres. S3 wires ZERO production routes to these.
+
+/** Tables carrying a denormalised org_id (every guarded leaf). */
+type OrgScopedTable = PgTable & { id: AnyPgColumn; org_id: AnyPgColumn };
+
+/** SQL predicate limiting a query to the caller's effective org. Drops straight
+ *  into the existing `conditions[]` + `and(...)` route pattern.
+ *  - tenant user          → org_id = ctx.orgId        (effectiveOrgId)
+ *  - operator, acting      → org_id = ctx.actingOrgId  (effectiveOrgId)
+ *  - operator, NOT acting  → FALSE  (no blanket bypass, §5.5)
+ *  effectiveOrgId already collapses the three cases.
+ *
+ *  CRITICAL: when effectiveOrgId is null this MUST be a literal FALSE, never
+ *  eq(org_id, null) — Drizzle would emit `org_id = NULL`/bind a null and risk
+ *  matching the still-nullable org_id rows. Branch explicitly. */
+export function orgScope(table: OrgScopedTable, ctx: TenantContext): SQL {
+  return ctx.effectiveOrgId
+    ? eq(table.org_id, ctx.effectiveOrgId)
+    : sql`false`;
+}
+
+/** Pure ownership predicate — the unit-testable core. A non-acting operator
+ *  (effectiveOrgId null) owns nothing; a null row org_id never matches. */
+export function isInScope(rowOrgId: string | null, ctx: TenantContext): boolean {
+  return ctx.effectiveOrgId !== null && rowOrgId === ctx.effectiveOrgId;
+}
+
+/** RSC / server-action guard: 404 (not 403) when a row is out of the caller's
+ *  scope, to avoid existence disclosure (§5.6). Returns the row for chaining. */
+export function assertOwnership<T extends { org_id: string | null }>(
+  row: T | null | undefined,
+  ctx: TenantContext
+): T {
+  if (!row || !isInScope(row.org_id, ctx)) notFound();
+  return row;
+}
+
+/** Fetch a row by id scoped to the caller's org in ONE query — fixes raw-UUID
+ *  resolution. A valid cross-org UUID returns null (caller 404s), indistinguishable
+ *  from "does not exist". Returns null for a non-acting operator (orgScope → FALSE).
+ *  Returns null, not a thrown 404, so it is usable from both route handlers
+ *  (return error(...,404)) and RSC pages (if (!row) notFound()). */
+export async function resolveOwnedResource<T extends OrgScopedTable>(
+  table: T,
+  id: string,
+  ctx: TenantContext
+): Promise<T["$inferSelect"] | null> {
+  const [row] = await db
+    .select()
+    // Cast for the no-columns .from() overload: the generic T can't prove a
+    // non-empty selection to Drizzle. The precise per-table return type is
+    // preserved by the cast on the returned row below.
+    .from(table as PgTable)
+    .where(and(eq(table.id, id), orgScope(table, ctx)))
+    .limit(1);
+  return (row as T["$inferSelect"]) ?? null;
 }
