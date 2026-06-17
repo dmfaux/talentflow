@@ -1,7 +1,8 @@
 import { db } from "@/db";
 import { campaigns, candidates } from "@/db/schema";
-import { error, requireApiAuth } from "@/lib/api";
+import { error, getApiTenant } from "@/lib/api";
 import { downloadBlob, isStorageConfigured } from "@/lib/azure-storage";
+import { orgScope } from "@/lib/tenant";
 import { buildCvManifest } from "@/lib/cv-files";
 import { and, asc, desc, eq } from "drizzle-orm";
 import JSZip from "jszip";
@@ -12,14 +13,15 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const { id } = await params;
 
+    // Org-scope the campaign: a cross-tenant id → 404 (existence hidden).
     const campaign = await db.query.campaigns.findFirst({
-      where: eq(campaigns.id, id),
+      where: and(eq(campaigns.id, id), orgScope(campaigns, ctx)),
       with: { client: true },
     });
 
@@ -35,8 +37,15 @@ export async function GET(
         cv_url: candidates.cv_url,
       })
       .from(candidates)
+      // orgScope is belt-and-suspenders on top of the org-scoped campaign: the
+      // bundle can only ever contain in-org CVs even if the campaign join were
+      // tampered with.
       .where(
-        and(eq(candidates.campaign_id, id), eq(candidates.status, "shortlisted"))
+        and(
+          eq(candidates.campaign_id, id),
+          eq(candidates.status, "shortlisted"),
+          orgScope(candidates, ctx)
+        )
       )
       // Tie-break on id so the order is stable and matches the report page.
       .orderBy(desc(candidates.ai_score), asc(candidates.id));

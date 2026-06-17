@@ -48,7 +48,9 @@ export async function POST(request: NextRequest) {
 
     const safeName = sanitiseFilename(file.name) || `logo${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
-    const url = await uploadClientLogo(clientId, buffer, safeName);
+    // org-prefixed public logo path: logos/{orgId}/{clientId}/… — org_id from
+    // the in-org resolved brand. Returns a directly-usable public URL.
+    const url = await uploadClientLogo(brand.org_id, clientId, buffer, safeName);
 
     if (!url) {
       return error("Storage is not configured", 503);

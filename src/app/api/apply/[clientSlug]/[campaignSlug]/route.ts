@@ -150,9 +150,11 @@ export async function POST(
     let cvStored = false;
     if (cvFile) {
       const buffer = Buffer.from(await cvFile.arrayBuffer());
-      const blobUrl = await uploadCV(clientSlug, campaignSlug, candidateId, buffer, cvFile.name);
-      if (blobUrl) {
-        await db.update(candidates).set({ cv_url: blobUrl, updated_at: new Date() }).where(eq(candidates.id, candidateId));
+      // Org-prefixed path: cvs/{orgId}/{brandSlug}/{candidateId}/… — org_id comes
+      // from the resolved campaign (stamped non-null), brandSlug == clientSlug.
+      const blobPath = await uploadCV(campaign.org_id, clientSlug, candidateId, buffer, cvFile.name);
+      if (blobPath) {
+        await db.update(candidates).set({ cv_url: blobPath, updated_at: new Date() }).where(eq(candidates.id, candidateId));
         cvStored = true;
       }
     }

@@ -5,6 +5,11 @@ import {
   StorageSharedKeyCredential,
   generateBlobSASQueryParameters,
 } from "@azure/storage-blob";
+import {
+  blobKeyFromStored,
+  cvBlobPath,
+  logoBlobPath,
+} from "./blob-paths";
 
 const CONTENT_TYPES: Record<string, string> = {
   ".pdf": "application/pdf",
@@ -39,10 +44,25 @@ function getServiceClient(): BlobServiceClient {
   return blobServiceClient;
 }
 
+/** The private CV/PII container (SAS-only reads). */
 function getContainerClient(): ContainerClient {
   const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME;
   if (!containerName)
     throw new Error("AZURE_STORAGE_CONTAINER_NAME is not set");
+  return getServiceClient().getContainerClient(containerName);
+}
+
+export function getLogoContainerName(): string | undefined {
+  return process.env.AZURE_STORAGE_LOGO_CONTAINER_NAME;
+}
+
+/** The public logos container (non-PII branding assets; S6 Resolved Decision 1).
+ *  Separate from the CV container so flipping CVs to private never breaks the
+ *  directly-embedded `branding_logo_url` on careers/chat/admin pages. */
+function getLogoContainerClient(): ContainerClient {
+  const containerName = getLogoContainerName();
+  if (!containerName)
+    throw new Error("AZURE_STORAGE_LOGO_CONTAINER_NAME is not set");
   return getServiceClient().getContainerClient(containerName);
 }
 
@@ -52,8 +72,8 @@ function getExtension(filename: string): string {
 }
 
 export async function uploadCV(
-  clientSlug: string,
-  campaignSlug: string,
+  orgId: string,
+  brandSlug: string,
   candidateId: string,
   file: Buffer,
   filename: string
@@ -65,7 +85,7 @@ export async function uploadCV(
 
   const container = getContainerClient();
   const ext = getExtension(filename);
-  const blobPath = `cvs/${clientSlug}/${campaignSlug}/${candidateId}/${filename}`;
+  const blobPath = cvBlobPath(orgId, brandSlug, candidateId, filename);
   const blockBlob = container.getBlockBlobClient(blobPath);
 
   await blockBlob.uploadData(file, {
@@ -74,22 +94,30 @@ export async function uploadCV(
     },
   });
 
-  return blockBlob.url;
+  // Return the relative blob PATH (key), never the raw blob URL. The CV
+  // container is private, so the only readable URL is a short-lived SAS minted
+  // by generateSasUrl. A bare path flows unchanged through downloadBlob /
+  // deleteCV / generateSasUrl (their prefix-strip is a no-op on a path).
+  return blobPath;
 }
 
 export async function uploadClientLogo(
+  orgId: string,
   clientId: string,
   file: Buffer,
   filename: string
 ): Promise<string | null> {
-  if (!isConfigured()) {
-    console.warn("Azure Storage not configured — logo discarded for", clientId);
+  if (!isConfigured() || !getLogoContainerName()) {
+    console.warn(
+      "Azure logo storage not configured — logo discarded for",
+      clientId
+    );
     return null;
   }
 
-  const container = getContainerClient();
+  const container = getLogoContainerClient();
   const ext = getExtension(filename);
-  const blobPath = `logos/${clientId}/${filename}`;
+  const blobPath = logoBlobPath(orgId, clientId, filename);
   const blockBlob = container.getBlockBlobClient(blobPath);
 
   await blockBlob.uploadData(file, {
@@ -99,11 +127,14 @@ export async function uploadClientLogo(
     },
   });
 
+  // Logos live in the PUBLIC logos container, so a direct URL is fine and keeps
+  // branding_logo_url a directly-usable <img> src (Resolved Decision 1). The
+  // "stop returning raw blockBlob.url" rule applies to CVs only.
   return blockBlob.url;
 }
 
 export async function downloadBlob(
-  blobUrl: string
+  blobPath: string
 ): Promise<{ buffer: Buffer; contentType: string } | null> {
   if (!isConfigured()) {
     console.warn("Azure Storage not configured — cannot download blob");
@@ -111,9 +142,8 @@ export async function downloadBlob(
   }
 
   const container = getContainerClient();
-  const containerUrl = container.url.replace(/\/$/, "");
-  const blobPath = decodeURIComponent(blobUrl.replace(containerUrl + "/", ""));
-  const blockBlob = container.getBlockBlobClient(blobPath);
+  const key = blobKeyFromStored(blobPath, container.url);
+  const blockBlob = container.getBlockBlobClient(key);
 
   const response = await blockBlob.download(0);
   const chunks: Buffer[] = [];
@@ -127,18 +157,17 @@ export async function downloadBlob(
   };
 }
 
-export async function deleteCV(blobUrl: string): Promise<void> {
+export async function deleteCV(blobPath: string): Promise<void> {
   if (!isConfigured()) return;
 
   const container = getContainerClient();
-  const containerUrl = container.url.replace(/\/$/, "");
-  const blobPath = decodeURIComponent(blobUrl.replace(containerUrl + "/", ""));
-  const blockBlob = container.getBlockBlobClient(blobPath);
+  const key = blobKeyFromStored(blobPath, container.url);
+  const blockBlob = container.getBlockBlobClient(key);
   await blockBlob.deleteIfExists();
 }
 
 export function generateSasUrl(
-  blobUrl: string,
+  blobPath: string,
   expiresInHours: number
 ): string | null {
   if (!isConfigured()) return null;
@@ -146,8 +175,7 @@ export function generateSasUrl(
   const client = getServiceClient();
   const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME!;
   const container = client.getContainerClient(containerName);
-  const containerUrl = container.url.replace(/\/$/, "");
-  const blobPath = decodeURIComponent(blobUrl.replace(containerUrl + "/", ""));
+  const key = blobKeyFromStored(blobPath, container.url);
 
   const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING!;
   const accountName = connectionString.match(/AccountName=([^;]+)/)?.[1];
@@ -166,7 +194,7 @@ export function generateSasUrl(
   const sas = generateBlobSASQueryParameters(
     {
       containerName,
-      blobName: blobPath,
+      blobName: key,
       permissions: BlobSASPermissions.parse("r"),
       startsOn,
       expiresOn,
@@ -174,5 +202,8 @@ export function generateSasUrl(
     credential
   );
 
+  // Build the absolute blob URL from the key (the stored value is a bare path
+  // now), then append the SAS — this short-lived URL is the ONLY readable CV URL.
+  const blobUrl = container.getBlockBlobClient(key).url;
   return `${blobUrl}?${sas.toString()}`;
 }

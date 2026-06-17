@@ -20,7 +20,9 @@ export async function POST(
     const { clientSlug, campaignSlug } = await params;
 
     const [campaign] = await db
-      .select({ id: campaigns.id, status: campaigns.status })
+      // org_id is needed to build the org-prefixed CV path (S6); this route
+      // writes a CV blob whereas the apply POST already selected it.
+      .select({ id: campaigns.id, org_id: campaigns.org_id, status: campaigns.status })
       .from(campaigns)
       .innerJoin(clients, eq(campaigns.client_id, clients.id))
       .where(and(eq(clients.slug, clientSlug), eq(campaigns.slug, campaignSlug)))
@@ -48,10 +50,10 @@ export async function POST(
     if (!candidate) return json({ error: "Candidate not found" }, 404);
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const blobUrl = await uploadCV(clientSlug, campaignSlug, candidateId, buffer, file.name);
+    const blobPath = await uploadCV(campaign.org_id, clientSlug, candidateId, buffer, file.name);
 
-    if (blobUrl) {
-      await db.update(candidates).set({ cv_url: blobUrl, updated_at: new Date() }).where(eq(candidates.id, candidateId));
+    if (blobPath) {
+      await db.update(candidates).set({ cv_url: blobPath, updated_at: new Date() }).where(eq(candidates.id, candidateId));
       if (candidate.gating_passed) {
         // The worker owns the move to 'scoring' once it starts processing.
         await getQueue().enqueue(
@@ -61,7 +63,9 @@ export async function POST(
       }
     }
 
-    return json({ success: true, url: blobUrl, stored: !!blobUrl }, 201);
+    // Don't echo the internal blob path back to the public caller — the CV is
+    // private and only retrievable via an authorised SAS.
+    return json({ success: true, stored: !!blobPath }, 201);
   } catch (err) {
     console.error("POST /api/apply/upload error:", err);
     return json({ error: "Internal server error" }, 500);

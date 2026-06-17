@@ -6,10 +6,37 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, sql } from "drizzle-orm";
 import * as schema from "./schema";
+import { isStorageConfigured, uploadCV } from "../lib/azure-storage";
 
 const connectionString = process.env.DATABASE_URL!;
 const client = postgres(connectionString);
 const db = drizzle(client, { schema });
+
+/** Build a tiny but valid single-page PDF so seeded CVs resolve to a real,
+ *  previewable blob (S6 Resolved Decision 2). */
+function buildSamplePdf(text: string): Buffer {
+  const content = `BT /F1 18 Tf 36 96 Td (${text}) Tj ET`;
+  const objs = [
+    `<< /Type /Catalog /Pages 2 0 R >>`,
+    `<< /Type /Pages /Kids [3 0 R] /Count 1 >>`,
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 144] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>`,
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>`,
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  objs.forEach((body, i) => {
+    offsets.push(Buffer.byteLength(pdf, "latin1"));
+    pdf += `${i + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const xrefStart = Buffer.byteLength(pdf, "latin1");
+  pdf += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
+  for (const off of offsets) {
+    pdf += `${off.toString().padStart(10, "0")} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+  return Buffer.from(pdf, "latin1");
+}
 
 // ── Deterministic random ─────────────────────────────────────────────
 
@@ -600,6 +627,30 @@ async function main() {
   }
   const orgId = org.id;
 
+  // ── Shared sample CV (S6 Resolved Decision 2) ──
+  // Seeded cv_url values must resolve to a real blob. When storage is
+  // configured, upload ONE shared sample CV for the org and point every seeded
+  // CV at it (all seeded CVs are synthetic, so a shared blob is fine and keeps
+  // the demo CV preview/download working). Otherwise leave cv_url null — cv_text
+  // still drives scoring/report copy. Either branch leaves no dangling cv_url.
+  let sampleCvPath: string | null = null;
+  if (isStorageConfigured()) {
+    sampleCvPath = await uploadCV(
+      orgId,
+      "_sample",
+      "shared",
+      buildSamplePdf("Sample CV"),
+      "sample.pdf"
+    );
+    console.log(
+      sampleCvPath
+        ? `Uploaded shared sample CV → ${sampleCvPath}`
+        : "Sample CV upload skipped (storage returned null)"
+    );
+  } else {
+    console.log("Storage not configured — seeded cv_url will be null.");
+  }
+
   // ── Insert clients ──
   console.log(`Inserting ${CLIENTS.length} clients...`);
   const insertedClients = await db.insert(schema.clients).values(
@@ -808,7 +859,7 @@ async function main() {
         whatsapp_opted_in: rand() < 0.6,
         gating_answers: answers,
         gating_passed: gatingPassed,
-        cv_url: hasCv ? `https://example.blob.core.windows.net/cvs/${campaign.slug}/${email.replace("@", "_at_")}.pdf` : null,
+        cv_url: hasCv ? sampleCvPath : null,
         cv_text: hasCv ? generateCvText(name, department, yearsExp, aiScore ?? 5) : null,
         ai_score: aiScore,
         ai_dimensions: aiDimensions,
