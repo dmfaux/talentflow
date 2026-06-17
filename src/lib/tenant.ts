@@ -2,7 +2,12 @@ import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { and, eq, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
-import { getSession, type OrgRole, type SessionPayload } from "@/lib/auth";
+import {
+  getActAsClaim,
+  getSession,
+  type OrgRole,
+  type SessionPayload,
+} from "@/lib/auth";
 import { decideBrandAccess, type BrandRole } from "@/lib/rbac";
 import { db } from "@/db";
 import { memberships } from "@/db/schema";
@@ -24,10 +29,20 @@ export type TenantContext = {
   effectiveOrgId: string | null; // orgId ?? actingOrgId — what S3/S4 scope on
 };
 
-/** S7 wires the act-as cookie; returns null in S2. Keeps requireTenant's
- *  operator branch shaped for impersonation without implementing it yet. */
-async function getActingOrgId(): Promise<string | null> {
-  return null;
+/** Resolve the operator's act-as target from the short-lived act-as cookie.
+ *  Bound to THIS session three ways (defence in depth):
+ *   - server-side isOperator gate (the cookie is meaningless for a tenant);
+ *   - the cookie's signature + TTL (verified in getActAsClaim) — an expired
+ *     cookie returns null, so the time-box self-enforces with no DB read;
+ *   - operatorUserId === session.userId, rejecting a cookie minted for (or
+ *     stolen from) another operator.
+ *  Returns null in every other case → the operator stays deny-by-default. */
+async function getActingOrgId(session: SessionPayload): Promise<string | null> {
+  if (!session.isOperator) return null;
+  const claim = await getActAsClaim();
+  if (!claim) return null;
+  if (claim.operatorUserId !== session.userId) return null;
+  return claim.actingOrgId;
 }
 
 /** Build the effective TenantContext from a verified session. Single-sourced
@@ -36,7 +51,7 @@ async function getActingOrgId(): Promise<string | null> {
 export async function tenantFromSession(
   session: SessionPayload
 ): Promise<TenantContext> {
-  const actingOrgId = session.isOperator ? await getActingOrgId() : null;
+  const actingOrgId = await getActingOrgId(session);
   return {
     userId: session.userId,
     isOperator: session.isOperator,

@@ -71,6 +71,46 @@ export async function requireAuth(): Promise<SessionPayload> {
   return session;
 }
 
+// ── Operator act-as cookie (S7) ──────────────────────────────────────
+//
+// Impersonation rides a SEPARATE, short-lived signed-JWT cookie — never baked
+// into the long-lived admin_session (the slice forbids it). Reuses
+// ADMIN_AUTH_SECRET, so it is tamper-proof with no new secret; the JWT TTL *is*
+// the time-box (Resolved Decision 6) — when it lapses verifyJwt returns null and
+// the operator silently drops back to deny-by-default. Read only inside the seam
+// (auth.ts/tenant.ts), like admin_session. The operatorUserId is cross-checked
+// against the session in tenant.ts so a stolen/replayed cookie minted for
+// another operator is rejected.
+
+const ACT_AS_COOKIE = "operator_act_as";
+const ACT_AS_EXPIRY = "60m"; // fixed time-box, no sliding renewal (Resolved Decision 6)
+export const ACT_AS_MAX_AGE = 60 * 60; // seconds; mirrors ACT_AS_EXPIRY for the cookie
+
+export async function signActAsToken(
+  operatorUserId: string,
+  actingOrgId: string
+): Promise<string> {
+  return new SignJWT({ operatorUserId, actingOrgId, kind: "act_as" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(ACT_AS_EXPIRY)
+    .sign(getAuthSecret());
+}
+
+export async function getActAsClaim(): Promise<{
+  operatorUserId: string;
+  actingOrgId: string;
+} | null> {
+  const token = (await cookies()).get(ACT_AS_COOKIE)?.value;
+  if (!token) return null;
+  const p = await verifyJwt(token); // signature + expiry; null if expired → auto-exit when TTL lapses
+  if (!p || p.kind !== "act_as") return null;
+  if (typeof p.operatorUserId !== "string" || typeof p.actingOrgId !== "string") {
+    return null;
+  }
+  return { operatorUserId: p.operatorUserId, actingOrgId: p.actingOrgId };
+}
+
 // ── Password hashing ─────────────────────────────────────────────────
 
 export async function hashPassword(plain: string): Promise<string> {
@@ -96,4 +136,4 @@ export function hashResetToken(raw: string): string {
   return createHash("sha256").update(raw).digest("hex");
 }
 
-export { COOKIE_NAME };
+export { COOKIE_NAME, ACT_AS_COOKIE };

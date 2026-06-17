@@ -21,6 +21,16 @@ export function error(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
+/** Best-effort client IP for the operator_audit trail (S7). Trusts the proxy's
+ *  x-forwarded-for (first hop) then x-real-ip; null when neither is present. */
+export function clientIp(request: Request): string | null {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    request.headers.get("x-real-ip") ||
+    null
+  );
+}
+
 export async function requireApiAuth(): Promise<NextResponse | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
@@ -41,6 +51,21 @@ export async function getApiTenant(): Promise<
   const session = await getSession();
   if (!session) return { ctx: null, response: error("Unauthorized", 401) };
   const ctx = await tenantFromSession(session);
+  return { ctx, response: null };
+}
+
+/** Operator-only route gate (S7). The route-handler analog of the RSC
+ *  requireOperator(): resolves the TenantContext and returns a 403 for a
+ *  non-operator (a tenant owner included). Acceptance: non-operators 403 on
+ *  /api/operator/*. (The RSC requireOperator stays 404 to hide the console's
+ *  existence — the established 404-RSC / 403-API split.) */
+export async function requireApiOperator(): Promise<
+  | { ctx: TenantContext; response: null }
+  | { ctx: null; response: NextResponse }
+> {
+  const { ctx, response } = await getApiTenant();
+  if (response) return { ctx: null, response };
+  if (!ctx.isOperator) return { ctx: null, response: error("Forbidden", 403) };
   return { ctx, response: null };
 }
 

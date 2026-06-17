@@ -588,3 +588,50 @@ export const jobs = pgTable(
       ),
   ]
 );
+
+// ── Operator audit (S7) ─────────────────────────────────────────────
+//
+// The tenant-LESS audit trail for operator (act-as) actions. Deliberately has
+// NO org_id: it is operator-keyed and read only behind requireOperator — never
+// org-scoped or tenant-readable (a tenant-side audit_log is a separate, future
+// org-scoped table; see S7 Resolved Decision 7). Both FKs are onDelete
+// "set null" and metadata snapshots the org slug/name so the row outlives an
+// S11 org purge / future operator removal (Resolved Decision 3). `action` is
+// open free-text validated against an in-code allow-list, so S9 (provision_org)
+// and S11 (suspend|restore|soft_delete|purge) extend it without a migration.
+
+export const operatorAudit = pgTable(
+  "operator_audit",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    operator_user_id: uuid("operator_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "set null" }), // audit outlives the actor
+    action: text("action").notNull(), // impersonate | impersonate_exit | set_tier | set_billing_email
+    // (S9 adds provision_org; S11 adds suspend|restore|soft_delete|purge)
+    target_org_id: uuid("target_org_id").references(() => organizations.id, {
+      onDelete: "set null", // keep the audit row after an org is purged (S11)
+    }),
+    metadata: jsonb("metadata"), // {from,to} for tier/billing; org slug/name/status snapshot for durability
+    ip: text("ip"),
+    started_at: timestamp("started_at").defaultNow().notNull(),
+    ended_at: timestamp("ended_at"), // set on impersonate exit; null for point-in-time actions
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("operator_audit_operator_idx").on(table.operator_user_id),
+    index("operator_audit_target_org_idx").on(table.target_org_id),
+    index("operator_audit_action_idx").on(table.action),
+  ]
+);
+
+export const operatorAuditRelations = relations(operatorAudit, ({ one }) => ({
+  operator: one(users, {
+    fields: [operatorAudit.operator_user_id],
+    references: [users.id],
+  }),
+  targetOrg: one(organizations, {
+    fields: [operatorAudit.target_org_id],
+    references: [organizations.id],
+  }),
+}));

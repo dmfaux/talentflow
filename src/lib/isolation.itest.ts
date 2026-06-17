@@ -12,7 +12,15 @@ const sessionHolder = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/auth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/auth")>();
-  return { ...actual, getSession: async () => sessionHolder.current };
+  // getActAsClaim is part of the session seam now (S7): tenantFromSession reads
+  // it for operator sessions. These tests cover tenant users + non-acting
+  // operators, so stub it to null (no act-as) — otherwise the real one calls
+  // cookies() outside a request scope.
+  return {
+    ...actual,
+    getSession: async () => sessionHolder.current,
+    getActAsClaim: async () => null,
+  };
 });
 
 // The queue uses a dynamic require() that vitest's loader can't resolve, and
@@ -33,6 +41,7 @@ import {
   clients,
   events,
   memberships,
+  operatorAudit,
   organizations,
   users,
 } from "@/db/schema";
@@ -164,6 +173,10 @@ async function seedCandidate(
 describe.skipIf(!RUN)("S5 write-isolation & RBAC (DB-backed)", () => {
   beforeAll(async () => {
     // Clean slate (dependency order) so the fixture is idempotent across runs.
+    // operator_audit (S7) FK-references users/organizations with onDelete
+    // set-null on a NOT NULL column, so it must be cleared before users —
+    // otherwise the delete below trips the not-null constraint.
+    await db.delete(operatorAudit);
     await db.delete(events);
     await db.delete(candidates);
     await db.delete(campaigns);
