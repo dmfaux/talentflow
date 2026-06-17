@@ -5,7 +5,13 @@ import {
   getProviderChain,
   getModelId,
 } from "./config";
-import { getProviderFactory, type ProviderAttempt, AllProvidersFailedError } from "./providers";
+import {
+  getProviderFactory,
+  extractUsage,
+  type ProviderAttempt,
+  type TokenUsage,
+  AllProvidersFailedError,
+} from "./providers";
 
 // ── Zod schema ──────────────────────────────────────────────────────
 
@@ -198,7 +204,7 @@ function getHttpStatus(err: unknown): number | undefined {
 async function callProviderForJobSpec(
   providerName: ProviderName,
   prompt: string
-): Promise<{ output: JobSpecResult; modelId: string }> {
+): Promise<{ output: JobSpecResult; modelId: string; usage: TokenUsage }> {
   const modelId = getModelId(providerName);
   const factory = getProviderFactory(providerName);
   const model = factory(modelId);
@@ -220,13 +226,13 @@ async function callProviderForJobSpec(
   const output = result.output as JobSpecResult;
   validateQuality(output);
 
-  return { output, modelId };
+  return { output, modelId, usage: extractUsage(result.usage) };
 }
 
 export async function parseJobSpec(
   extractedText: string,
   clientName: string
-): Promise<{ output: JobSpecResult; providerName: ProviderName; modelId: string }> {
+): Promise<{ output: JobSpecResult; providerName: ProviderName; modelId: string; usage: TokenUsage }> {
   const chain = getProviderChain();
   const prompt = buildJobSpecPrompt(extractedText, clientName);
   const attempts: ProviderAttempt[] = [];

@@ -58,6 +58,13 @@ export const clients = pgTable(
   contact_email: text("contact_email"),
   contact_phone: text("contact_phone"),
   billing_email: text("billing_email"),
+  // Per-brand outbound-email identity (S10). Both nullable/backfill-free.
+  // Deliverability-safe by design: from_name personalises the DISPLAY name
+  // only — the verified envelope-from (EMAIL_FROM) is always retained, since
+  // brands have no SPF/DKIM/domain verification. reply_to_email routes
+  // candidate replies. A brand with neither set keeps today's global default.
+  from_name: text("from_name"),
+  reply_to_email: text("reply_to_email"),
   branding_logo_url: text("branding_logo_url"),
   brand_primary_color: text("brand_primary_color"),
   brand_secondary_color: text("brand_secondary_color"),
@@ -658,6 +665,49 @@ export const jobs = pgTable(
       .where(
         sql`${table.deduplication_id} IS NOT NULL AND ${table.status} IN ('pending', 'processing')`
       ),
+  ]
+);
+
+// ── Usage events (S10 — per-org cost/volume metering) ───────────────
+//
+// The cost-visibility ledger. Billing is deferred, but AI spend must be
+// attributable per org before launch. Rows are written best-effort from the
+// production insert paths (recordUsageEvent) — there is NO trigger, so S14 can
+// seed realistic metered data through the same path.
+//
+// FK lifecycle (Resolved Decision C): org_id CASCADE — cost is incurred at the
+// org level and dies with the org (and stays outside the POPIA candidate-purge
+// path); brand/campaign/candidate are SET NULL so an S11 candidate purge nulls
+// the reference without erasing the org's spend ledger. Token columns are
+// nullable (ai_tokens-only; "unknown" ≠ "zero" — never coerce to 0).
+export const usageEvents = pgTable(
+  "usage_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    org_id: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    // Forward-looking name (S14 renames Clients→Brands); references clients.id.
+    brand_id: uuid("brand_id").references(() => clients.id, {
+      onDelete: "set null",
+    }),
+    kind: text("kind").notNull(), // ai_tokens | campaign_created | candidate_created | chat_message | email_sent
+    provider: text("provider"), // ai_tokens only (e.g. 'anthropic')
+    model: text("model"), // ai_tokens only (modelId from the SDK result)
+    input_tokens: integer("input_tokens"), // ai_tokens only; SDK usage.inputTokens (undefined→null)
+    output_tokens: integer("output_tokens"), // ai_tokens only; SDK usage.outputTokens
+    campaign_id: uuid("campaign_id").references(() => campaigns.id, {
+      onDelete: "set null",
+    }),
+    candidate_id: uuid("candidate_id").references(() => candidates.id, {
+      onDelete: "set null",
+    }),
+    quantity: integer("quantity").notNull().default(1),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("usage_events_org_created_idx").on(table.org_id, table.created_at),
+    index("usage_events_org_kind_idx").on(table.org_id, table.kind),
   ]
 );
 

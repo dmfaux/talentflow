@@ -35,6 +35,7 @@ type FollowUpRejectResult =
  *  to set pending_rejection_at. */
 async function handleFollowUpRejection(
   candidateId: string,
+  orgId: string,
   roleTitle: string,
   clientName: string,
   adminReason: string | undefined
@@ -93,7 +94,7 @@ async function handleFollowUpRejection(
       emailKind: "rejection_confirmation",
       adminReason,
     },
-    { deliverAt, deduplicationId: `reject-confirm-${candidateId}` }
+    { orgId, deliverAt, deduplicationId: `reject-confirm-${candidateId}` }
   );
 
   return { blocked: false, tier, pending: hasUserMessages };
@@ -162,6 +163,7 @@ export async function PATCH(
     if (isRejectingFollowUp) {
       followUpResult = await handleFollowUpRejection(
         existing.id,
+        existing.org_id,
         existing.campaign.role_title,
         existing.campaign.client?.name ?? "the company",
         typeof body.rejection_reason === "string" ? body.rejection_reason : undefined
@@ -216,7 +218,7 @@ export async function PATCH(
     if (body.status === "rejected" && !isRejectingFollowUp) {
       await getQueue().enqueue(
         { type: "send-email", candidateId: id, emailKind: "rejected" },
-        { deduplicationId: `rejected-${id}` }
+        { orgId: existing.org_id, deduplicationId: `rejected-${id}` }
       );
     }
 

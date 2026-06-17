@@ -5,6 +5,7 @@ import {
   clients,
   invitations,
   organizations,
+  usageEvents,
   users,
 } from "@/db/schema";
 import { clientIp, error, requireApiOperator, success } from "@/lib/api";
@@ -12,15 +13,28 @@ import { recordOperatorAudit } from "@/lib/operator-audit";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
+const USAGE_KINDS = [
+  "ai_tokens",
+  "campaign_created",
+  "candidate_created",
+  "chat_message",
+  "email_sent",
+] as const;
+
+type UsageByKind = Record<
+  (typeof USAGE_KINDS)[number],
+  { count: number; inputTokens: number; outputTokens: number }
+>;
+
 const TIERS = ["standard", "premium", "enterprise"] as const;
 type Tier = (typeof TIERS)[number];
 const isTier = (v: unknown): v is Tier =>
   typeof v === "string" && (TIERS as readonly string[]).includes(v);
 
-// GET /api/operator/organizations/[id] — org detail + derived counts.
+// GET /api/operator/organizations/[id] — org detail + derived counts + usage.
 //
-// "Usage" in S7 is only the counts derivable today (brands/campaigns/
-// candidates); AI/token metering is S10 (the UI shows a labelled placeholder).
+// Counts (brands/campaigns/candidates) plus the S10 per-org usage aggregate:
+// last-30-day per-kind volume + token sums, with all-time token totals.
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -37,39 +51,81 @@ export async function GET(
     });
     if (!org) return error("Organization not found", 404);
 
+    // Per-org usage aggregate (S10), windowed to the last 30 days, plus
+    // all-time token totals for context. Uses usage_events_org_kind_idx /
+    // usage_events_org_created_idx. Metering read — not an audited mutation.
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
     // Onboarding status (S9): the accepted Owner vs the pending org-level Owner
     // invite, so the detail page can render "owner active" vs "invite / resend".
-    const [[brands], [camps], [cands], owner, pendingInvite] = await Promise.all([
-      db
-        .select({ total: sql<number>`count(*)::int` })
-        .from(clients)
-        .where(eq(clients.org_id, id)),
-      db
-        .select({ total: sql<number>`count(*)::int` })
-        .from(campaigns)
-        .where(eq(campaigns.org_id, id)),
-      db
-        .select({ total: sql<number>`count(*)::int` })
-        .from(candidates)
-        .where(eq(candidates.org_id, id)),
-      db.query.users.findFirst({
-        where: and(
-          eq(users.org_id, id),
-          eq(users.org_role, "owner"),
-          eq(users.is_operator, false)
-        ),
-        columns: { id: true, email: true, first_name: true, last_name: true },
-      }),
-      db.query.invitations.findFirst({
-        where: and(
-          eq(invitations.org_id, id),
-          eq(invitations.org_role, "owner"),
-          isNull(invitations.accepted_at),
-          gt(invitations.expires_at, new Date())
-        ),
-        columns: { email: true, expires_at: true },
-      }),
-    ]);
+    const [[brands], [camps], [cands], owner, pendingInvite, usageRows, [allTime]] =
+      await Promise.all([
+        db
+          .select({ total: sql<number>`count(*)::int` })
+          .from(clients)
+          .where(eq(clients.org_id, id)),
+        db
+          .select({ total: sql<number>`count(*)::int` })
+          .from(campaigns)
+          .where(eq(campaigns.org_id, id)),
+        db
+          .select({ total: sql<number>`count(*)::int` })
+          .from(candidates)
+          .where(eq(candidates.org_id, id)),
+        db.query.users.findFirst({
+          where: and(
+            eq(users.org_id, id),
+            eq(users.org_role, "owner"),
+            eq(users.is_operator, false)
+          ),
+          columns: { id: true, email: true, first_name: true, last_name: true },
+        }),
+        db.query.invitations.findFirst({
+          where: and(
+            eq(invitations.org_id, id),
+            eq(invitations.org_role, "owner"),
+            isNull(invitations.accepted_at),
+            gt(invitations.expires_at, new Date())
+          ),
+          columns: { email: true, expires_at: true },
+        }),
+        db
+          .select({
+            kind: usageEvents.kind,
+            count: sql<number>`sum(${usageEvents.quantity})::int`,
+            inputTokens: sql<number>`coalesce(sum(${usageEvents.input_tokens}), 0)::int`,
+            outputTokens: sql<number>`coalesce(sum(${usageEvents.output_tokens}), 0)::int`,
+          })
+          .from(usageEvents)
+          .where(and(eq(usageEvents.org_id, id), gt(usageEvents.created_at, since)))
+          .groupBy(usageEvents.kind),
+        db
+          .select({
+            inputTokens: sql<number>`coalesce(sum(${usageEvents.input_tokens}), 0)::int`,
+            outputTokens: sql<number>`coalesce(sum(${usageEvents.output_tokens}), 0)::int`,
+          })
+          .from(usageEvents)
+          .where(eq(usageEvents.org_id, id)),
+      ]);
+
+    // Shape rows into a fixed-key map so the UI never has to guard on missing
+    // kinds (an org with no events reports zeros, not an error).
+    const byKind = Object.fromEntries(
+      USAGE_KINDS.map((k) => [k, { count: 0, inputTokens: 0, outputTokens: 0 }])
+    ) as UsageByKind;
+    let periodInput = 0;
+    let periodOutput = 0;
+    for (const row of usageRows) {
+      if (row.kind in byKind) {
+        byKind[row.kind as keyof UsageByKind] = {
+          count: row.count,
+          inputTokens: row.inputTokens,
+          outputTokens: row.outputTokens,
+        };
+      }
+      periodInput += row.inputTokens;
+      periodOutput += row.outputTokens;
+    }
 
     return success({
       ...org,
@@ -80,6 +136,12 @@ export async function GET(
       },
       owner: owner ?? null,
       pendingInvite: pendingInvite ?? null,
+      usage: {
+        period: "30d",
+        byKind,
+        tokens: { input: periodInput, output: periodOutput },
+        allTime: { input: allTime.inputTokens, output: allTime.outputTokens },
+      },
     });
   } catch (err) {
     console.error("GET /api/operator/organizations/[id] error:", err);

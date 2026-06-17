@@ -1,5 +1,6 @@
 import { db } from "@/db";
 import { candidates, messages } from "@/db/schema";
+import { recordUsageEvent } from "@/lib/usage";
 import { eq } from "drizzle-orm";
 
 // ── Transport abstraction ───────────────────────────────────────────
@@ -14,7 +15,8 @@ interface EmailTransport {
     from: string,
     to: string,
     subject: string,
-    html: string
+    html: string,
+    replyTo?: string
   ): Promise<SendResult>;
 }
 
@@ -27,12 +29,13 @@ function getTransport(): EmailTransport {
       const { Resend } = require("resend");
       const client = new Resend(process.env.RESEND_API_KEY);
       _transport = {
-        async send(from, to, subject, html) {
+        async send(from, to, subject, html, replyTo) {
           const { data, error } = await client.emails.send({
             from,
             to,
             subject,
             html,
+            ...(replyTo ? { replyTo } : {}),
           });
           return { id: data?.id ?? null, error };
         },
@@ -47,8 +50,14 @@ function getTransport(): EmailTransport {
         secure: false,
       });
       _transport = {
-        async send(from, to, subject, html) {
-          const info = await transporter.sendMail({ from, to, subject, html });
+        async send(from, to, subject, html, replyTo) {
+          const info = await transporter.sendMail({
+            from,
+            to,
+            subject,
+            html,
+            ...(replyTo ? { replyTo } : {}),
+          });
           return { id: info.messageId ?? null, error: null };
         },
       };
@@ -60,15 +69,57 @@ function getTransport(): EmailTransport {
 const FROM =
   process.env.EMAIL_FROM ?? "TalentStream <apply@talentstream.co.za>";
 
+/** Bare email address from a possibly-display-name From header
+ *  ("Name <a@b.com>" → "a@b.com"). */
+function addressOf(from: string): string {
+  const match = from.match(/<([^>]+)>/);
+  return (match ? match[1] : from).trim();
+}
+
+// ── Per-brand sending identity (S10, Decision D) ────────────────────
+
+export interface BrandEmailIdentity {
+  /** Full From header. Display name may be personalised per brand, but the
+   *  address is always the verified EMAIL_FROM address (deliverability-safe). */
+  from: string;
+  /** Reply-To, set only when the brand configured one. */
+  replyTo?: string;
+}
+
+/**
+ * Deliverability-safe per-brand identity. Personalises the DISPLAY name only —
+ * the verified envelope-from (EMAIL_FROM's address) is always retained, because
+ * brands have no SPF/DKIM/domain verification and spoofing their domain would
+ * tank deliverability. A brand with neither field set yields exactly today's
+ * behaviour: the global FROM and no Reply-To. Safe for unverified brands.
+ */
+export function brandEmailIdentity(
+  brand?: { from_name?: string | null; reply_to_email?: string | null } | null
+): BrandEmailIdentity {
+  const fromName = brand?.from_name?.trim();
+  const replyTo = brand?.reply_to_email?.trim() || undefined;
+  return {
+    from: fromName ? `${fromName} <${addressOf(FROM)}>` : FROM,
+    replyTo,
+  };
+}
+
 // ── Send email ───────────────────────────────────────────────────────
 
 export async function sendTransactionalEmail(
   to: string,
   subject: string,
-  htmlBody: string
+  htmlBody: string,
+  identity?: BrandEmailIdentity
 ): Promise<string | null> {
   try {
-    const { id, error } = await getTransport().send(FROM, to, subject, htmlBody);
+    const { id, error } = await getTransport().send(
+      identity?.from ?? FROM,
+      to,
+      subject,
+      htmlBody,
+      identity?.replyTo
+    );
 
     if (error) {
       console.error("sendTransactionalEmail error:", error);
@@ -86,21 +137,31 @@ export async function sendCandidateEmail(
   to: string,
   subject: string,
   htmlBody: string,
-  candidateId: string
+  candidateId: string,
+  identity?: BrandEmailIdentity
 ): Promise<string | null> {
   try {
-    const { id, error } = await getTransport().send(FROM, to, subject, htmlBody);
+    const { id, error } = await getTransport().send(
+      identity?.from ?? FROM,
+      to,
+      subject,
+      htmlBody,
+      identity?.replyTo
+    );
 
     if (error) {
       console.error("sendCandidateEmail error:", error);
     }
 
-    // messages.org_id is NOT NULL (S5). Derive it from the candidate so the
-    // message log carries the tenant explicitly rather than relying on the
-    // DB trigger (dropped in S13). Skip the log if the candidate is gone.
+    // messages.org_id is NOT NULL (S5). Derive org + brand from the candidate
+    // so the message log + usage meter carry the tenant explicitly rather than
+    // relying on the DB trigger (dropped in S13). Skip the log if the candidate
+    // is gone. email_sent metering is centralised here so every candidate email
+    // is counted exactly once regardless of call site.
     const candidate = await db.query.candidates.findFirst({
       where: eq(candidates.id, candidateId),
       columns: { org_id: true },
+      with: { campaign: { columns: { client_id: true } } },
     });
     if (candidate) {
       await db.insert(messages).values({
@@ -111,6 +172,12 @@ export async function sendCandidateEmail(
         content: subject,
         status: error ? "failed" : "sent",
         external_id: id,
+      });
+      recordUsageEvent({
+        orgId: candidate.org_id,
+        brandId: candidate.campaign?.client_id ?? null,
+        kind: "email_sent",
+        candidateId,
       });
     }
 

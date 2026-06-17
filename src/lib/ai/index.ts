@@ -11,7 +11,9 @@ export {
 
 export {
   callWithFallback,
+  extractUsage,
   AllProvidersFailedError,
   type AIResult,
+  type TokenUsage,
   type ProviderAttempt,
 } from "./providers";

@@ -9,7 +9,9 @@ import {
   withdrawConversation,
 } from "@/lib/chat";
 import { buildChatSystemPrompt } from "@/lib/ai/chat-prompt";
-import { getChatModel } from "@/lib/ai/chat-provider";
+import { getChatModel, getChatModelMeta } from "@/lib/ai/chat-provider";
+import { extractUsage, type TokenUsage } from "@/lib/ai";
+import { recordUsageEvent } from "@/lib/usage";
 import { eq, and, asc } from "drizzle-orm";
 import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
@@ -96,6 +98,16 @@ export async function POST(
     content: userText,
   });
 
+  // Volume counter — one chat_message per inbound candidate message (S10).
+  recordUsageEvent({
+    orgId: conv.org_id,
+    kind: "chat_message",
+    candidateId: conv.candidate_id,
+  });
+
+  // Provider/model backing all three chat LLM calls, for ai_tokens attribution.
+  const chatModel = getChatModelMeta();
+
   // Load full message history
   const history = await db
     .select({ role: chatMessages.role, content: chatMessages.content })
@@ -119,11 +131,25 @@ export async function POST(
   // complete transcript.
   let coveredIndices: number[] = [];
   if (pendingTopics.length > 0) {
-    coveredIndices = await classifyTopicCoverage(
+    const classification = await classifyTopicCoverage(
       history,
       userText,
       pendingTopics
     );
+    coveredIndices = classification.coveredIndices;
+    // Record only when the LLM call actually ran (usage present) — the regex
+    // fallback path spends no tokens.
+    if (classification.usage) {
+      recordUsageEvent({
+        orgId: conv.org_id,
+        kind: "ai_tokens",
+        provider: chatModel.providerName,
+        model: chatModel.modelId,
+        inputTokens: classification.usage.inputTokens,
+        outputTokens: classification.usage.outputTokens,
+        candidateId: conv.candidate_id,
+      });
+    }
     if (coveredIndices.length > 0) {
       topics = topics.map((topic, index) =>
         coveredIndices.includes(index)
@@ -167,6 +193,20 @@ export async function POST(
       const text = await result.text;
       const reasoningText = await result.reasoningText;
 
+      // Stream token usage is only available after the stream finishes —
+      // totalUsage aggregates multi-step. Recorded here in after() so it never
+      // stalls the stream to the client.
+      const streamUsage = extractUsage(await result.totalUsage);
+      recordUsageEvent({
+        orgId: conv.org_id,
+        kind: "ai_tokens",
+        provider: chatModel.providerName,
+        model: chatModel.modelId,
+        inputTokens: streamUsage.inputTokens,
+        outputTokens: streamUsage.outputTokens,
+        candidateId: conv.candidate_id,
+      });
+
       let cleanText = stripThinking(text);
       if (reasoningText && cleanText.startsWith(reasoningText)) {
         cleanText = cleanText.slice(reasoningText.length).trim();
@@ -203,8 +243,19 @@ export async function POST(
       // record on a withdrawing candidate's message.
       await recordTopicProgress(conversationId, { coveredIndices, askedIndex });
 
-      const withdrawn = await detectWithdrawal(history, cleanText);
-      if (withdrawn) {
+      const withdrawal = await detectWithdrawal(history, cleanText);
+      if (withdrawal.usage) {
+        recordUsageEvent({
+          orgId: conv.org_id,
+          kind: "ai_tokens",
+          provider: chatModel.providerName,
+          model: chatModel.modelId,
+          inputTokens: withdrawal.usage.inputTokens,
+          outputTokens: withdrawal.usage.outputTokens,
+          candidateId: conv.candidate_id,
+        });
+      }
+      if (withdrawal.withdrawn) {
         await withdrawConversation(conversationId);
       }
     } catch (err) {
@@ -227,20 +278,22 @@ export async function POST(
  * exchange — the assistant's last message plus the candidate's reply — so
  * unusual phrasing can't defeat it but earlier messages can't leak coverage.
  *
- * Returns indices into the conversation's full topics array. Falls back to
- * the regex heuristics (first pending topic only) if the call fails.
+ * Returns indices into the conversation's full topics array, plus the SDK
+ * token usage of the classification call (null when the regex fallback ran and
+ * no tokens were spent). Falls back to the regex heuristics (first pending
+ * topic only) if the call fails.
  */
 async function classifyTopicCoverage(
   history: { role: string; content: string }[],
   userText: string,
   pendingTopics: Array<Topic & { index: number }>
-): Promise<number[]> {
+): Promise<{ coveredIndices: number[]; usage: TokenUsage | null }> {
   const lastAssistant = [...history]
     .reverse()
     .find((message) => message.role === "assistant");
 
   try {
-    const { object } = await generateObject({
+    const { object, usage } = await generateObject({
       model: getChatModel(),
       schema: z.object({
         replyType: z
@@ -285,21 +338,33 @@ Rules:
 - Do NOT infer coverage from vague or tangential mentions — the information must be explicit.`,
     });
 
-    if (object.replyType === "withdrawal_request") return [];
+    // The call succeeded, so tokens were spent even on the withdrawal_request
+    // branch — surface usage in both cases; only the regex fallback is free.
+    const tokenUsage = extractUsage(usage);
+
+    if (object.replyType === "withdrawal_request")
+      return { coveredIndices: [], usage: tokenUsage };
 
     const validIndices = new Set(pendingTopics.map((t) => t.index));
-    return object.coveredTopicIndices.filter((i: number) =>
-      validIndices.has(i)
-    );
+    return {
+      coveredIndices: object.coveredTopicIndices.filter((i: number) =>
+        validIndices.has(i)
+      ),
+      usage: tokenUsage,
+    };
   } catch (err) {
     console.error(
       "classifyTopicCoverage failed, falling back to heuristics:",
       err
     );
     const first = pendingTopics[0];
-    return first && shouldMarkTopicCovered(history, userText, first)
-      ? [first.index]
-      : [];
+    return {
+      coveredIndices:
+        first && shouldMarkTopicCovered(history, userText, first)
+          ? [first.index]
+          : [],
+      usage: null,
+    };
   }
 }
 
@@ -399,7 +464,7 @@ function looksLikeTopicQuestion(text: string): boolean {
 async function detectWithdrawal(
   history: { role: string; content: string }[],
   latestAssistantMessage: string
-): Promise<boolean> {
+): Promise<{ withdrawn: boolean; usage: TokenUsage | null }> {
   try {
     const transcript = [
       ...history.slice(-6),
@@ -411,7 +476,7 @@ async function detectWithdrawal(
       )
       .join("\n");
 
-    const { object } = await generateObject({
+    const { object, usage } = await generateObject({
       model: getChatModel(),
       schema: z.object({
         withdrawn: z
@@ -435,10 +500,10 @@ Recent conversation:
 ${transcript}`,
     });
 
-    return object.withdrawn;
+    return { withdrawn: object.withdrawn, usage: extractUsage(usage) };
   } catch (err) {
     console.error("detectWithdrawal failed:", err);
-    return false;
+    return { withdrawn: false, usage: null };
   }
 }
 

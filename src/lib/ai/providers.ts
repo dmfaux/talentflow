@@ -74,11 +74,20 @@ export interface ProviderAttempt {
   httpStatus?: number;
 }
 
+/** SDK token usage, normalised to the v6 field names with undefined→null so
+ *  "unknown" stays distinguishable from a genuine zero (S10). Providers that
+ *  report no usage surface as null tokens, never 0. */
+export interface TokenUsage {
+  inputTokens: number | null;
+  outputTokens: number | null;
+}
+
 export interface AIResult {
   output: ScoringResult;
   text: string;
   providerName: ProviderName;
   modelId: string;
+  usage: TokenUsage;
   attempts: ProviderAttempt[];
 }
 
@@ -103,7 +112,7 @@ async function callProvider(
   providerName: ProviderName,
   system: string,
   prompt: string
-): Promise<{ output: ScoringResult; text: string; modelId: string }> {
+): Promise<{ output: ScoringResult; text: string; modelId: string; usage: TokenUsage }> {
   const modelId = getModelId(providerName);
   const factory = getProviderFactory(providerName);
   const model = factory(modelId);
@@ -126,6 +135,19 @@ async function callProvider(
     output: result.output as ScoringResult,
     text: result.text,
     modelId,
+    usage: extractUsage(result.usage),
+  };
+}
+
+/** Normalise the SDK's LanguageModelUsage to {inputTokens, outputTokens}. v6
+ *  reports each as `number | undefined`; map undefined→null (never 0). */
+export function extractUsage(usage: {
+  inputTokens?: number;
+  outputTokens?: number;
+}): TokenUsage {
+  return {
+    inputTokens: usage?.inputTokens ?? null,
+    outputTokens: usage?.outputTokens ?? null,
   };
 }
 

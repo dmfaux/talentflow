@@ -65,7 +65,7 @@ export async function POST(
     // Send invitation email via queue
     await getQueue().enqueue(
       { type: "send-chat-invitation", candidateId: id },
-      { deduplicationId: `chat-invite-${id}` }
+      { orgId: candidate.org_id, deduplicationId: `chat-invite-${id}` }
     );
 
     return success({ conversationId, existing: false });

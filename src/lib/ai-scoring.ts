@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { candidates, chatMessages, scoringLogs } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { getQueue } from "./queue";
+import { recordUsageEvent } from "./usage";
 import {
   callWithFallback,
   AllProvidersFailedError,
@@ -147,6 +148,20 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
   const processingTimeMs = Date.now() - startTime;
   const result: ScoringResult = aiResult.output;
 
+  // Meter the AI spend (best-effort; never blocks scoring). SDK token counts,
+  // never estimates — see usage.ts.
+  recordUsageEvent({
+    orgId: candidate.org_id,
+    brandId: candidate.campaign.client_id,
+    kind: "ai_tokens",
+    provider: aiResult.providerName,
+    model: aiResult.modelId,
+    inputTokens: aiResult.usage.inputTokens,
+    outputTokens: aiResult.usage.outputTokens,
+    campaignId: candidate.campaign_id,
+    candidateId: candidate.id,
+  });
+
   // Determine status from the score and any flags raised.
   //
   // Three thresholds are at play:
@@ -214,7 +229,7 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
     getQueue()
       .enqueue(
         { type: "send-email", candidateId, emailKind: "rejected" },
-        { deliverAt, deduplicationId: `rejection-${candidateId}` }
+        { orgId: candidate.org_id, deliverAt, deduplicationId: `rejection-${candidateId}` }
       )
       .catch((err) =>
         console.error(
@@ -233,7 +248,7 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
     getQueue()
       .enqueue(
         { type: "send-chat-invitation", candidateId },
-        { deduplicationId: `chat-invite-${candidateId}` }
+        { orgId: candidate.org_id, deduplicationId: `chat-invite-${candidateId}` }
       )
       .catch((err) =>
         console.error(
@@ -520,6 +535,19 @@ export async function rescoreWithChatContext(
   const processingTimeMs = Date.now() - startTime;
   const result: ScoringResult = aiResult.output;
 
+  // Meter the re-score AI spend (best-effort).
+  recordUsageEvent({
+    orgId: candidate.org_id,
+    brandId: candidate.campaign.client_id,
+    kind: "ai_tokens",
+    provider: aiResult.providerName,
+    model: aiResult.modelId,
+    inputTokens: aiResult.usage.inputTokens,
+    outputTokens: aiResult.usage.outputTokens,
+    campaignId: candidate.campaign_id,
+    candidateId: candidate.id,
+  });
+
   // Check minimum score threshold after follow-up
   const minScore = rubric.min_score ?? 5;
   const belowMinScore = result.overall_score < minScore;
@@ -571,7 +599,7 @@ export async function rescoreWithChatContext(
     getQueue()
       .enqueue(
         { type: "send-email", candidateId, emailKind: "rejected" },
-        { deliverAt, deduplicationId: `rejection-rescore-${candidateId}` }
+        { orgId: candidate.org_id, deliverAt, deduplicationId: `rejection-rescore-${candidateId}` }
       )
       .catch((err) =>
         console.error(

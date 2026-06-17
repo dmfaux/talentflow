@@ -12,6 +12,13 @@ export function getChatModel(): LanguageModel {
   return createModel(providerName, modelId);
 }
 
+/** Provider + model id backing getChatModel(), for usage attribution (S10).
+ *  Resolved the same way (chain head) so it matches the model actually used. */
+export function getChatModelMeta(): { providerName: ProviderName; modelId: string } {
+  const providerName = getProviderChain()[0];
+  return { providerName, modelId: getModelId(providerName) };
+}
+
 function createModel(name: ProviderName, modelId: string): LanguageModel {
   switch (name) {
     case "anthropic": {

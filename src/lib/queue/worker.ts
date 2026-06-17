@@ -11,6 +11,7 @@ import {
   rejectionConfirmationEmail,
   rejectionEmail,
   sendCandidateEmail,
+  brandEmailIdentity,
 } from "../email";
 import { generateChatToken } from "../chat-auth";
 import { createConversation, getActiveConversation } from "../chat";
@@ -67,6 +68,7 @@ async function handleEmailJob(
   const { name, email, id: candidateId } = candidate;
   const roleTitle = candidate.campaign.role_title;
   const clientName = candidate.campaign.client?.name ?? "the company";
+  const identity = brandEmailIdentity(candidate.campaign.client);
 
   switch (payload.emailKind) {
     case "application_received":
@@ -74,7 +76,8 @@ async function handleEmailJob(
         email,
         `Application received — ${roleTitle}`,
         applicationReceivedEmail(name, roleTitle, clientName),
-        candidateId
+        candidateId,
+        identity
       );
       break;
     case "gating_passed":
@@ -82,7 +85,8 @@ async function handleEmailJob(
         email,
         `Good news — ${roleTitle}`,
         gatingPassedEmail(name, roleTitle, clientName),
-        candidateId
+        candidateId,
+        identity
       );
       break;
     case "gating_failed":
@@ -90,7 +94,8 @@ async function handleEmailJob(
         email,
         `Application update — ${roleTitle}`,
         gatingFailedEmail(name, roleTitle, clientName),
-        candidateId
+        candidateId,
+        identity
       );
       break;
     case "rejected":
@@ -98,7 +103,8 @@ async function handleEmailJob(
         email,
         `Application update — ${roleTitle}`,
         rejectionEmail(name, roleTitle, clientName),
-        candidateId
+        candidateId,
+        identity
       );
       break;
     case "rejection_confirmation":
@@ -115,7 +121,8 @@ async function handleEmailJob(
         email,
         `Application update — ${roleTitle}`,
         rejectionConfirmationEmail(name, roleTitle, clientName, payload.adminReason),
-        candidateId
+        candidateId,
+        identity
       );
       break;
     case "no_response":
@@ -131,7 +138,8 @@ async function handleEmailJob(
         email,
         `Application update — ${roleTitle}`,
         noResponseEmail(name, roleTitle, clientName),
-        candidateId
+        candidateId,
+        identity
       );
       break;
   }
@@ -193,7 +201,8 @@ async function handleChatInvitation(
       clientName,
       chatUrl
     ),
-    candidate.id
+    candidate.id,
+    brandEmailIdentity(candidate.campaign.client)
   );
 
   // Update candidate status to follow_up if not already
@@ -215,11 +224,11 @@ async function handleChatInvitation(
   await Promise.all([
     queue.enqueue(
       { type: "chat-nudge", candidateId: candidate.id },
-      { deliverAt: nudgeAt, deduplicationId: `nudge-${candidate.id}` }
+      { orgId: candidate.org_id, deliverAt: nudgeAt, deduplicationId: `nudge-${candidate.id}` }
     ),
     queue.enqueue(
       { type: "chat-expire", candidateId: candidate.id },
-      { deliverAt: expireAt, deduplicationId: `expire-${candidate.id}` }
+      { orgId: candidate.org_id, deliverAt: expireAt, deduplicationId: `expire-${candidate.id}` }
     ),
   ]);
 }
@@ -269,6 +278,7 @@ async function handleChatNudge(
     await getQueue().enqueue(
       { type: "chat-nudge", candidateId: candidate.id },
       {
+        orgId: candidate.org_id,
         deliverAt: newDeliverAt,
         deduplicationId: `nudge-${candidate.id}-${lastActivityMs}`,
       }
@@ -302,7 +312,8 @@ async function handleChatNudge(
       chatUrl,
       closeByDate
     ),
-    candidate.id
+    candidate.id,
+    brandEmailIdentity(candidate.campaign.client)
   );
 
   await db
@@ -350,6 +361,7 @@ async function handleChatExpire(
     await getQueue().enqueue(
       { type: "chat-expire", candidateId: candidate.id },
       {
+        orgId: candidate.org_id,
         deliverAt: newDeliverAt,
         deduplicationId: `expire-${candidate.id}-${lastActivityMs}`,
       }
@@ -380,6 +392,6 @@ async function handleChatExpire(
   // and logging are consistent with the other email paths.
   await getQueue().enqueue(
     { type: "send-email", candidateId: candidate.id, emailKind: "no_response" },
-    { deduplicationId: `no-response-email-${candidate.id}` }
+    { orgId: candidate.org_id, deduplicationId: `no-response-email-${candidate.id}` }
   );
 }

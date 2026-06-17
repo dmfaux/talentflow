@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { jobs } from "@/db/schema";
-import type { JobQueue, JobPayload, EnqueueOptions } from "./types";
+import { namespaceDedup, type JobQueue, type JobPayload, type EnqueueOptions } from "./types";
 
 export class DbQueue implements JobQueue {
   async enqueue(payload: JobPayload, options?: EnqueueOptions): Promise<void> {
@@ -10,7 +10,11 @@ export class DbQueue implements JobQueue {
         type: payload.type,
         payload,
         deliver_at: options?.deliverAt ?? new Date(),
-        deduplication_id: options?.deduplicationId ?? null,
+        org_id: options?.orgId ?? null,
+        // Org-namespaced so two tenants' identical raw keys produce distinct
+        // values — the existing partial-unique jobs_dedup_idx then keys off the
+        // namespaced value and no longer collides across orgs.
+        deduplication_id: namespaceDedup(options?.orgId, options?.deduplicationId) ?? null,
       })
       .onConflictDoNothing();
   }

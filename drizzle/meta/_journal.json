@@ -211,6 +211,13 @@
       "when": 1781700093508,
       "tag": "0029_burly_virginia_dare",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1781701466846,
+      "tag": "0030_sad_boomer",
+      "breakpoints": true
     }
   ]
 }

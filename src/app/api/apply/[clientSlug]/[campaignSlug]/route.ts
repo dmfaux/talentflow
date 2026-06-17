@@ -2,9 +2,14 @@ import { db } from "@/db";
 import { campaigns, candidates, clients } from "@/db/schema";
 import { uploadCV } from "@/lib/azure-storage";
 import { generateChatToken } from "@/lib/chat-auth";
-import { applicationReceivedEmail, sendCandidateEmail } from "@/lib/email";
+import {
+  applicationReceivedEmail,
+  brandEmailIdentity,
+  sendCandidateEmail,
+} from "@/lib/email";
 import { evaluateGating, GatingQuestion } from "@/lib/gating";
 import { getQueue } from "@/lib/queue";
+import { recordUsageEvent } from "@/lib/usage";
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -28,10 +33,13 @@ export async function POST(
       .select({
         id: campaigns.id,
         org_id: campaigns.org_id,
+        client_id: campaigns.client_id,
         status: campaigns.status,
         role_title: campaigns.role_title,
         gating_config: campaigns.gating_config,
         client_name: clients.name,
+        brand_from_name: clients.from_name,
+        brand_reply_to: clients.reply_to_email,
       })
       .from(campaigns)
       .innerJoin(clients, eq(campaigns.client_id, clients.id))
@@ -140,6 +148,15 @@ export async function POST(
     const clientName = campaign.client_name ?? "the company";
     const candidateId = newCandidate.id;
 
+    // Volume counter — one candidate_created per application (S10, best-effort).
+    recordUsageEvent({
+      orgId: campaign.org_id,
+      brandId: campaign.client_id,
+      kind: "candidate_created",
+      campaignId: campaign.id,
+      candidateId,
+    });
+
     // Generate persistent chat token for in-app chat authentication
     const chatToken = generateChatToken();
     await db
@@ -160,7 +177,16 @@ export async function POST(
     }
 
     // Immediate confirmation email (fire-and-forget is acceptable here)
-    sendCandidateEmail(trimmedEmail, `Application received — ${roleTitle}`, applicationReceivedEmail(candidateName, roleTitle, clientName), candidateId).catch((err) => console.error("Email send failed:", err));
+    sendCandidateEmail(
+      trimmedEmail,
+      `Application received — ${roleTitle}`,
+      applicationReceivedEmail(candidateName, roleTitle, clientName),
+      candidateId,
+      brandEmailIdentity({
+        from_name: campaign.brand_from_name,
+        reply_to_email: campaign.brand_reply_to,
+      })
+    ).catch((err) => console.error("Email send failed:", err));
 
     const queue = getQueue();
 
@@ -173,7 +199,7 @@ export async function POST(
       if (cvStored) {
         await queue.enqueue(
           { type: "candidate-processing", candidateId },
-          { deduplicationId: `process-${candidateId}` }
+          { orgId: campaign.org_id, deduplicationId: `process-${candidateId}` }
         );
       }
     } else {
@@ -181,7 +207,7 @@ export async function POST(
       const deliverAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await queue.enqueue(
         { type: "send-email", candidateId, emailKind: "gating_failed" },
-        { deliverAt, deduplicationId: `reject-email-${candidateId}` }
+        { orgId: campaign.org_id, deliverAt, deduplicationId: `reject-email-${candidateId}` }
       );
     }
 

@@ -4,6 +4,7 @@ import { authorizeApiBrand, error, getApiTenant, success } from "@/lib/api";
 import { brandScope, orgScope, resolveOwnedResource } from "@/lib/tenant";
 import { validateSlug } from "@/lib/slug";
 import { validateHtmlTemplate } from "@/lib/slots";
+import { recordUsageEvent } from "@/lib/usage";
 import { and, desc, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
@@ -146,6 +147,14 @@ export async function POST(request: NextRequest) {
         salary_range_max: body.salary_range_max ?? null,
       })
       .returning();
+
+    // Volume counter (S10, best-effort).
+    recordUsageEvent({
+      orgId: ctx.effectiveOrgId!,
+      brandId: brand.id,
+      kind: "campaign_created",
+      campaignId: row.id,
+    });
 
     return success(row, 201);
   } catch (err) {

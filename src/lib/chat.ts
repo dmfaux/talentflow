@@ -156,7 +156,7 @@ export async function recordTopicProgress(
       .where(eq(conversations.id, conversationId));
 
     return allCovered && coveredThisCall
-      ? { candidateId: conv.candidate_id }
+      ? { candidateId: conv.candidate_id, orgId: conv.org_id }
       : null;
   });
 
@@ -169,7 +169,7 @@ export async function recordTopicProgress(
         candidateId: completed.candidateId,
         conversationId,
       },
-      { deduplicationId: `rescore-chat-${conversationId}` }
+      { orgId: completed.orgId, deduplicationId: `rescore-chat-${conversationId}` }
     );
   } catch (err) {
     console.error(

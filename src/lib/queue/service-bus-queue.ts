@@ -2,7 +2,7 @@ import {
   ServiceBusClient,
   type ServiceBusSender,
 } from "@azure/service-bus";
-import type { JobQueue, JobPayload, EnqueueOptions } from "./types";
+import { namespaceDedup, type JobQueue, type JobPayload, type EnqueueOptions } from "./types";
 
 let client: ServiceBusClient | null = null;
 const senders = new Map<string, ServiceBusSender>();
@@ -37,8 +37,14 @@ export class ServiceBusQueue implements JobQueue {
     const sender = getSender(queueName);
     await sender.sendMessages({
       body: payload,
-      messageId: options?.deduplicationId ?? undefined,
+      // Same org-namespacing as DbQueue → Service Bus messageId dedup is
+      // tenant-safe too (two orgs' identical raw keys no longer collide).
+      messageId: namespaceDedup(options?.orgId, options?.deduplicationId),
       scheduledEnqueueTimeUtc: options?.deliverAt ?? undefined,
+      // Stamp the org for downstream attribution on the Service Bus path.
+      ...(options?.orgId
+        ? { applicationProperties: { orgId: options.orgId } }
+        : {}),
     });
   }
 }

@@ -17,6 +17,21 @@ interface PendingInvite {
   email: string;
   expires_at: string;
 }
+type UsageKind =
+  | "ai_tokens"
+  | "campaign_created"
+  | "candidate_created"
+  | "chat_message"
+  | "email_sent";
+interface OrgUsage {
+  period: string;
+  byKind: Record<
+    UsageKind,
+    { count: number; inputTokens: number; outputTokens: number }
+  >;
+  tokens: { input: number; output: number };
+  allTime: { input: number; output: number };
+}
 interface OrgDetail {
   id: string;
   name: string;
@@ -30,6 +45,7 @@ interface OrgDetail {
   counts: { brands: number; campaigns: number; candidates: number };
   owner: OrgOwner | null;
   pendingInvite: PendingInvite | null;
+  usage: OrgUsage;
 }
 
 const TIER_OPTIONS: Array<{ value: Tier; label: string; helper: string }> = [
@@ -139,6 +155,20 @@ export default function OperatorOrgDetailPage() {
     { label: "Campaigns", value: org.counts.campaigns },
     { label: "Candidates", value: org.counts.candidates },
   ];
+
+  const nf = (n: number) => n.toLocaleString("en-ZA");
+  const { usage } = org;
+  const usageRows = [
+    { label: "AI calls", value: usage.byKind.ai_tokens.count },
+    { label: "Candidates created", value: usage.byKind.candidate_created.count },
+    { label: "Campaigns created", value: usage.byKind.campaign_created.count },
+    { label: "Chat messages", value: usage.byKind.chat_message.count },
+    { label: "Emails sent", value: usage.byKind.email_sent.count },
+  ];
+  const hasUsage =
+    usage.tokens.input > 0 ||
+    usage.tokens.output > 0 ||
+    usageRows.some((r) => r.value > 0);
 
   return (
     <div>
@@ -300,19 +330,57 @@ export default function OperatorOrgDetailPage() {
           </div>
         </div>
 
-        {/* Usage (S10 placeholder) */}
-        <div className="rounded-xl border border-dashed border-border bg-surface/60 p-6">
+        {/* Usage (S10) — per-org AI token + volume metering */}
+        <div className="rounded-xl border border-border bg-surface p-6">
           <div className="flex items-center justify-between">
             <h2 className="font-serif text-lg text-ink">Usage</h2>
             <span className="rounded-full bg-canvas-2 px-2 py-0.5 font-mono text-[0.6rem] uppercase tracking-[0.1em] text-ink-muted">
-              S10
+              Last 30 days
             </span>
           </div>
-          <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-            AI / token usage metering is available after S10. For now, the counts
-            above (brands, campaigns, candidates) are the per-org figures
-            derivable today.
+
+          {/* AI tokens — the headline cost signal */}
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="rounded-lg border border-border bg-cream/40 p-3.5">
+              <p className="text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-ink-muted">
+                Input tokens
+              </p>
+              <p className="mt-1 font-mono text-xl tabular-nums text-ink">
+                {nf(usage.tokens.input)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border bg-cream/40 p-3.5">
+              <p className="text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-ink-muted">
+                Output tokens
+              </p>
+              <p className="mt-1 font-mono text-xl tabular-nums text-ink">
+                {nf(usage.tokens.output)}
+              </p>
+            </div>
+          </div>
+          <p className="mt-2.5 text-[0.7rem] text-ink-muted">
+            All time&nbsp;·&nbsp;
+            <span className="font-mono text-ink-soft">{nf(usage.allTime.input)}</span> in&nbsp;/&nbsp;
+            <span className="font-mono text-ink-soft">{nf(usage.allTime.output)}</span> out
           </p>
+
+          {/* Per-kind volume */}
+          <dl className="mt-5 space-y-2.5 border-t border-border pt-4">
+            {usageRows.map((row) => (
+              <div key={row.label} className="flex items-center justify-between">
+                <dt className="text-[0.8rem] text-ink-soft">{row.label}</dt>
+                <dd className="font-mono text-sm tabular-nums text-ink">
+                  {nf(row.value)}
+                </dd>
+              </div>
+            ))}
+          </dl>
+
+          {!hasUsage && (
+            <p className="mt-4 rounded-lg border border-dashed border-border px-4 py-3 text-center text-[0.78rem] text-ink-muted">
+              No usage recorded in the last 30 days.
+            </p>
+          )}
         </div>
       </div>
     </div>

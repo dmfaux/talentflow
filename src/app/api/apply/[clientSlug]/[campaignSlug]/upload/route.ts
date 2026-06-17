@@ -58,7 +58,7 @@ export async function POST(
         // The worker owns the move to 'scoring' once it starts processing.
         await getQueue().enqueue(
           { type: "candidate-processing", candidateId },
-          { deduplicationId: `process-${candidateId}` }
+          { orgId: campaign.org_id, deduplicationId: `process-${candidateId}` }
         );
       }
     }

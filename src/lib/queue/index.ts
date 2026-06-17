@@ -18,4 +18,5 @@ export function getQueue(): JobQueue {
   return _queue!;
 }
 
+export { namespaceDedup } from "./types";
 export type { JobQueue, JobPayload, EnqueueOptions } from "./types";

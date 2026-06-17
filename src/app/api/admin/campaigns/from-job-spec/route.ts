@@ -9,6 +9,7 @@ import {
   JobSpecQualityError,
 } from "@/lib/ai/job-spec-schema";
 import { AllProvidersFailedError } from "@/lib/ai/providers";
+import { recordUsageEvent } from "@/lib/usage";
 import { NextRequest, NextResponse } from "next/server";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -170,6 +171,25 @@ export async function POST(request: NextRequest) {
         salary_range_max: result.salary_range_max ?? null,
       })
       .returning();
+
+    // Meter the job-spec parse (ai_tokens) + the campaign creation, now that
+    // the campaign id exists. Both best-effort — never block the response.
+    recordUsageEvent({
+      orgId: ctx.effectiveOrgId!,
+      brandId: clientId,
+      kind: "ai_tokens",
+      provider: aiResult.providerName,
+      model: aiResult.modelId,
+      inputTokens: aiResult.usage.inputTokens,
+      outputTokens: aiResult.usage.outputTokens,
+      campaignId: row.id,
+    });
+    recordUsageEvent({
+      orgId: ctx.effectiveOrgId!,
+      brandId: clientId,
+      kind: "campaign_created",
+      campaignId: row.id,
+    });
 
     return success({ id: row.id }, 201);
   } catch (err) {

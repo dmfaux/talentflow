@@ -38,12 +38,18 @@ export async function POST(request: NextRequest) {
   // table is the queue — with Service Bus the table cannot see in-flight
   // messages, so requeuing here would double-process.
   if (process.env.QUEUE_PROVIDER !== "servicebus") {
+    // S10: stamp org_id (candidates.org_id is NOT NULL → recovery rows always
+    // get a non-null org_id) and org-namespace the deduplication_id, matching
+    // namespaceDedup("<orgId>", "process-recovery-<id>") so per-tenant dedup is
+    // consistent with DbQueue.enqueue. This is the S13-gated writer: it is one
+    // of the verified writers the trigger-drop gate is waiting on.
     await db.execute(sql`
-      INSERT INTO jobs (type, payload, deduplication_id)
+      INSERT INTO jobs (type, payload, deduplication_id, org_id)
       SELECT
         'candidate-processing',
         jsonb_build_object('type', 'candidate-processing', 'candidateId', ${candidates.id}),
-        'process-recovery-' || ${candidates.id}::text
+        ${candidates.org_id}::text || ':process-recovery-' || ${candidates.id}::text,
+        ${candidates.org_id}
       FROM ${candidates}
       WHERE (
           (
@@ -68,11 +74,11 @@ export async function POST(request: NextRequest) {
         )
         -- Throttle: at most one recovery attempt per candidate per window,
         -- so a candidate the job keeps skipping (e.g. storage unconfigured)
-        -- doesn't requeue on every tick.
+        -- doesn't requeue on every tick. Matches the namespaced dedup key.
         AND NOT EXISTS (
           SELECT 1
           FROM jobs recent
-          WHERE recent.deduplication_id = 'process-recovery-' || ${candidates.id}::text
+          WHERE recent.deduplication_id = ${candidates.org_id}::text || ':process-recovery-' || ${candidates.id}::text
             AND recent.created_at > now() - interval '15 minutes'
         )
       ON CONFLICT DO NOTHING
