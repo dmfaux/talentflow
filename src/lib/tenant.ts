@@ -4,6 +4,7 @@ import { and, eq, sql, type SQL } from "drizzle-orm";
 import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import {
   getActAsClaim,
+  getActiveBrandCookie,
   getSession,
   type OrgRole,
   type SessionPayload,
@@ -27,6 +28,10 @@ export type TenantContext = {
   orgId: string | null; // the user's home org (null for operators)
   actingOrgId: string | null; // operator act-as target — null until S7
   effectiveOrgId: string | null; // orgId ?? actingOrgId — what S3/S4 scope on
+  // Optional read narrowing from the active_brand cookie (S8). Re-validated
+  // every request against the caller's access; org_id stays the hard boundary.
+  // null = no narrowing ("All brands", or an invalid/foreign cookie).
+  activeBrandId: string | null;
 };
 
 /** Resolve the operator's act-as target from the short-lived act-as cookie.
@@ -52,14 +57,27 @@ export async function tenantFromSession(
   session: SessionPayload
 ): Promise<TenantContext> {
   const actingOrgId = await getActingOrgId(session);
-  return {
+  const ctx: TenantContext = {
     userId: session.userId,
     isOperator: session.isOperator,
     orgRole: session.orgRole,
     orgId: session.orgId,
     actingOrgId,
     effectiveOrgId: session.orgId ?? actingOrgId,
+    activeBrandId: null,
   };
+  // Re-validate the active-brand cookie EVERY request (plan §5.7: UI gating is
+  // cosmetic; activeBrandId re-validated server-side every request). Only honour
+  // a brand the caller can actually access — owner/org_admin/acting-operator can
+  // target any in-org brand, a plain member only their membership brands.
+  // An invalid/foreign/stale cookie → null (no narrowing), never an error.
+  // canAccessBrand reads only role/membership (not activeBrandId), so passing
+  // the partially-built ctx is safe.
+  const raw = await getActiveBrandCookie();
+  if (raw && (await canAccessBrand(ctx, raw))) {
+    ctx.activeBrandId = raw;
+  }
+  return ctx;
 }
 
 /** Resolve the effective tenant context, or redirect to /login if no session.
@@ -173,6 +191,18 @@ export function orgScope(table: OrgScopedTable, ctx: TenantContext): SQL {
   return ctx.effectiveOrgId
     ? eq(table.org_id, ctx.effectiveOrgId)
     : sql`false`;
+}
+
+/** Optional brand narrowing for reads (S8) — `org_id` stays the hard boundary.
+ *  Returns undefined when no brand is active ("All brands"), so it drops out of
+ *  the existing `conditions[]` + `and(...)` filter. Always AND it with orgScope:
+ *  `and(orgScope(t, ctx), brandScope(t, ctx))`. Unlike orgScope this never needs
+ *  a literal FALSE — a null activeBrandId means "don't narrow", not "deny". */
+export function brandScope(
+  table: { client_id: AnyPgColumn },
+  ctx: TenantContext
+): SQL | undefined {
+  return ctx.activeBrandId ? eq(table.client_id, ctx.activeBrandId) : undefined;
 }
 
 /** Pure ownership predicate — the unit-testable core. A non-acting operator

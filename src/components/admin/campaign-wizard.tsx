@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { buildTemplatePrompt, type BrandColors } from "@/lib/prompt-builder";
 import { validateHtmlTemplate, replaceSlots, type SlotData } from "@/lib/slots";
 import { renderMarkdown } from "@/lib/markdown";
+import { useTenant } from "./tenant-provider";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -135,8 +136,14 @@ export function CampaignWizard({
   breadcrumbLabel,
 }: CampaignWizardProps) {
   const router = useRouter();
+  const tenant = useTenant();
   const [step, setStep] = useState(initialStep);
   const [form, setForm] = useState<FormData>({ ...INITIAL, ...initialForm });
+  // S8: in create mode the campaign's brand IS the active brand (no select).
+  // Keep form.client_id synced to it so the existing branding/slug/submit logic
+  // keeps working; edit mode keeps the campaign's own (locked) client_id.
+  const activeBrandName =
+    tenant.brands.find((b) => b.id === tenant.activeBrandId)?.name ?? null;
   // Track if the user has manually touched the slug (or if edit mode
   // loaded an existing slug). In edit mode we treat the slug as manual
   // so auto-slugify from role_title changes doesn't clobber it.
@@ -162,6 +169,14 @@ export function CampaignWizard({
       .then((r) => r.json())
       .then((res) => setClients(res.data ?? []));
   }, []);
+
+  // Create mode: bind the form's brand to the active-brand context (and follow
+  // header brand switches). "All brands"/none → empty, which blocks step 0.
+  useEffect(() => {
+    if (mode !== "create") return;
+    const next = tenant.activeBrandId ?? "";
+    setForm((prev) => (prev.client_id === next ? prev : { ...prev, client_id: next }));
+  }, [mode, tenant.activeBrandId]);
 
   // Debounced slug validation + availability check (format + uniqueness per client)
   useEffect(() => {
@@ -190,11 +205,15 @@ export function CampaignWizard({
     setSlugSuggestion("");
     const controller = new AbortController();
     const timeout = setTimeout(() => {
-      const params = new URLSearchParams({
-        client_id: form.client_id,
-        slug,
-      });
-      if (mode === "edit" && campaignId) params.set("exclude_id", campaignId);
+      // S8: create mode lets the server derive the brand from the active-brand
+      // context (no client_id sent). Edit mode passes the campaign's own brand
+      // (which may differ from the active brand) + exclude_id; the server
+      // ownership-checks it.
+      const params = new URLSearchParams({ slug });
+      if (mode === "edit" && campaignId) {
+        params.set("client_id", form.client_id);
+        params.set("exclude_id", campaignId);
+      }
       fetch(`/api/admin/campaigns/check-slug?${params.toString()}`, {
         signal: controller.signal,
       })
@@ -438,7 +457,8 @@ export function CampaignWizard({
     setSubmitError("");
 
     const body = {
-      client_id: form.client_id,
+      // S8: brand is derived server-side from the active-brand context — never
+      // sent in the body (acceptance: create never requires/accepts client_id).
       slug: form.slug,
       role_title: form.role_title,
       role_description: form.role_description || null,
@@ -556,29 +576,52 @@ export function CampaignWizard({
           <div className="space-y-5">
             <h2 className="text-base font-semibold text-charcoal">Campaign Basics</h2>
 
-            <div>
-              <label htmlFor="client_id" className={labelClass}>
-                Client <span className="text-red">*</span>
-              </label>
-              <select
-                id="client_id"
-                value={form.client_id}
-                onChange={(e) => updateForm({ client_id: e.target.value })}
-                disabled={lockClient}
-                className={`${inputClass} ${errors.client_id ? "border-red" : ""} ${lockClient ? "cursor-not-allowed opacity-70" : ""}`}
-              >
-                <option value="">Select a client...</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              {lockClient && (
-                <p className="mt-1 text-[0.7rem] text-txt-muted">
-                  Client can&apos;t change on an existing campaign.
-                </p>
-              )}
-              {errors.client_id && <p className="mt-1 text-xs text-red">{errors.client_id}</p>}
-            </div>
+            {mode === "create" ? (
+              tenant.activeBrandId ? (
+                <div>
+                  <label className={labelClass}>Brand</label>
+                  <div className="flex h-10 items-center justify-between rounded-lg border border-border bg-cream/40 px-3.5">
+                    <span className="flex items-center gap-2 text-sm text-charcoal">
+                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent" />
+                      {activeBrandName ?? "Selected brand"}
+                    </span>
+                    <span className="text-[0.7rem] text-txt-muted">From the brand switcher</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-border bg-cream/40 p-4">
+                  <p className="text-sm font-medium text-charcoal">Choose a brand first</p>
+                  <p className="mt-1 text-xs text-txt-muted">
+                    Pick a brand from the switcher in the top bar to create this
+                    campaign in it. &ldquo;All brands&rdquo; can&apos;t own a campaign.
+                  </p>
+                </div>
+              )
+            ) : (
+              <div>
+                <label htmlFor="client_id" className={labelClass}>
+                  Client <span className="text-red">*</span>
+                </label>
+                <select
+                  id="client_id"
+                  value={form.client_id}
+                  onChange={(e) => updateForm({ client_id: e.target.value })}
+                  disabled={lockClient}
+                  className={`${inputClass} ${errors.client_id ? "border-red" : ""} ${lockClient ? "cursor-not-allowed opacity-70" : ""}`}
+                >
+                  <option value="">Select a client...</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                {lockClient && (
+                  <p className="mt-1 text-[0.7rem] text-txt-muted">
+                    Client can&apos;t change on an existing campaign.
+                  </p>
+                )}
+                {errors.client_id && <p className="mt-1 text-xs text-red">{errors.client_id}</p>}
+              </div>
+            )}
 
             {form.client_id && (
               <ClientBrandingSummary

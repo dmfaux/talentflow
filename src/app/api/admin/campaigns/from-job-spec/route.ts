@@ -37,9 +37,11 @@ export async function POST(request: NextRequest) {
 
     // ── Validate inputs ─────────────────────────────────────────────
 
-    const clientId = formData.get("client_id");
-    if (!clientId || typeof clientId !== "string") {
-      return error("client_id is required", 400);
+    // S8: brand derived from the active-brand context, not a FormData client_id
+    // (acceptance: never requires/accepts client_id). No active brand → 400.
+    const clientId = ctx.activeBrandId;
+    if (!clientId) {
+      return error("Select a brand before creating a campaign", 400);
     }
 
     const file = formData.get("file");

@@ -19,6 +19,7 @@ const ctx = (
   orgRole: null,
   orgId: over.effectiveOrgId,
   actingOrgId: null,
+  activeBrandId: null,
   ...over,
 });
 

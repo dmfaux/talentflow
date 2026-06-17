@@ -361,6 +361,28 @@ export function passwordResetEmail(
   `);
 }
 
+/** Colleague invitation to join an org on TalentStream (S8). Credential-granting
+ *  link with a 7-day TTL. orgName + inviterName are DB free text → HTML-escaped. */
+export function invitationEmail(
+  orgName: string,
+  inviterName: string,
+  acceptUrl: string
+): string {
+  const org = escapeHtml(orgName);
+  const inviter = inviterName.trim() ? escapeHtml(inviterName.trim()) : null;
+  const intro = inviter
+    ? `<strong>${inviter}</strong> has invited you to join <strong>${org}</strong> on TalentStream.`
+    : `You&rsquo;ve been invited to join <strong>${org}</strong> on TalentStream.`;
+  return wrapTemplate(`
+    ${emailHeading("Invitation", "You&rsquo;ve been invited")}
+    ${emailP(intro)}
+    ${emailP("Set up your account to get started. This invitation expires in 7&nbsp;days.")}
+    ${emailBtn("Accept invitation", acceptUrl)}
+    ${emailFallbackLink(acceptUrl)}
+    ${emailNote("If you weren&rsquo;t expecting this invitation, you can safely ignore this email.")}
+  `);
+}
+
 export function gatingFailedEmail(
   candidateName: string,
   roleTitle: string,

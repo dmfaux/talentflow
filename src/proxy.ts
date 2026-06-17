@@ -56,6 +56,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Invite-accept page is public — the invitee has no session yet (S8). The
+  // accept API (/api/auth/invite/accept) is already exempt via the /api/ guard.
+  if (pathname === "/accept-invite" || pathname.startsWith("/accept-invite/")) {
+    return NextResponse.next();
+  }
+
   // Protect admin routes. This is an optimistic signature check only; the
   // canonical tenant guard is requireTenant() in (admin)/layout.tsx — the
   // proxy must not read the DB (see Next.js Proxy docs).

@@ -111,6 +111,22 @@ export async function getActAsClaim(): Promise<{
   return { operatorUserId: p.operatorUserId, actingOrgId: p.actingOrgId };
 }
 
+// ── Active-brand cookie (S8) ─────────────────────────────────────────
+//
+// The BrandSwitcher's selection. Unlike the act-as cookie (which IS a privilege
+// grant, hence signed), active_brand grants NOTHING — it only narrows reads
+// within the user's already-enforced access, so a plain unsigned cookie is fine.
+// The security is the per-request membership re-check in tenantFromSession
+// (canAccessBrand): a tampered/foreign value coerces to null, never an error on
+// a read path. Read only inside the seam (auth.ts/tenant.ts), like admin_session.
+
+const ACTIVE_BRAND_COOKIE = "active_brand";
+export const ACTIVE_BRAND_MAX_AGE = 60 * 60 * 8; // seconds; mirrors the session
+
+export async function getActiveBrandCookie(): Promise<string | null> {
+  return (await cookies()).get(ACTIVE_BRAND_COOKIE)?.value ?? null;
+}
+
 // ── Password hashing ─────────────────────────────────────────────────
 
 export async function hashPassword(plain: string): Promise<string> {
@@ -136,4 +152,8 @@ export function hashResetToken(raw: string): string {
   return createHash("sha256").update(raw).digest("hex");
 }
 
-export { COOKIE_NAME, ACT_AS_COOKIE };
+export { COOKIE_NAME, ACT_AS_COOKIE, ACTIVE_BRAND_COOKIE };
+
+// Invite tokens reuse the hardened reset-token primitive verbatim (sha256,
+// single-use, TTL) — aliased so call sites read intentfully (S8).
+export { generateResetToken as generateInviteToken };

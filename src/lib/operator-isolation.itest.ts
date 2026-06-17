@@ -20,6 +20,10 @@ vi.mock("@/lib/auth", async (importOriginal) => {
     getSession: async () => sessionHolder.current,
     getActAsClaim: async () => actAsHolder.claim,
     signActAsToken: async () => "test-act-as-token",
+    // S8: tenantFromSession now reads the active-brand cookie every request.
+    // These S7 tests don't exercise brand narrowing, so stub it to null —
+    // otherwise the real one calls cookies() outside a request scope.
+    getActiveBrandCookie: async () => null,
   };
 });
 

@@ -7,10 +7,18 @@ import {
   requireApiAuth,
   success,
 } from "@/lib/api";
+import { rateLimit } from "@/lib/rate-limit";
 import { slugify, validateSlug } from "@/lib/slug";
 import { isLogoBackground, isLogoPosition, normaliseHexColor } from "@/lib/utils";
 import { asc, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
+
+// Generic message: never assert cross-org existence ("…taken" leaks that some
+// other tenant owns the slug). Brand creation is rate-limited per org alongside
+// check-slug so the create path can't be used as an enumeration oracle either.
+const SLUG_UNAVAILABLE = "This name isn't available";
+const BRAND_CREATE_LIMIT = 10;
+const BRAND_CREATE_WINDOW_MS = 60 * 1000;
 
 export async function GET() {
   const authError = await requireApiAuth();
@@ -47,6 +55,16 @@ export async function POST(request: NextRequest) {
   const denied = authorizeApiOrg(ctx, "manage_brand");
   if (denied) return denied;
 
+  if (
+    !rateLimit(
+      `clients:create:${ctx.effectiveOrgId}`,
+      BRAND_CREATE_LIMIT,
+      BRAND_CREATE_WINDOW_MS
+    )
+  ) {
+    return error("Too many requests. Please slow down.", 429);
+  }
+
   try {
     const body = await request.json();
 
@@ -62,7 +80,7 @@ export async function POST(request: NextRequest) {
       where: eq(clients.slug, slug),
       columns: { id: true },
     });
-    if (slugTaken) return error("This slug is already taken");
+    if (slugTaken) return error(SLUG_UNAVAILABLE);
 
     // Validate + normalise brand colours
     const normalisedColors: Record<string, string | null> = {};
@@ -84,30 +102,44 @@ export async function POST(request: NextRequest) {
       return error("logo_position must be 'top-left' or 'top-centre'");
     }
 
-    const [row] = await db
-      .insert(clients)
-      .values({
-        // Bind to the actor's org; never trust a body org_id or client-supplied
-        // id (the latter is dropped entirely — Resolved Decision; closes the
-        // id-injection path). tier is omitted so it defaults to 'standard'.
-        org_id: ctx.effectiveOrgId!,
-        slug,
-        name: body.name.trim(),
-        contact_name: body.contact_name ?? null,
-        contact_email: body.contact_email ?? null,
-        contact_phone: body.contact_phone ?? null,
-        billing_email: body.billing_email ?? null,
-        branding_logo_url: body.branding_logo_url ?? null,
-        brand_primary_color: normalisedColors.brand_primary_color,
-        brand_secondary_color: normalisedColors.brand_secondary_color,
-        brand_accent_color: normalisedColors.brand_accent_color,
-        brand_text_color: normalisedColors.brand_text_color ?? "#11123c",
-        logo_background: body.logo_background ?? "light",
-        logo_position: body.logo_position ?? "top-left",
-        notes: body.notes ?? null,
-        is_active: body.is_active ?? true,
-      })
-      .returning();
+    const values = {
+      // Bind to the actor's org; never trust a body org_id or client-supplied
+      // id (the latter is dropped entirely — Resolved Decision; closes the
+      // id-injection path). tier is omitted so it defaults to 'standard'.
+      org_id: ctx.effectiveOrgId!,
+      slug,
+      name: body.name.trim(),
+      contact_name: body.contact_name ?? null,
+      contact_email: body.contact_email ?? null,
+      contact_phone: body.contact_phone ?? null,
+      billing_email: body.billing_email ?? null,
+      branding_logo_url: body.branding_logo_url ?? null,
+      brand_primary_color: normalisedColors.brand_primary_color,
+      brand_secondary_color: normalisedColors.brand_secondary_color,
+      brand_accent_color: normalisedColors.brand_accent_color,
+      brand_text_color: normalisedColors.brand_text_color ?? "#11123c",
+      logo_background: body.logo_background ?? "light",
+      logo_position: body.logo_position ?? "top-left",
+      notes: body.notes ?? null,
+      is_active: body.is_active ?? true,
+    };
+
+    // Defence in depth: the global unique index is the real guarantee, so a
+    // race past the pre-check surfaces as the same generic message, not a 500.
+    let row;
+    try {
+      [row] = await db.insert(clients).values(values).returning();
+    } catch (insertErr) {
+      if (
+        insertErr &&
+        typeof insertErr === "object" &&
+        "code" in insertErr &&
+        insertErr.code === "23505"
+      ) {
+        return error(SLUG_UNAVAILABLE);
+      }
+      throw insertErr;
+    }
 
     return success(row, 201);
   } catch (err) {

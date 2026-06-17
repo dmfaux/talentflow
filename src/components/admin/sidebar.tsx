@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { canManageOrg, useTenant } from "./tenant-provider";
 
+// S8 label renames: Clients→Brands, Users→Members (hrefs unchanged; S14 moves
+// the routes). `orgOnly` items are gated to owner/org_admin/acting-operator.
 const NAV_ITEMS = [
-  { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
-  { label: "Campaigns", href: "/campaigns", icon: "campaign" },
-  { label: "Clients", href: "/clients", icon: "client" },
-  { label: "Users", href: "/users", icon: "users" },
-  { label: "Settings", href: "/settings", icon: "settings" },
+  { label: "Dashboard", href: "/dashboard", icon: "dashboard", orgOnly: false },
+  { label: "Campaigns", href: "/campaigns", icon: "campaign", orgOnly: false },
+  { label: "Brands", href: "/clients", icon: "client", orgOnly: true },
+  { label: "Members", href: "/users", icon: "users", orgOnly: true },
+  { label: "Settings", href: "/settings", icon: "settings", orgOnly: true },
 ] as const;
 
 const ICONS: Record<string, React.ReactNode> = {
@@ -58,6 +61,10 @@ const ICONS: Record<string, React.ReactNode> = {
 export function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const tenant = useTenant();
+  const orgManager = canManageOrg(tenant);
+
+  const navItems = NAV_ITEMS.filter((item) => !item.orgOnly || orgManager);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -68,7 +75,7 @@ export function AdminSidebar() {
     <aside className="sticky top-14 flex h-[calc(100vh-3.5rem)] w-52 flex-col border-r border-white/10 bg-[#11123c]">
       <nav className="flex-1 px-3 pt-4">
         <ul className="space-y-0.5">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const active = pathname.startsWith(item.href);
             return (
               <li key={item.href}>

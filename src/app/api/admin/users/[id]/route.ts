@@ -1,11 +1,10 @@
 import { db } from "@/db";
-import { clients, users } from "@/db/schema";
+import { clients, memberships, users } from "@/db/schema";
 import {
   authorizeApiOrg,
   effectiveOrgRole,
   error,
   getApiTenant,
-  requireApiAuth,
   success,
 } from "@/lib/api";
 import { orgScope, resolveOwnedResource } from "@/lib/tenant";
@@ -59,33 +58,53 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  // S8: close the S4 read carry-over — was requireApiAuth() resolving ANY user
+  // by raw UUID across all orgs. Now org-scoped via resolveOwnedResource; a
+  // cross-org id or an operator → 404 (indistinguishable from "does not exist").
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const { id } = await params;
 
-    const [row] = await db
+    const row = await resolveOwnedResource(users, id, ctx);
+    if (!row || row.is_operator) return error("User not found", 404);
+
+    // Membership view: the brands this member can act in (org-level owners/admins
+    // carry none and span every brand).
+    const mships = await db
       .select({
-        id: users.id,
-        first_name: users.first_name,
-        last_name: users.last_name,
-        email: users.email,
-        security_group: users.security_group,
-        client_id: users.client_id,
+        client_id: memberships.client_id,
         client_name: clients.name,
-        is_active: users.is_active,
-        created_at: users.created_at,
-        updated_at: users.updated_at,
+        brand_role: memberships.brand_role,
       })
-      .from(users)
-      .leftJoin(clients, eq(users.client_id, clients.id))
-      .where(eq(users.id, id))
-      .limit(1);
+      .from(memberships)
+      .innerJoin(clients, eq(memberships.client_id, clients.id))
+      .where(eq(memberships.user_id, row.id));
 
-    if (!row) return error("User not found", 404);
+    // Legacy single-brand name (users.client_id), kept for the existing detail/
+    // edit page until S14; client_id is now nullable (org-level members).
+    const legacyClient = row.client_id
+      ? await db.query.clients.findFirst({
+          where: eq(clients.id, row.client_id),
+          columns: { name: true },
+        })
+      : null;
 
-    return success(row);
+    return success({
+      id: row.id,
+      first_name: row.first_name,
+      last_name: row.last_name,
+      email: row.email,
+      org_role: row.org_role,
+      security_group: row.security_group, // legacy (dropped S13)
+      client_id: row.client_id,
+      client_name: legacyClient?.name ?? null,
+      is_active: row.is_active,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      memberships: mships,
+    });
   } catch (err) {
     console.error("GET /api/admin/users/[id] error:", err);
     return error("Internal server error", 500);

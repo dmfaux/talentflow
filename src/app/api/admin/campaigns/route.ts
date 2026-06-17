@@ -1,30 +1,27 @@
 import { db } from "@/db";
 import { campaigns, clients } from "@/db/schema";
-import {
-  authorizeApiBrand,
-  error,
-  getApiTenant,
-  requireApiAuth,
-  success,
-} from "@/lib/api";
-import { resolveOwnedResource } from "@/lib/tenant";
+import { authorizeApiBrand, error, getApiTenant, success } from "@/lib/api";
+import { brandScope, orgScope, resolveOwnedResource } from "@/lib/tenant";
 import { validateSlug } from "@/lib/slug";
 import { validateHtmlTemplate } from "@/lib/slots";
 import { and, desc, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
 export async function GET(request: NextRequest) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  // S8: org-scoped + brand-narrowed (the active brand re-scopes the list). org_id
+  // stays the hard boundary; brandScope is an additional predicate when a brand
+  // is active. (Also closes the prior unscoped requireApiAuth read.)
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const { searchParams } = request.nextUrl;
     const statusFilter = searchParams.get("status");
-    const clientIdFilter = searchParams.get("client_id");
 
-    const conditions = [];
+    const conditions = [orgScope(campaigns, ctx)];
+    const brand = brandScope(campaigns, ctx);
+    if (brand) conditions.push(brand);
     if (statusFilter) conditions.push(eq(campaigns.status, statusFilter));
-    if (clientIdFilter) conditions.push(eq(campaigns.client_id, clientIdFilter));
 
     const rows = await db
       .select({
@@ -47,7 +44,7 @@ export async function GET(request: NextRequest) {
       })
       .from(campaigns)
       .leftJoin(clients, eq(campaigns.client_id, clients.id))
-      .where(conditions.length ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(desc(campaigns.created_at));
 
     return success(rows);
@@ -64,8 +61,14 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
+    // S8: the brand is derived from the active-brand context, NOT a body
+    // client_id (acceptance: campaign create never requires/accepts client_id).
+    // Any body client_id is ignored entirely. "All brands"/no active brand → 400
+    // (the wizard blocks before POST; this is the backstop).
+    const brandId = ctx.activeBrandId;
+    if (!brandId) return error("Select a brand before creating a campaign", 400);
+
     // Required fields
-    if (!body.client_id) return error("client_id is required");
     if (!body.slug) return error("slug is required");
     if (!body.role_title) return error("role_title is required");
     if (body.gating_config === undefined) return error("gating_config is required");
@@ -95,9 +98,10 @@ export async function POST(request: NextRequest) {
       if (!htmlCheck.ok) return error(htmlCheck.errors.join("; "));
     }
 
-    // Resolve the target brand WITHIN the actor's org (never trust body
-    // client_id to widen scope). A cross-org/non-existent id → 404.
-    const brand = await resolveOwnedResource(clients, body.client_id, ctx);
+    // Resolve the active brand WITHIN the actor's org (the active-brand cookie is
+    // re-validated in the seam, but resolveOwnedResource is the write-path
+    // backstop). A cross-org/non-existent id → 404.
+    const brand = await resolveOwnedResource(clients, brandId, ctx);
     if (!brand) return error("Client not found", 404);
 
     // RBAC: creating a campaign (incl. publishing straight to active) requires

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import bcrypt from "bcryptjs";
 
 // ── Session seam mock ────────────────────────────────────────────────
@@ -10,6 +10,9 @@ import bcrypt from "bcryptjs";
 const sessionHolder = vi.hoisted(() => ({
   current: null as Record<string, unknown> | null,
 }));
+// S8: campaigns POST derives the brand from the active-brand cookie. Tests set
+// this holder before a campaign create so the seam resolves a concrete brand.
+const brandHolder = vi.hoisted(() => ({ current: null as string | null }));
 vi.mock("@/lib/auth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/auth")>();
   // getActAsClaim is part of the session seam now (S7): tenantFromSession reads
@@ -20,6 +23,11 @@ vi.mock("@/lib/auth", async (importOriginal) => {
     ...actual,
     getSession: async () => sessionHolder.current,
     getActAsClaim: async () => null,
+    // S8: tenantFromSession now reads the active-brand cookie every request.
+    // Back it with a settable holder (default null = "All brands") so campaign
+    // creates can pick a concrete brand; the real one calls cookies(), which
+    // would throw outside a request scope.
+    getActiveBrandCookie: async () => brandHolder.current,
   };
 });
 
@@ -246,6 +254,11 @@ describe.skipIf(!RUN)("S5 write-isolation & RBAC (DB-backed)", () => {
     sessionHolder.current = null;
   });
 
+  // Brand narrowing must not leak between tests (default: no active brand).
+  afterEach(() => {
+    brandHolder.current = null;
+  });
+
   // 1. Cross-org valid UUID → 404 (indistinguishable from missing).
   describe("cross-org writes → 404", () => {
     it("campaign PATCH on another org's campaign", async () => {
@@ -285,8 +298,12 @@ describe.skipIf(!RUN)("S5 write-isolation & RBAC (DB-backed)", () => {
 
   // 2. Body scope never widens the actor's reach.
   describe("body-scope escape rejected", () => {
-    it("campaign POST with a foreign client_id → 404", async () => {
+    it("campaign POST ignores a body client_id; uses the active brand (S8)", async () => {
+      // S8: campaign create never accepts a body client_id — the brand is the
+      // active-brand context. With brand A active and a foreign brand B in the
+      // body, the campaign is still created under A (body ignored).
       login({ userId: fx.owner, orgId: fx.orgA, orgRole: "owner", isOperator: false });
+      brandHolder.current = fx.brandA;
       const res = await campaignsPost(
         jsonReq({
           client_id: fx.brandB,
@@ -296,7 +313,9 @@ describe.skipIf(!RUN)("S5 write-isolation & RBAC (DB-backed)", () => {
           scoring_rubric: {},
         })
       );
-      expect(res.status).toBe(404);
+      expect(res.status).toBe(201);
+      const { data } = await res.json();
+      expect(data.client_id).toBe(fx.brandA);
     });
     it("client POST ignores body id/org_id; binds actor org", async () => {
       login({ userId: fx.owner, orgId: fx.orgA, orgRole: "owner", isOperator: false });
@@ -344,8 +363,9 @@ describe.skipIf(!RUN)("S5 write-isolation & RBAC (DB-backed)", () => {
   describe("role matrix", () => {
     it("viewer → 403 creating a campaign", async () => {
       login({ userId: fx.viewer, orgId: fx.orgA, orgRole: null, isOperator: false });
+      brandHolder.current = fx.brandA;
       const res = await campaignsPost(
-        jsonReq({ client_id: fx.brandA, slug: "viewer-x", role_title: "x", gating_config: [], scoring_rubric: {} })
+        jsonReq({ slug: "viewer-x", role_title: "x", gating_config: [], scoring_rubric: {} })
       );
       expect(res.status).toBe(403);
     });
@@ -366,8 +386,9 @@ describe.skipIf(!RUN)("S5 write-isolation & RBAC (DB-backed)", () => {
     });
     it("recruiter → creates/publishes a campaign (201)", async () => {
       login({ userId: fx.recruiter, orgId: fx.orgA, orgRole: null, isOperator: false });
+      brandHolder.current = fx.brandA;
       const res = await campaignsPost(
-        jsonReq({ client_id: fx.brandA, slug: "recruiter-x", role_title: "x", status: "active", gating_config: [], scoring_rubric: {} })
+        jsonReq({ slug: "recruiter-x", role_title: "x", status: "active", gating_config: [], scoring_rubric: {} })
       );
       expect(res.status).toBe(201);
     });

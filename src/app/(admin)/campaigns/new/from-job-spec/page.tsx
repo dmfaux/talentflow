@@ -3,13 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTenant } from "@/components/admin/tenant-provider";
 
 // ── Types ───────────────────────────────────────────────────────────
-
-interface Client {
-  id: string;
-  name: string;
-}
 
 type Phase = "upload" | "processing" | "error";
 
@@ -41,11 +37,6 @@ const ERROR_MESSAGES: Record<string, string> = {
   ai_quality_invalid:
     "The AI struggled to extract consistent screening criteria from this document. Try again or create the campaign manually.",
 };
-
-// ── Shared styles ───────────────────────────────────────────────────
-
-const inputClass =
-  "h-10 w-full rounded-lg border border-border bg-cream/40 px-3.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20";
 
 // ── Processing animation ────────────────────────────────────────────
 
@@ -126,21 +117,19 @@ function MorphingDocumentAnimation() {
 
 export default function FromJobSpecPage() {
   const router = useRouter();
+  const tenant = useTenant();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [clients, setClients] = useState<Client[]>([]);
-  const [clientId, setClientId] = useState("");
+  // S8: the brand is the active-brand context (set from the header switcher),
+  // not a selector. "All brands"/none blocks submission (the API 400s too).
+  const activeBrandName =
+    tenant.brands.find((b) => b.id === tenant.activeBrandId)?.name ?? null;
+
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [phase, setPhase] = useState<Phase>("upload");
   const [errorMessage, setErrorMessage] = useState("");
   const [fileError, setFileError] = useState("");
-
-  useEffect(() => {
-    fetch("/api/admin/clients")
-      .then((r) => r.json())
-      .then((res) => setClients(res.data ?? []));
-  }, []);
 
   const validateFile = useCallback((f: File): boolean => {
     if (!ACCEPTED_TYPES.includes(f.type)) {
@@ -171,12 +160,11 @@ export default function FromJobSpecPage() {
   }
 
   async function handleSubmit() {
-    if (!clientId || !file) return;
+    if (!tenant.activeBrandId || !file) return;
     setPhase("processing");
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("client_id", clientId);
 
     try {
       const res = await fetch("/api/admin/campaigns/from-job-spec", {
@@ -238,24 +226,27 @@ export default function FromJobSpecPage() {
           </p>
 
           <div className="space-y-6">
-            {/* Client selector */}
+            {/* Active-brand context (set from the header switcher) */}
             <div>
-              <label htmlFor="client" className="mb-1.5 block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
-                Client
+              <label className="mb-1.5 block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
+                Brand
               </label>
-              <select
-                id="client"
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">Select a client...</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              {tenant.activeBrandId ? (
+                <div className="flex h-10 items-center justify-between rounded-lg border border-border bg-cream/40 px-3.5">
+                  <span className="flex items-center gap-2 text-sm text-charcoal">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent" />
+                    {activeBrandName ?? "Selected brand"}
+                  </span>
+                  <span className="text-[0.7rem] text-txt-muted">From the brand switcher</span>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-border bg-cream/40 p-4">
+                  <p className="text-sm font-medium text-charcoal">Choose a brand first</p>
+                  <p className="mt-1 text-xs text-txt-muted">
+                    Pick a brand from the switcher in the top bar before uploading a job spec.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* File drop zone */}
@@ -328,7 +319,7 @@ export default function FromJobSpecPage() {
             {/* Submit */}
             <button
               onClick={handleSubmit}
-              disabled={!clientId || !file}
+              disabled={!tenant.activeBrandId || !file}
               className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-accent px-5 text-sm font-medium text-white transition-colors hover:bg-accent-light disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

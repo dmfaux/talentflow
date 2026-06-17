@@ -5,13 +5,12 @@ import {
   effectiveOrgRole,
   error,
   getApiTenant,
-  requireApiAuth,
   success,
 } from "@/lib/api";
 import { hashPassword, type OrgRole } from "@/lib/auth";
-import { resolveOwnedResource } from "@/lib/tenant";
+import { orgScope, resolveOwnedResource } from "@/lib/tenant";
 import { ROLE_RANK } from "@/lib/rbac";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
 const BRAND_ROLES = ["brand_admin", "recruiter", "viewer"] as const;
@@ -34,8 +33,11 @@ function canAssignOrgRole(
 }
 
 export async function GET() {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  // S8: close the S4 read carry-over — was requireApiAuth() (signature-only,
+  // UNSCOPED, leaking every org's users). Now org-scoped + operator-excluded.
+  // Any same-org member may read the directory; mutations stay manage_member.
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const rows = await db
@@ -44,17 +46,49 @@ export async function GET() {
         first_name: users.first_name,
         last_name: users.last_name,
         email: users.email,
-        security_group: users.security_group,
+        org_role: users.org_role,
         client_id: users.client_id,
-        client_name: clients.name,
         is_active: users.is_active,
         created_at: users.created_at,
         updated_at: users.updated_at,
       })
       .from(users)
-      .leftJoin(clients, eq(users.client_id, clients.id))
+      .where(and(orgScope(users, ctx), eq(users.is_operator, false)))
       .orderBy(desc(users.created_at));
-    return success(rows);
+
+    // Membership view (preferred over the legacy users.client_id join): a member
+    // may belong to several brands; an org-level owner/admin has none and spans
+    // every brand. Fetch all memberships for these users in one query + assemble.
+    const ids = rows.map((r) => r.id);
+    const mships = ids.length
+      ? await db
+          .select({
+            user_id: memberships.user_id,
+            client_id: memberships.client_id,
+            client_name: clients.name,
+            brand_role: memberships.brand_role,
+          })
+          .from(memberships)
+          .innerJoin(clients, eq(memberships.client_id, clients.id))
+          .where(inArray(memberships.user_id, ids))
+      : [];
+    const byUser = new Map<
+      string,
+      { client_id: string; client_name: string; brand_role: string }[]
+    >();
+    for (const m of mships) {
+      const list = byUser.get(m.user_id) ?? [];
+      list.push({
+        client_id: m.client_id,
+        client_name: m.client_name,
+        brand_role: m.brand_role,
+      });
+      byUser.set(m.user_id, list);
+    }
+
+    return success(
+      rows.map((r) => ({ ...r, memberships: byUser.get(r.id) ?? [] }))
+    );
   } catch (err) {
     console.error("GET /api/admin/users error:", err);
     return error("Internal server error", 500);

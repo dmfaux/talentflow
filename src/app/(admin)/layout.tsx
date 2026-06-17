@@ -1,14 +1,20 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { ActiveCampaignCount } from "@/components/admin/active-campaign-count";
+import { BrandSwitcher } from "@/components/admin/brand-switcher";
+import {
+  TenantProvider,
+  type TenantBrand,
+} from "@/components/admin/tenant-provider";
 import { ActingAsBanner } from "@/components/operator/acting-as-banner";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { Logo } from "@/components/brand/logo";
-import { requireTenant } from "@/lib/tenant";
+import { canManageOrg } from "@/components/admin/tenant-provider";
+import { getBrandMemberships, requireTenant } from "@/lib/tenant";
 import { db } from "@/db";
-import { organizations } from "@/db/schema";
+import { clients, organizations } from "@/db/schema";
 
 export default async function AdminLayout({
   children,
@@ -32,33 +38,79 @@ export default async function AdminLayout({
       })
     : null;
 
+  // Resolve the client-visible tenant context (S8): org name + the caller's
+  // accessible brands. Owner/org_admin/acting-operator span every brand in the
+  // org; a plain member sees only their membership brands.
+  const org =
+    actingOrg ??
+    (ctx.effectiveOrgId
+      ? await db.query.organizations.findFirst({
+          where: eq(organizations.id, ctx.effectiveOrgId),
+          columns: { name: true },
+        })
+      : null);
+
+  const tenantValue = {
+    userId: ctx.userId,
+    orgRole: ctx.orgRole,
+    isOperator: ctx.isOperator,
+    actingOrgId: ctx.actingOrgId,
+    activeBrandId: ctx.activeBrandId,
+    orgName: org?.name ?? null,
+    brands: [] as TenantBrand[],
+  };
+
+  if (ctx.effectiveOrgId) {
+    if (canManageOrg(tenantValue)) {
+      tenantValue.brands = await db
+        .select({ id: clients.id, name: clients.name })
+        .from(clients)
+        .where(eq(clients.org_id, ctx.effectiveOrgId))
+        .orderBy(asc(clients.name));
+    } else {
+      const memberships = await getBrandMemberships(ctx.userId);
+      const ids = memberships.map((m) => m.clientId);
+      tenantValue.brands = ids.length
+        ? await db
+            .select({ id: clients.id, name: clients.name })
+            .from(clients)
+            .where(inArray(clients.id, ids))
+            .orderBy(asc(clients.name))
+        : [];
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-canvas font-sans">
-      {actingOrg && (
-        <ActingAsBanner orgName={actingOrg.name} status={actingOrg.status} />
-      )}
-      {/* Top bar */}
-      <header className="sticky top-[var(--dev-banner-h,0px)] z-30 flex h-14 items-center justify-between border-b border-rule bg-paper/85 px-6 backdrop-blur-md">
-        <Link href="/dashboard" className="group" aria-label="TalentStream admin">
-          <Logo size="md" />
-        </Link>
-        <div className="flex items-center">
-          <div id="admin-header-default" className="flex items-center">
-            <ActiveCampaignCount />
+    <TenantProvider value={tenantValue}>
+      <div className="min-h-screen bg-canvas font-sans">
+        {actingOrg && (
+          <ActingAsBanner orgName={actingOrg.name} status={actingOrg.status} />
+        )}
+        {/* Top bar */}
+        <header className="sticky top-[var(--dev-banner-h,0px)] z-30 flex h-14 items-center justify-between border-b border-rule bg-paper/85 px-6 backdrop-blur-md">
+          <Link href="/dashboard" className="group" aria-label="TalentStream admin">
+            <Logo size="md" />
+          </Link>
+          <div className="flex items-center gap-4">
+            <div id="admin-header-default" className="flex items-center">
+              <ActiveCampaignCount />
+            </div>
+            <div id="admin-header-slot" className="flex items-center">
+              <BrandSwitcher />
+            </div>
           </div>
-          <div id="admin-header-slot" className="flex items-center" />
+        </header>
+
+        <div className="flex">
+          {/* Sidebar */}
+          <AdminSidebar />
+
+          {/* Main content */}
+          <main className="flex-1 px-8 py-6">
+            <ToastProvider>{children}</ToastProvider>
+          </main>
         </div>
-      </header>
-
-      <div className="flex">
-        {/* Sidebar */}
-        <AdminSidebar />
-
-        {/* Main content */}
-        <main className="flex-1 px-8 py-6">
-          <ToastProvider>{children}</ToastProvider>
-        </main>
       </div>
-    </div>
+    </TenantProvider>
   );
 }

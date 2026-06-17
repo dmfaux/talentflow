@@ -238,9 +238,14 @@ export const users = pgTable(
   "users",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    client_id: uuid("client_id")
-      .notNull()
-      .references(() => clients.id, { onDelete: "cascade" }),
+    // NULLABLE (S8): an org-level invitee (Owner/Org-Admin spanning all brands)
+    // is created with no brand to point at — the S9 empty-org bootstrap. This is
+    // a scoped pull-forward of S13's full DROP COLUMN; the sole-org trigger
+    // (set_org_id_from_client_user) never dereferences client_id on the accept
+    // path because org_id is always set explicitly. operators also carry it null.
+    client_id: uuid("client_id").references(() => clients.id, {
+      onDelete: "cascade",
+    }),
     org_id: uuid("org_id").references(() => organizations.id, {
       onDelete: "cascade",
     }), // NULLABLE: operators have no org (DB + model nullable)
@@ -288,6 +293,68 @@ export const passwordResetTokens = pgTable(
     index("password_reset_tokens_user_id_idx").on(table.user_id),
   ]
 );
+
+// ── Invitations (S8) ─────────────────────────────────────────────────
+//
+// The colleague-actioned onboarding token. Mirrors the hardened sha256 /
+// single-use / TTL pattern of password_reset_tokens, with accepted_at standing
+// in for used_at. A BRAND invite carries client_id + brand_role; an ORG-LEVEL
+// invite (Owner/Org-Admin spanning every brand) carries org_role and leaves
+// client_id null — the path S9 reuses to seat the first Owner of an empty org.
+// Written only by the invite route, which stamps org_id explicitly from
+// ctx.effectiveOrgId (no org_id-stamping trigger dependency).
+
+export const invitations = pgTable(
+  "invitations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    org_id: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    email: text("email").notNull(), // stored lowercased/trimmed (match users + login)
+    // Nullable for an ORG-LEVEL invite. A brand invite carries client_id +
+    // brand_role; an org invite carries org_role.
+    client_id: uuid("client_id").references(() => clients.id, {
+      onDelete: "cascade",
+    }),
+    org_role: text("org_role"), // owner | org_admin | null
+    brand_role: text("brand_role"), // brand_admin | recruiter | viewer | null
+    token_hash: text("token_hash").notNull(), // sha256(raw), mirrors password_reset_tokens
+    expires_at: timestamp("expires_at").notNull(),
+    accepted_at: timestamp("accepted_at"), // null = pending (the single-use flag)
+    invited_by: uuid("invited_by").references(() => users.id, {
+      onDelete: "set null", // keep the invite row legible after the inviter leaves
+    }),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("invitations_token_hash_idx").on(table.token_hash),
+    // unique(org_id, email) WHILE PENDING — one live invite per email per org.
+    // Partial so a re-invite after accept/expiry-cleanup is allowed (accepted
+    // rows have a non-null accepted_at and drop out of the index).
+    uniqueIndex("invitations_org_email_pending_idx")
+      .on(table.org_id, table.email)
+      .where(sql`${table.accepted_at} IS NULL`),
+    index("invitations_org_id_idx").on(table.org_id),
+    index("invitations_expires_at_idx").on(table.expires_at),
+  ]
+);
+
+export const invitationsRelations = relations(invitations, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [invitations.org_id],
+    references: [organizations.id],
+  }),
+  client: one(clients, {
+    fields: [invitations.client_id],
+    references: [clients.id],
+  }),
+  inviter: one(users, {
+    fields: [invitations.invited_by],
+    references: [users.id],
+  }),
+}));
 
 // ── Messages ─────────────────────────────────────────────────────────
 

@@ -91,6 +91,7 @@ const ctx = (over: Partial<TenantContext>): TenantContext => ({
   orgId: "org-a",
   actingOrgId: null,
   effectiveOrgId: "org-a",
+  activeBrandId: null,
   ...over,
 });
 
