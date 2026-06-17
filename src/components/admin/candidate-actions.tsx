@@ -8,9 +8,13 @@ interface Props {
   candidateId: string;
   status: string;
   hasCv: boolean;
+  /** When false (viewer / non-member), mutation controls (open chat,
+   *  shortlist, reject) are hidden. CV download stays — it is a read. The
+   *  server enforces the same; the hide is cosmetic. */
+  canManage?: boolean;
 }
 
-export function CandidateActions({ candidateId, status, hasCv }: Props) {
+export function CandidateActions({ candidateId, status, hasCv, canManage = true }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState("");
@@ -101,7 +105,7 @@ export function CandidateActions({ candidateId, status, hasCv }: Props) {
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        {canOpenChat && (
+        {canManage && canOpenChat && (
           <button
             onClick={openChat}
             disabled={!!loading}
@@ -113,7 +117,7 @@ export function CandidateActions({ candidateId, status, hasCv }: Props) {
             {loading === "open-chat" ? "..." : "Open Chat"}
           </button>
         )}
-        {canShortlist && (
+        {canManage && canShortlist && (
           <button
             onClick={() => updateStatus("shortlisted")}
             disabled={!!loading}
@@ -122,7 +126,7 @@ export function CandidateActions({ candidateId, status, hasCv }: Props) {
             {loading === "shortlisted" ? "..." : "Add to Shortlist"}
           </button>
         )}
-        {canReject && (
+        {canManage && canReject && (
           <button
             onClick={() => setConfirmReject(true)}
             disabled={!!loading}

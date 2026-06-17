@@ -169,6 +169,7 @@ async function handleChatInvitation(
 
   // Create the conversation
   const conversationId = await createConversation(
+    candidate.org_id,
     candidate.id,
     candidate.name,
     candidate.campaign.role_title,

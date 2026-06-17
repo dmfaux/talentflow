@@ -1,6 +1,13 @@
 import { db } from "@/db";
 import { campaigns, candidates } from "@/db/schema";
-import { error, requireApiAuth, success } from "@/lib/api";
+import {
+  authorizeApiBrand,
+  error,
+  getApiTenant,
+  requireApiAuth,
+  success,
+} from "@/lib/api";
+import { resolveOwnedResource } from "@/lib/tenant";
 import { validateSlug } from "@/lib/slug";
 import { validateHtmlTemplate } from "@/lib/slots";
 import { and, eq, sql } from "drizzle-orm";
@@ -49,19 +56,22 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const { id } = await params;
     const body = await request.json();
 
-    // Check campaign exists
-    const existing = await db.query.campaigns.findFirst({
-      where: eq(campaigns.id, id),
-      columns: { id: true, slug: true, status: true, client_id: true },
-    });
+    // Resolve the campaign WITHIN the actor's org — a cross-org id → 404.
+    const existing = await resolveOwnedResource(campaigns, id, ctx);
     if (!existing) return error("Campaign not found", 404);
+
+    // RBAC: editing (incl. publishing draft → active) requires recruiter+ on
+    // the campaign's brand. The publish_campaign min-role is also recruiter,
+    // so a viewer/non-member is 403'd here before any status flip.
+    const denied = await authorizeApiBrand(ctx, existing.client_id, "recruiter");
+    if (denied) return denied;
 
     // Validate HTML template if provided
     if (body.html_template !== undefined && body.html_template) {
@@ -145,17 +155,17 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const { id } = await params;
 
-    const existing = await db.query.campaigns.findFirst({
-      where: eq(campaigns.id, id),
-      columns: { id: true },
-    });
+    const existing = await resolveOwnedResource(campaigns, id, ctx);
     if (!existing) return error("Campaign not found", 404);
+
+    const denied = await authorizeApiBrand(ctx, existing.client_id, "recruiter");
+    if (denied) return denied;
 
     const [row] = await db
       .update(campaigns)

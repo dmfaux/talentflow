@@ -9,13 +9,19 @@ import { useToast } from "@/components/ui/toast-provider";
 interface Props {
   campaignId: string;
   status: string;
+  /** When false (viewer / non-member), mutation controls are hidden — the
+   *  server still enforces this; the hide is cosmetic. */
+  canManage?: boolean;
 }
 
-export function CampaignActions({ campaignId, status }: Props) {
+export function CampaignActions({ campaignId, status, canManage = true }: Props) {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+
+  // A viewer (or non-member) gets a read-only view — no publish/pause/close.
+  if (!canManage) return null;
 
   async function updateStatus(newStatus: string) {
     setLoading(true);

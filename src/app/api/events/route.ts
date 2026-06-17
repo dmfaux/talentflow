@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     // Resolve campaign_id from slugs
     const [campaign] = await db
-      .select({ id: campaigns.id })
+      .select({ id: campaigns.id, org_id: campaigns.org_id })
       .from(campaigns)
       .innerJoin(clients, eq(campaigns.client_id, clients.id))
       .where(and(eq(clients.slug, client_slug), eq(campaigns.slug, campaign_slug)))
@@ -74,6 +74,8 @@ export async function POST(request: NextRequest) {
     // Batch insert
     await db.insert(events).values(
       validEvents.map((e: { type: string; metadata?: Record<string, unknown> }) => ({
+        // Public write: stamp org_id explicitly from the resolved campaign.
+        org_id: campaign.org_id,
         campaign_id: campaign.id,
         event_type: e.type,
         session_id: String(session_id),

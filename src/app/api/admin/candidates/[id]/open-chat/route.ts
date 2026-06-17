@@ -1,27 +1,36 @@
 import { db } from "@/db";
 import { candidates } from "@/db/schema";
-import { error, requireApiAuth, success } from "@/lib/api";
+import { authorizeApiBrand, error, getApiTenant, success } from "@/lib/api";
+import { orgScope } from "@/lib/tenant";
 import { generateChatToken } from "@/lib/chat-auth";
 import { createConversation, getActiveConversation } from "@/lib/chat";
 import { getQueue } from "@/lib/queue";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const { id } = await params;
 
     const candidate = await db.query.candidates.findFirst({
-      where: eq(candidates.id, id),
+      where: and(eq(candidates.id, id), orgScope(candidates, ctx)),
       with: { campaign: { with: { client: true } } },
     });
 
     if (!candidate) return error("Candidate not found", 404);
+
+    // RBAC: opening a follow-up chat requires recruiter+ on the brand.
+    const denied = await authorizeApiBrand(
+      ctx,
+      candidate.campaign.client_id,
+      "recruiter"
+    );
+    if (denied) return denied;
 
     // Ensure candidate has a chat token
     if (!candidate.chat_token_hash) {
@@ -44,6 +53,7 @@ export async function POST(
     const clientName = candidate.campaign.client?.name ?? "the company";
 
     const conversationId = await createConversation(
+      candidate.org_id,
       id,
       candidate.name,
       candidate.campaign.role_title,

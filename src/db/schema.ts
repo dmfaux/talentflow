@@ -38,11 +38,14 @@ export const clients = pgTable(
   "clients",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    // DB-level NOT NULL is enforced by migration 0026 (+ sole-org trigger);
-    // the model omits .notNull() until S5 so existing insert sites typecheck.
-    org_id: uuid("org_id").references(() => organizations.id, {
-      onDelete: "cascade",
-    }),
+    // DB-level NOT NULL is enforced by migration 0026 (+ sole-org trigger).
+    // S5 flips the model to .notNull() now that every brand writer stamps it;
+    // the trigger remains the runtime backstop until S13.
+    org_id: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, {
+        onDelete: "cascade",
+      }),
     slug: text("slug").notNull().unique(),
     name: text("name").notNull(),
     tier: text("tier").notNull().default("standard"),
@@ -100,9 +103,11 @@ export const campaigns = pgTable(
     client_id: uuid("client_id")
       .notNull()
       .references(() => clients.id, { onDelete: "cascade" }),
-    org_id: uuid("org_id").references(() => organizations.id, {
-      onDelete: "cascade",
-    }), // DB NOT NULL via 0026; model nullable until S5
+    org_id: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, {
+        onDelete: "cascade",
+      }), // DB + model NOT NULL (S5 flip); trigger backstop stays until S13
     slug: text("slug").notNull(),
     role_title: text("role_title").notNull(),
     role_description: text("role_description"),
@@ -142,9 +147,11 @@ export const candidates = pgTable(
     campaign_id: uuid("campaign_id")
       .notNull()
       .references(() => campaigns.id, { onDelete: "cascade" }),
-    org_id: uuid("org_id").references(() => organizations.id, {
-      onDelete: "cascade",
-    }), // DB NOT NULL via 0026; model nullable until S5
+    org_id: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, {
+        onDelete: "cascade",
+      }), // DB + model NOT NULL (S5 flip); trigger backstop stays until S13
     name: text("name").notNull(),
     email: text("email").notNull(),
     phone: text("phone"),
@@ -197,9 +204,11 @@ export const scoringLogs = pgTable(
     candidate_id: uuid("candidate_id")
       .notNull()
       .references(() => candidates.id, { onDelete: "cascade" }),
-    org_id: uuid("org_id").references(() => organizations.id, {
-      onDelete: "cascade",
-    }), // DB NOT NULL via 0026; model nullable until S5
+    org_id: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, {
+        onDelete: "cascade",
+      }), // DB + model NOT NULL (S5 flip); trigger backstop stays until S13
     provider: text("provider"),
     model_version: text("model_version").notNull(),
     full_prompt: text("full_prompt").notNull(),
@@ -289,9 +298,11 @@ export const messages = pgTable(
     candidate_id: uuid("candidate_id")
       .notNull()
       .references(() => candidates.id, { onDelete: "cascade" }),
-    org_id: uuid("org_id").references(() => organizations.id, {
-      onDelete: "cascade",
-    }), // DB NOT NULL via 0026; model nullable until S5
+    org_id: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, {
+        onDelete: "cascade",
+      }), // DB + model NOT NULL (S5 flip); trigger backstop stays until S13
     channel: text("channel").notNull(),
     direction: text("direction").notNull(),
     content: text("content").notNull(),
@@ -317,9 +328,11 @@ export const conversations = pgTable(
     candidate_id: uuid("candidate_id")
       .notNull()
       .references(() => candidates.id, { onDelete: "cascade" }),
-    org_id: uuid("org_id").references(() => organizations.id, {
-      onDelete: "cascade",
-    }), // DB NOT NULL via 0026; model nullable until S5
+    org_id: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, {
+        onDelete: "cascade",
+      }), // DB + model NOT NULL (S5 flip); trigger backstop stays until S13
     status: text("status").notNull().default("active"),
     lifecycle: text("lifecycle").notNull().default("dormant"),
     topics: jsonb("topics"),
@@ -347,9 +360,11 @@ export const chatMessages = pgTable(
     conversation_id: uuid("conversation_id")
       .notNull()
       .references(() => conversations.id, { onDelete: "cascade" }),
-    org_id: uuid("org_id").references(() => organizations.id, {
-      onDelete: "cascade",
-    }), // DB NOT NULL via 0026; model nullable until S5
+    org_id: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, {
+        onDelete: "cascade",
+      }), // DB + model NOT NULL (S5 flip); trigger backstop stays until S13
     role: text("role").notNull(),
     content: text("content").notNull(),
     created_at: timestamp("created_at").defaultNow().notNull(),
@@ -370,9 +385,11 @@ export const chatTokens = pgTable(
     candidate_id: uuid("candidate_id")
       .notNull()
       .references(() => candidates.id, { onDelete: "cascade" }),
-    org_id: uuid("org_id").references(() => organizations.id, {
-      onDelete: "cascade",
-    }), // DB NOT NULL via 0026; model nullable until S5
+    org_id: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, {
+        onDelete: "cascade",
+      }), // DB + model NOT NULL (S5 flip); trigger backstop stays until S13
     token_hash: text("token_hash").notNull(),
     expires_at: timestamp("expires_at").notNull(),
     used_at: timestamp("used_at"),
@@ -394,9 +411,11 @@ export const events = pgTable(
     campaign_id: uuid("campaign_id")
       .notNull()
       .references(() => campaigns.id, { onDelete: "cascade" }),
-    org_id: uuid("org_id").references(() => organizations.id, {
-      onDelete: "cascade",
-    }), // DB NOT NULL via 0026; model nullable until S5
+    org_id: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, {
+        onDelete: "cascade",
+      }), // DB + model NOT NULL (S5 flip); trigger backstop stays until S13
     event_type: text("event_type").notNull(),
     session_id: text("session_id").notNull(),
     visitor_id: text("visitor_id"),

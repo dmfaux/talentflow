@@ -4,7 +4,7 @@ dotenv.config();
 
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import * as schema from "./schema";
 
 const connectionString = process.env.DATABASE_URL!;
@@ -582,10 +582,29 @@ async function main() {
   await db.delete(schema.clients);
   console.log("Done.\n");
 
+  // ── Organization (single demo tenant) ──
+  // S5 made org_id NOT NULL on every leaf, so the seed must stamp it. The
+  // full multi-org seed rework is S14; here all demo data lives under one
+  // find-or-create org so every insert below has a valid org_id.
+  const orgSlug = "demo-org";
+  let org = await db.query.organizations.findFirst({
+    where: eq(schema.organizations.slug, orgSlug),
+    columns: { id: true },
+  });
+  if (!org) {
+    const [inserted] = await db
+      .insert(schema.organizations)
+      .values({ slug: orgSlug, name: "Demo Org" })
+      .returning({ id: schema.organizations.id });
+    org = inserted;
+  }
+  const orgId = org.id;
+
   // ── Insert clients ──
   console.log(`Inserting ${CLIENTS.length} clients...`);
   const insertedClients = await db.insert(schema.clients).values(
     CLIENTS.map((c) => ({
+      org_id: orgId,
       slug: c.slug,
       name: c.name,
       contact_name: c.contact_name,
@@ -627,6 +646,7 @@ async function main() {
       const campaignEnd = status === "closed" ? daysAgo(randInt(1, 10)) : null;
 
       campaignsToInsert.push({
+        org_id: orgId,
         client_id: c.id,
         slug: baseSlug,
         role_title: role.title,
@@ -780,6 +800,7 @@ async function main() {
 
       candidatesToInsert.push({
         _department: department,
+        org_id: orgId,
         campaign_id: campaign.id,
         name,
         email,
@@ -849,6 +870,7 @@ async function main() {
   for (const cand of insertedCandidates) {
     if (cand.ai_score !== null) {
       scoringLogsToInsert.push({
+        org_id: orgId,
         candidate_id: cand.id,
         provider: pick(["anthropic", "anthropic", "openai"]),
         model_version: pick(["claude-sonnet-4-20250514", "claude-sonnet-4-20250514", "gpt-4o-2024-08-06"]),
@@ -874,6 +896,7 @@ async function main() {
       if (cand.status === "follow_up" && rand() < 0.3) {
         const rescored = Math.round(normalScore(cand.ai_score + 0.5, 0.5) * 10) / 10;
         scoringLogsToInsert.push({
+          org_id: orgId,
           candidate_id: cand.id,
           provider: "anthropic",
           model_version: "claude-sonnet-4-20250514",
@@ -908,6 +931,7 @@ async function main() {
   for (const cand of insertedCandidates) {
     // Application received email
     messagesToInsert.push({
+      org_id: orgId,
       candidate_id: cand.id,
       channel: "email",
       direction: "outbound",
@@ -919,6 +943,7 @@ async function main() {
     // Gating result email
     if (cand.status === "gating_failed") {
       messagesToInsert.push({
+        org_id: orgId,
         candidate_id: cand.id,
         channel: "email",
         direction: "outbound",
@@ -928,6 +953,7 @@ async function main() {
       });
     } else if (cand.status !== "gating_passed") {
       messagesToInsert.push({
+        org_id: orgId,
         candidate_id: cand.id,
         channel: "email",
         direction: "outbound",
@@ -940,6 +966,7 @@ async function main() {
     // Chat invitation emails for follow_up candidates
     if (cand.status === "follow_up") {
       messagesToInsert.push({
+        org_id: orgId,
         candidate_id: cand.id,
         channel: "email",
         direction: "outbound",
@@ -952,6 +979,7 @@ async function main() {
     // Rejection emails for rejected candidates
     if (cand.status === "rejected") {
       messagesToInsert.push({
+        org_id: orgId,
         candidate_id: cand.id,
         channel: "email",
         direction: "outbound",
@@ -1030,6 +1058,7 @@ async function main() {
     const convCreatedAt = minutesAgo(convStartedMinutesAgo);
 
     const [conv] = await db.insert(schema.conversations).values({
+      org_id: orgId,
       candidate_id: cand.id,
       status: convStatus,
       lifecycle: campaign.chat_lifecycle ?? "dormant",
@@ -1049,6 +1078,7 @@ async function main() {
     for (const msg of script.messages) {
       msgTime = new Date(msgTime.getTime() + randInt(15, 180) * 1000);
       await db.insert(schema.chatMessages).values({
+        org_id: orgId,
         conversation_id: conv.id,
         role: msg.role,
         content: msg.content,
@@ -1079,6 +1109,7 @@ async function main() {
 
       // Page view
       eventsToInsert.push({
+        org_id: orgId,
         campaign_id: campaign.id,
         event_type: "page_view",
         session_id: sessionId,
@@ -1092,6 +1123,7 @@ async function main() {
       // Some visitors start the application
       if (rand() < 0.45) {
         eventsToInsert.push({
+          org_id: orgId,
           campaign_id: campaign.id,
           event_type: "application_started",
           session_id: sessionId,
@@ -1104,6 +1136,7 @@ async function main() {
         // Some complete it
         if (rand() < 0.65) {
           eventsToInsert.push({
+            org_id: orgId,
             campaign_id: campaign.id,
             event_type: "application_submitted",
             session_id: sessionId,

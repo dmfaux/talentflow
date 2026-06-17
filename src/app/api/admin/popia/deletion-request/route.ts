@@ -1,10 +1,14 @@
-import { error, requireApiAuth, success } from "@/lib/api";
+import { authorizeApiOrg, error, getApiTenant, success } from "@/lib/api";
 import { handleDataDeletionRequest } from "@/lib/popia";
 import { NextRequest } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
+
+  // Tenant deletion-by-email is org_admin+ and scoped to the actor's org.
+  const denied = authorizeApiOrg(ctx, "run_popia_purge");
+  if (denied) return denied;
 
   try {
     const { email } = await request.json();
@@ -13,7 +17,7 @@ export async function POST(request: NextRequest) {
       return error("A valid email address is required");
     }
 
-    const result = await handleDataDeletionRequest(email);
+    const result = await handleDataDeletionRequest(email, ctx.effectiveOrgId);
 
     return success({
       ...result,

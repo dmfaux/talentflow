@@ -1,6 +1,13 @@
 import { db } from "@/db";
 import { candidates, chatMessages } from "@/db/schema";
-import { error, requireApiAuth, success } from "@/lib/api";
+import {
+  authorizeApiBrand,
+  error,
+  getApiTenant,
+  requireApiAuth,
+  success,
+} from "@/lib/api";
+import { orgScope } from "@/lib/tenant";
 import { getQueue } from "@/lib/queue";
 import { closeChatWithRejection, getActiveConversation } from "@/lib/chat";
 import { and, count, eq } from "drizzle-orm";
@@ -123,18 +130,29 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const { id } = await params;
     const body = await request.json();
 
+    // Relational load (the reject path needs campaign.role_title +
+    // campaign.client.name), org-scoped so a cross-org id → 404.
     const existing = await db.query.candidates.findFirst({
-      where: eq(candidates.id, id),
+      where: and(eq(candidates.id, id), orgScope(candidates, ctx)),
       with: { campaign: { with: { client: true } } },
     });
     if (!existing) return error("Candidate not found", 404);
+
+    // RBAC: managing a candidate (status/notes/reject) requires recruiter+ on
+    // the candidate's brand.
+    const denied = await authorizeApiBrand(
+      ctx,
+      existing.campaign.client_id,
+      "recruiter"
+    );
+    if (denied) return denied;
 
     // ── Tiered path: admin rejecting a follow_up candidate ──────────
     const isRejectingFollowUp =

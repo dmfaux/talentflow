@@ -87,8 +87,10 @@ export async function POST(
     );
   }
 
-  // Save user message to database
+  // Save user message to database. Public write: stamp org_id explicitly from
+  // the resolved conversation rather than relying on the DB trigger (S13 drop).
   await db.insert(chatMessages).values({
+    org_id: conv.org_id,
     conversation_id: conversationId,
     role: "user",
     content: userText,
@@ -173,6 +175,7 @@ export async function POST(
       // Persist assistant response
       if (cleanText.trim()) {
         await db.insert(chatMessages).values({
+          org_id: conv.org_id,
           conversation_id: conversationId,
           role: "assistant",
           content: cleanText,

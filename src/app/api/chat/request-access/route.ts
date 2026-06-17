@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
     const [candidate] = await db
       .select({
         id: candidates.id,
+        org_id: candidates.org_id,
         name: candidates.name,
         role_title: campaigns.role_title,
       })
@@ -43,6 +44,8 @@ export async function POST(request: NextRequest) {
     // Generate magic link token
     const token = generateMagicLinkToken();
     await db.insert(chatTokens).values({
+      // Public write: stamp org_id explicitly from the resolved candidate.
+      org_id: candidate.org_id,
       candidate_id: candidate.id,
       token_hash: token.hash,
       expires_at: token.expiresAt,

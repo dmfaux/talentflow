@@ -134,7 +134,14 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
   } catch (err: unknown) {
     const attempts =
       err instanceof AllProvidersFailedError ? err.attempts : [];
-    return handleApiFailure(candidateId, userPrompt, startTime, err, attempts);
+    return handleApiFailure(
+      candidateId,
+      candidate.org_id,
+      userPrompt,
+      startTime,
+      err,
+      attempts
+    );
   }
 
   const processingTimeMs = Date.now() - startTime;
@@ -183,6 +190,7 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
 
   // Write scoring log
   await db.insert(scoringLogs).values({
+    org_id: candidate.org_id,
     candidate_id: candidateId,
     provider: aiResult.providerName,
     model_version: aiResult.modelId,
@@ -238,6 +246,7 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
 
 async function handleApiFailure(
   candidateId: string,
+  orgId: string,
   prompt: string,
   startTime: number,
   err: unknown,
@@ -248,6 +257,7 @@ async function handleApiFailure(
   console.error(`scoreCandidate: API failure for ${candidateId}:`, message);
 
   await db.insert(scoringLogs).values({
+    org_id: orgId,
     candidate_id: candidateId,
     provider: attempts.length > 0 ? attempts[attempts.length - 1].provider : null,
     model_version: "unknown",
@@ -490,6 +500,7 @@ export async function rescoreWithChatContext(
     );
 
     await db.insert(scoringLogs).values({
+      org_id: candidate.org_id,
       candidate_id: candidateId,
       provider:
         attempts.length > 0 ? attempts[attempts.length - 1].provider : null,
@@ -536,6 +547,7 @@ export async function rescoreWithChatContext(
 
   // Write scoring log
   await db.insert(scoringLogs).values({
+    org_id: candidate.org_id,
     candidate_id: candidateId,
     provider: aiResult.providerName,
     model_version: aiResult.modelId,

@@ -119,6 +119,22 @@ export async function requireBrandAccess(
   return ctx;
 }
 
+/** Boolean brand-access check for RSC control-gating (S5) — mirrors
+ *  requireBrandAccess's decision but returns a boolean instead of throwing, so
+ *  pages can hide/disable mutation controls a user may not perform. The server
+ *  routes remain the source of truth; this is cosmetic. */
+export async function canAccessBrand(
+  ctx: TenantContext,
+  brandId: string,
+  minRole: BrandRole = "viewer"
+): Promise<boolean> {
+  const brandMemberships =
+    ctx.orgRole || (ctx.isOperator && ctx.actingOrgId)
+      ? []
+      : await getBrandMemberships(ctx.userId);
+  return decideBrandAccess(ctx, brandId, brandMemberships, minRole) === "allow";
+}
+
 // ── Org-scoping primitives (§5.1) ────────────────────────────────────
 //
 // The reusable enforcement core that S4 (reads) and S5 (writes) call. Pure

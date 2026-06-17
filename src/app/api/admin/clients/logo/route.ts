@@ -1,5 +1,7 @@
+import { clients } from "@/db/schema";
 import { uploadClientLogo } from "@/lib/azure-storage";
-import { error, requireApiAuth, success } from "@/lib/api";
+import { authorizeApiOrg, error, getApiTenant, success } from "@/lib/api";
+import { resolveOwnedResource } from "@/lib/tenant";
 import { NextRequest } from "next/server";
 
 const MAX_SIZE = 2 * 1024 * 1024; // 2MB
@@ -11,8 +13,12 @@ function sanitiseFilename(name: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
+
+  // Only org_admin / owner may upload a brand logo.
+  const denied = authorizeApiOrg(ctx, "manage_brand");
+  if (denied) return denied;
 
   try {
     const formData = await request.formData();
@@ -34,6 +40,11 @@ export async function POST(request: NextRequest) {
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
       return error("Only PNG, JPG, and SVG files are accepted");
     }
+
+    // Resolve the brand WITHIN the actor's org BEFORE touching storage — a
+    // cross-org/non-existent id → 404. (Org-prefixed blob path is S6.)
+    const brand = await resolveOwnedResource(clients, clientId, ctx);
+    if (!brand) return error("Client not found", 404);
 
     const safeName = sanitiseFilename(file.name) || `logo${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());

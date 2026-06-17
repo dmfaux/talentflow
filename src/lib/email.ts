@@ -1,5 +1,6 @@
 import { db } from "@/db";
-import { messages } from "@/db/schema";
+import { candidates, messages } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 // ── Transport abstraction ───────────────────────────────────────────
 
@@ -94,14 +95,24 @@ export async function sendCandidateEmail(
       console.error("sendCandidateEmail error:", error);
     }
 
-    await db.insert(messages).values({
-      candidate_id: candidateId,
-      channel: "email",
-      direction: "outbound",
-      content: subject,
-      status: error ? "failed" : "sent",
-      external_id: id,
+    // messages.org_id is NOT NULL (S5). Derive it from the candidate so the
+    // message log carries the tenant explicitly rather than relying on the
+    // DB trigger (dropped in S13). Skip the log if the candidate is gone.
+    const candidate = await db.query.candidates.findFirst({
+      where: eq(candidates.id, candidateId),
+      columns: { org_id: true },
     });
+    if (candidate) {
+      await db.insert(messages).values({
+        org_id: candidate.org_id,
+        candidate_id: candidateId,
+        channel: "email",
+        direction: "outbound",
+        content: subject,
+        status: error ? "failed" : "sent",
+        external_id: id,
+      });
+    }
 
     return id;
   } catch (err) {

@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { passwordResetTokens, users } from "@/db/schema";
-import { error, requireApiAuth, success } from "@/lib/api";
+import { effectiveOrgRole, error, getApiTenant, success } from "@/lib/api";
+import { orgScope } from "@/lib/tenant";
 import { hashPassword } from "@/lib/auth";
 import { and, eq, isNull } from "drizzle-orm";
 import { NextRequest } from "next/server";
@@ -9,8 +10,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const { id } = await params;
@@ -21,11 +22,24 @@ export async function POST(
     if (password.length < 8) return error("Password must be at least 8 characters");
     if (password !== confirmPassword) return error("Passwords do not match");
 
+    // Resolve the target WITHIN the actor's org and as a non-operator. This
+    // structurally forbids resetting an operator's password or any other
+    // org's user — those resolve to 404 (the account-takeover fix).
     const existing = await db.query.users.findFirst({
-      where: eq(users.id, id),
+      where: and(
+        eq(users.id, id),
+        orgScope(users, ctx),
+        eq(users.is_operator, false)
+      ),
       columns: { id: true },
     });
     if (!existing) return error("User not found", 404);
+
+    // Allow an org_admin/owner to reset any same-org member's password, or any
+    // user to reset their own. A recruiter/viewer cannot reset a peer's.
+    const role = effectiveOrgRole(ctx);
+    const isOrgAdmin = role === "owner" || role === "org_admin";
+    if (id !== ctx.userId && !isOrgAdmin) return error("Forbidden", 403);
 
     const passwordHash = await hashPassword(password);
 

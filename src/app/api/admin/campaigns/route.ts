@@ -1,6 +1,13 @@
 import { db } from "@/db";
 import { campaigns, clients } from "@/db/schema";
-import { error, requireApiAuth, success } from "@/lib/api";
+import {
+  authorizeApiBrand,
+  error,
+  getApiTenant,
+  requireApiAuth,
+  success,
+} from "@/lib/api";
+import { resolveOwnedResource } from "@/lib/tenant";
 import { validateSlug } from "@/lib/slug";
 import { validateHtmlTemplate } from "@/lib/slots";
 import { and, desc, eq } from "drizzle-orm";
@@ -51,8 +58,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const body = await request.json();
@@ -88,16 +95,20 @@ export async function POST(request: NextRequest) {
       if (!htmlCheck.ok) return error(htmlCheck.errors.join("; "));
     }
 
-    // Verify client exists
-    const client = await db.query.clients.findFirst({
-      where: eq(clients.id, body.client_id),
-      columns: { id: true },
-    });
-    if (!client) return error("Client not found", 404);
+    // Resolve the target brand WITHIN the actor's org (never trust body
+    // client_id to widen scope). A cross-org/non-existent id → 404.
+    const brand = await resolveOwnedResource(clients, body.client_id, ctx);
+    if (!brand) return error("Client not found", 404);
+
+    // RBAC: creating a campaign (incl. publishing straight to active) requires
+    // recruiter+ on the brand. A viewer/non-member is 403'd here, which also
+    // closes the publish gate for status === "active".
+    const denied = await authorizeApiBrand(ctx, brand.id, "recruiter");
+    if (denied) return denied;
 
     // Check slug uniqueness per client
     const existing = await db.query.campaigns.findFirst({
-      where: and(eq(campaigns.client_id, body.client_id), eq(campaigns.slug, body.slug)),
+      where: and(eq(campaigns.client_id, brand.id), eq(campaigns.slug, body.slug)),
       columns: { id: true },
     });
     if (existing) return error("slug is already taken for this client");
@@ -105,7 +116,8 @@ export async function POST(request: NextRequest) {
     const [row] = await db
       .insert(campaigns)
       .values({
-        client_id: body.client_id,
+        org_id: ctx.effectiveOrgId!,
+        client_id: brand.id,
         slug: body.slug,
         role_title: body.role_title,
         role_description: body.role_description ?? null,

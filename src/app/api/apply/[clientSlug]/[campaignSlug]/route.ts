@@ -27,6 +27,7 @@ export async function POST(
     const [campaign] = await db
       .select({
         id: campaigns.id,
+        org_id: campaigns.org_id,
         status: campaigns.status,
         role_title: campaigns.role_title,
         gating_config: campaigns.gating_config,
@@ -118,6 +119,9 @@ export async function POST(
     purgeAt.setMonth(purgeAt.getMonth() + 12);
 
     const [newCandidate] = await db.insert(candidates).values({
+      // Public write: stamp org_id explicitly from the resolved campaign
+      // rather than relying on the DB trigger (dropped in S13).
+      org_id: campaign.org_id,
       campaign_id: campaign.id,
       name: name.trim(),
       email: trimmedEmail,

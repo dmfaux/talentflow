@@ -7,6 +7,7 @@ import { CampaignActions } from "@/components/admin/campaign-actions";
 import { CampaignTabs } from "@/components/admin/campaign-tabs";
 import { CandidateTable } from "@/components/admin/candidate-table";
 import { ShortlistTab } from "@/components/admin/shortlist-tab";
+import { canAccessBrand, requireTenant } from "@/lib/tenant";
 import { Suspense } from "react";
 
 interface Props {
@@ -40,6 +41,11 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
   });
 
   if (!campaign) notFound();
+
+  // Role-gate the mutation controls (recruiter+ on this brand). Cosmetic only —
+  // the campaign routes enforce the same check server-side.
+  const ctx = await requireTenant();
+  const canManageCampaign = await canAccessBrand(ctx, campaign.client_id, "recruiter");
 
   // Candidate counts by status
   const statusCounts = await db
@@ -191,7 +197,7 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
             </a>
           </div>
         </div>
-        <CampaignActions campaignId={campaign.id} status={campaign.status} />
+        <CampaignActions campaignId={campaign.id} status={campaign.status} canManage={canManageCampaign} />
       </div>
 
       {/* Overview — pipeline funnel + quality rail */}

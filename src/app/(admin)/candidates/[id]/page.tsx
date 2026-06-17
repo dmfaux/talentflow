@@ -7,6 +7,7 @@ import { CandidateActions } from "@/components/admin/candidate-actions";
 import { CandidateNotes } from "@/components/admin/candidate-notes";
 import { AuditLog } from "@/components/admin/audit-log";
 import { AssessmentHistory } from "@/components/admin/assessment-history";
+import { canAccessBrand, requireTenant } from "@/lib/tenant";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -61,6 +62,15 @@ export default async function CandidateDetailPage({ params }: Props) {
   });
 
   if (!candidate) notFound();
+
+  // Role-gate candidate mutation controls (recruiter+ on this brand). Cosmetic;
+  // the candidate routes enforce the same check server-side.
+  const ctx = await requireTenant();
+  const canManageCandidate = await canAccessBrand(
+    ctx,
+    candidate.campaign.client_id,
+    "recruiter"
+  );
 
   const dims = (candidate.ai_dimensions ?? {}) as Record<string, number>;
   const flags = (candidate.ai_flags ?? []) as (string | { type?: string; message?: string })[];
@@ -151,6 +161,7 @@ export default async function CandidateDetailPage({ params }: Props) {
           candidateId={candidate.id}
           status={candidate.status}
           hasCv={!!candidate.cv_url}
+          canManage={canManageCandidate}
         />
       </div>
 

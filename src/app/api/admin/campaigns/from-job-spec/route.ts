@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { campaigns, clients } from "@/db/schema";
-import { error, requireApiAuth, success } from "@/lib/api";
+import { authorizeApiBrand, error, getApiTenant, success } from "@/lib/api";
+import { resolveOwnedResource } from "@/lib/tenant";
 import { extractTextFromCV } from "@/lib/cv-parser";
 import { slugify, findAvailableCampaignSlug } from "@/lib/slug";
 import {
@@ -8,7 +9,6 @@ import {
   JobSpecQualityError,
 } from "@/lib/ai/job-spec-schema";
 import { AllProvidersFailedError } from "@/lib/ai/providers";
-import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -29,8 +29,8 @@ function errorWithCode(
 }
 
 export async function POST(request: NextRequest) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const formData = await request.formData();
@@ -58,13 +58,16 @@ export async function POST(request: NextRequest) {
       return error("File is too large. Maximum size is 10MB.", 400);
     }
 
-    // ── Verify client exists ────────────────────────────────────────
+    // ── Authorise BEFORE any LLM work ───────────────────────────────
+    // Resolve the brand in-org and gate on recruiter+ here, before
+    // extractTextFromCV/parseJobSpec, so a cross-org or unauthorised caller
+    // never burns an LLM call (the headline cost + isolation item).
 
-    const client = await db.query.clients.findFirst({
-      where: eq(clients.id, clientId),
-      columns: { id: true, name: true },
-    });
+    const client = await resolveOwnedResource(clients, clientId, ctx);
     if (!client) return error("Client not found", 404);
+
+    const denied = await authorizeApiBrand(ctx, client.id, "recruiter");
+    if (denied) return denied;
 
     // ── Extract text ────────────────────────────────────────────────
 
@@ -142,6 +145,7 @@ export async function POST(request: NextRequest) {
     const [row] = await db
       .insert(campaigns)
       .values({
+        org_id: ctx.effectiveOrgId!,
         client_id: clientId,
         slug,
         role_title: result.role_title,

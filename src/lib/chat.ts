@@ -16,6 +16,7 @@ export interface Topic {
 // ── Create conversation ─────────────────────────────────────────────
 
 export async function createConversation(
+  orgId: string,
   candidateId: string,
   candidateName: string,
   roleTitle: string,
@@ -32,6 +33,7 @@ export async function createConversation(
   const [conv] = await db
     .insert(conversations)
     .values({
+      org_id: orgId,
       candidate_id: candidateId,
       lifecycle,
       topics,
@@ -46,6 +48,7 @@ export async function createConversation(
       : `Hi ${candidateName}! Thanks for applying for the ${roleTitle} position at ${companyName}. The recruitment team would like to learn a bit more about your background. Let me know when you're ready and we can get started!`;
 
   await db.insert(chatMessages).values({
+    org_id: orgId,
     conversation_id: conv.id,
     role: "assistant",
     content: greeting,
@@ -212,6 +215,7 @@ export async function closeChatWithRejection(
     `Thank you for your time on this application. The recruitment team for ${roleTitle} at ${companyName} has reached a decision and won't be moving forward with your application.${reasonSentence} We wish you the very best in your search.`;
 
   await db.insert(chatMessages).values({
+    org_id: conv.org_id,
     conversation_id: conversationId,
     role: "assistant",
     content: message,

@@ -20,7 +20,10 @@ export default function NewUserPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [securityGroup, setSecurityGroup] = useState("user");
+  // Brand-level role granted to the new member (least-privilege default).
+  // The legacy security_group is written server-side with a default and no
+  // longer surfaced here. Org-level role grants are handled in S8.
+  const [brandRole, setBrandRole] = useState("viewer");
   const [clientId, setClientId] = useState("");
   const [clientOptions, setClientOptions] = useState<ClientOption[]>([]);
 
@@ -41,7 +44,7 @@ export default function NewUserPage() {
     if (!email.trim()) errs.email = "Email is required";
     if (password.length < 8) errs.password = "At least 8 characters";
     if (password !== confirmPassword) errs.confirmPassword = "Passwords do not match";
-    if (!clientId) errs.clientId = "Client is required";
+    if (!clientId) errs.clientId = "Brand is required";
 
     if (Object.keys(errs).length > 0) {
       setFieldErrors(errs);
@@ -58,7 +61,7 @@ export default function NewUserPage() {
           lastName: lastName.trim(),
           email: email.trim(),
           password,
-          securityGroup,
+          brandRole,
           clientId,
         }),
       });
@@ -201,26 +204,26 @@ export default function NewUserPage() {
             </div>
           </div>
 
-          {/* Security group + client row */}
+          {/* Brand role + brand row */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="securityGroup" className={labelClass}>
-                Security Group <span className="text-red">*</span>
+              <label htmlFor="brandRole" className={labelClass}>
+                Brand Role <span className="text-red">*</span>
               </label>
               <select
-                id="securityGroup"
-                value={securityGroup}
-                onChange={(e) => setSecurityGroup(e.target.value)}
+                id="brandRole"
+                value={brandRole}
+                onChange={(e) => setBrandRole(e.target.value)}
                 className={inputClass}
               >
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
-                <option value="user">User</option>
+                <option value="brand_admin">Brand Admin</option>
+                <option value="recruiter">Recruiter</option>
+                <option value="viewer">Viewer</option>
               </select>
             </div>
             <div>
               <label htmlFor="clientId" className={labelClass}>
-                Client <span className="text-red">*</span>
+                Brand <span className="text-red">*</span>
               </label>
               <select
                 id="clientId"
@@ -228,7 +231,7 @@ export default function NewUserPage() {
                 onChange={(e) => setClientId(e.target.value)}
                 className={`${inputClass} ${fieldErrors.clientId ? "border-red focus:border-red focus:ring-red/20" : ""}`}
               >
-                <option value="">Select a client…</option>
+                <option value="">Select a brand…</option>
                 {clientOptions.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}

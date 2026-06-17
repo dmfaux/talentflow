@@ -1,6 +1,12 @@
 import { db } from "@/db";
 import { clients } from "@/db/schema";
-import { error, requireApiAuth, success } from "@/lib/api";
+import {
+  authorizeApiOrg,
+  error,
+  getApiTenant,
+  requireApiAuth,
+  success,
+} from "@/lib/api";
 import { slugify, validateSlug } from "@/lib/slug";
 import { isLogoBackground, isLogoPosition, normaliseHexColor } from "@/lib/utils";
 import { asc, eq } from "drizzle-orm";
@@ -29,15 +35,17 @@ const COLOR_FIELDS = [
   "brand_text_color",
 ] as const;
 
-const VALID_TIERS = ["standard", "premium", "enterprise"] as const;
-type Tier = (typeof VALID_TIERS)[number];
-function isValidTier(value: unknown): value is Tier {
-  return typeof value === "string" && (VALID_TIERS as readonly string[]).includes(value);
-}
+// Note: `tier` is intentionally NOT tenant-writable (S5, Resolved Decision 4).
+// It is operator-set on the org; a tenant creating/editing a brand can't
+// escalate its own tier, so the column defaults to 'standard' here.
 
 export async function POST(request: NextRequest) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
+
+  // Only org_admin / owner may create a brand.
+  const denied = authorizeApiOrg(ctx, "manage_brand");
+  if (denied) return denied;
 
   try {
     const body = await request.json();
@@ -76,24 +84,15 @@ export async function POST(request: NextRequest) {
       return error("logo_position must be 'top-left' or 'top-centre'");
     }
 
-    let tier: Tier = "standard";
-    if (body.tier !== undefined && body.tier !== null && body.tier !== "") {
-      if (!isValidTier(body.tier)) {
-        return error("tier must be 'standard', 'premium', or 'enterprise'");
-      }
-      tier = body.tier;
-    }
-
-    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const providedId = typeof body.id === "string" && UUID_REGEX.test(body.id) ? body.id : undefined;
-
     const [row] = await db
       .insert(clients)
       .values({
-        ...(providedId ? { id: providedId } : {}),
+        // Bind to the actor's org; never trust a body org_id or client-supplied
+        // id (the latter is dropped entirely — Resolved Decision; closes the
+        // id-injection path). tier is omitted so it defaults to 'standard'.
+        org_id: ctx.effectiveOrgId!,
         slug,
         name: body.name.trim(),
-        tier,
         contact_name: body.contact_name ?? null,
         contact_email: body.contact_email ?? null,
         contact_phone: body.contact_phone ?? null,

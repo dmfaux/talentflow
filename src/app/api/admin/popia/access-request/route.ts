@@ -1,10 +1,15 @@
-import { error, requireApiAuth, success } from "@/lib/api";
+import { authorizeApiOrg, error, getApiTenant, success } from "@/lib/api";
 import { handleDataAccessRequest } from "@/lib/popia";
 import { NextRequest } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
+
+  // Subject-access returns full candidate PII across the org by email, so it
+  // is org_admin+ (Resolved Decision 3) and scoped to the actor's org.
+  const denied = authorizeApiOrg(ctx, "run_popia_purge");
+  if (denied) return denied;
 
   try {
     const { email } = await request.json();
@@ -13,7 +18,7 @@ export async function POST(request: NextRequest) {
       return error("A valid email address is required");
     }
 
-    const data = await handleDataAccessRequest(email);
+    const data = await handleDataAccessRequest(email, ctx.effectiveOrgId);
 
     if (!data) {
       return error("No records found for this email", 404);

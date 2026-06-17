@@ -1,7 +1,15 @@
 import { db } from "@/db";
-import { candidates, messages, scoringLogs, campaigns, clients } from "@/db/schema";
-import { and, eq, isNull, lte } from "drizzle-orm";
+import { candidates, messages, scoringLogs } from "@/db/schema";
+import { and, eq, isNull, lte, sql } from "drizzle-orm";
 import { deleteCV } from "./azure-storage";
+
+/** Org-scope predicate for the by-email/expiry POPIA queries. Mirrors
+ *  orgScope's null-semantics: a non-acting operator (orgId null) matches
+ *  nothing rather than every org. Tenant routes pass ctx.effectiveOrgId so a
+ *  purge/lookup can never reach another org's candidates. */
+function orgFilter(orgId: string | null) {
+  return orgId ? eq(candidates.org_id, orgId) : sql`false`;
+}
 
 // ── Purge a single candidate's PII ──────────────────────────────────
 
@@ -48,11 +56,14 @@ export async function purgeCandidateData(candidateId: string): Promise<void> {
 
 // ── POPIA access request ────────────────────────────────────────────
 
-export async function handleDataAccessRequest(email: string) {
+export async function handleDataAccessRequest(
+  email: string,
+  orgId: string | null
+) {
   const normalizedEmail = email.trim().toLowerCase();
 
   const records = await db.query.candidates.findMany({
-    where: eq(candidates.email, normalizedEmail),
+    where: and(eq(candidates.email, normalizedEmail), orgFilter(orgId)),
     with: {
       campaign: {
         columns: { role_title: true, slug: true },
@@ -133,14 +144,16 @@ export async function handleDataAccessRequest(email: string) {
 // ── POPIA deletion request ──────────────────────────────────────────
 
 export async function handleDataDeletionRequest(
-  email: string
+  email: string,
+  orgId: string | null
 ): Promise<{ purged: number }> {
   const normalizedEmail = email.trim().toLowerCase();
 
   const records = await db.query.candidates.findMany({
     where: and(
       eq(candidates.email, normalizedEmail),
-      isNull(candidates.purged_at)
+      isNull(candidates.purged_at),
+      orgFilter(orgId)
     ),
     columns: { id: true },
   });
@@ -158,13 +171,16 @@ export async function handleDataDeletionRequest(
 // Options: Azure Container Apps scheduled task, Vercel cron,
 // or a Next.js API route called by an external cron service.
 
-export async function findAndPurgeExpiredCandidates(): Promise<{ purged: number }> {
+export async function findAndPurgeExpiredCandidates(
+  orgId: string | null
+): Promise<{ purged: number }> {
   const now = new Date();
 
   const expired = await db.query.candidates.findMany({
     where: and(
       lte(candidates.data_purge_at, now),
-      isNull(candidates.purged_at)
+      isNull(candidates.purged_at),
+      orgFilter(orgId)
     ),
     columns: { id: true },
   });

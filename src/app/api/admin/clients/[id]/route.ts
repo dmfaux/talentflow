@@ -1,6 +1,13 @@
 import { db } from "@/db";
 import { clients } from "@/db/schema";
-import { error, requireApiAuth, success } from "@/lib/api";
+import {
+  authorizeApiOrg,
+  error,
+  getApiTenant,
+  requireApiAuth,
+  success,
+} from "@/lib/api";
+import { resolveOwnedResource } from "@/lib/tenant";
 import { validateSlug } from "@/lib/slug";
 import { isLogoBackground, isLogoPosition, normaliseHexColor } from "@/lib/utils";
 import { eq } from "drizzle-orm";
@@ -13,10 +20,9 @@ const COLOR_FIELDS = [
   "brand_text_color",
 ] as const;
 
-const VALID_TIERS = ["standard", "premium", "enterprise"] as const;
-function isValidTier(value: unknown): value is (typeof VALID_TIERS)[number] {
-  return typeof value === "string" && (VALID_TIERS as readonly string[]).includes(value);
-}
+// `tier` is operator-only (S5, Resolved Decision 4): a tenant editing a brand
+// must not be able to self-escalate its tier, so it is excluded from the
+// tenant-writable fields below and a body `tier` is ignored.
 
 export async function GET(
   _request: Request,
@@ -46,20 +52,23 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
+
+  // Only org_admin / owner may edit a brand.
+  const denied = authorizeApiOrg(ctx, "manage_brand");
+  if (denied) return denied;
 
   try {
     const { id } = await params;
     const body = await request.json();
 
-    const existing = await db.query.clients.findFirst({
-      where: eq(clients.id, id),
-      columns: { id: true, slug: true },
-    });
+    // Resolve the brand WITHIN the actor's org — a cross-org id → 404.
+    const existing = await resolveOwnedResource(clients, id, ctx);
     if (!existing) return error("Client not found", 404);
 
     const updates: Record<string, unknown> = { updated_at: new Date() };
+    // `tier` intentionally excluded — operator-only (see header note).
     const allowedFields = [
       "slug",
       "name",
@@ -70,12 +79,7 @@ export async function PATCH(
       "branding_logo_url",
       "notes",
       "is_active",
-      "tier",
     ] as const;
-
-    if (body.tier !== undefined && !isValidTier(body.tier)) {
-      return error("tier must be 'standard', 'premium', or 'enterprise'");
-    }
 
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
