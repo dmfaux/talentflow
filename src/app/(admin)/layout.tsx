@@ -4,14 +4,13 @@ import { asc, eq, inArray } from "drizzle-orm";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { ActiveCampaignCount } from "@/components/admin/active-campaign-count";
 import { BrandSwitcher } from "@/components/admin/brand-switcher";
-import {
-  TenantProvider,
-  type TenantBrand,
-} from "@/components/admin/tenant-provider";
+import { TenantProvider } from "@/components/admin/tenant-provider";
 import { ActingAsBanner } from "@/components/operator/acting-as-banner";
 import { ToastProvider } from "@/components/ui/toast-provider";
 import { Logo } from "@/components/brand/logo";
-import { canManageOrg } from "@/components/admin/tenant-provider";
+// Pure helper + type imported from the neutral module, not the "use client"
+// provider — a server component cannot invoke a client-module export.
+import { canManageOrg, type TenantBrand } from "@/components/admin/tenant-shared";
 import { getBrandMemberships, requireTenant } from "@/lib/tenant";
 import { db } from "@/db";
 import { clients, organizations } from "@/db/schema";
