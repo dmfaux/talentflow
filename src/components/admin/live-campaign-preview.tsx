@@ -56,8 +56,8 @@ export function LiveCampaignPreview({ values, clientName, clientSlug }: Props) {
   const accent = values.brand_accent_color ? hexOrFallback(values.brand_accent_color, primary) : primary;
   const text = hexOrFallback(values.brand_text_color, "#11123c");
 
-  const displayName = clientName.trim() || "Client";
-  const subdomain = clientSlug.trim() || "client";
+  const displayName = clientName.trim() || "Brand";
+  const subdomain = clientSlug.trim() || "brand";
 
   // Contrast checks — warn if text vs white page OR text vs secondary is poor
   const textOnWhiteContrast = contrastRatio(text, "#ffffff");

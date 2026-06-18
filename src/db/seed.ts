@@ -2,15 +2,22 @@ import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 dotenv.config();
 
-import { drizzle } from "drizzle-orm/postgres-js";
+import { pathToFileURL } from "url";
+import bcrypt from "bcryptjs";
+import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, type SQL } from "drizzle-orm";
 import * as schema from "./schema";
 import { isStorageConfigured, uploadCV } from "../lib/azure-storage";
+import { namespaceDedup } from "../lib/queue/types";
+import {
+  DEMO_ORGS,
+  DEMO_USERS,
+  buildMembershipRows,
+  type CastUserWithId,
+} from "./seed-cast";
 
-const connectionString = process.env.DATABASE_URL!;
-const client = postgres(connectionString);
-const db = drizzle(client, { schema });
+type Db = PostgresJsDatabase<typeof schema>;
 
 /** Build a tiny but valid single-page PDF so seeded CVs resolve to a real,
  *  previewable blob (S6 Resolved Decision 2). */
@@ -39,11 +46,17 @@ function buildSamplePdf(text: string): Buffer {
 }
 
 // ── Deterministic random ─────────────────────────────────────────────
+// A seeded LCG so a re-run reproduces identical data (and identical counts —
+// the re-runnability acceptance). resetRandom() is called at the start of every
+// seed() so the function is deterministic whether invoked by the CLI or a test.
 
-let seed = 42;
+let rngState = 42;
+function resetRandom(): void {
+  rngState = 42;
+}
 function rand(): number {
-  seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-  return seed / 0x7fffffff;
+  rngState = (rngState * 1103515245 + 12345) & 0x7fffffff;
+  return rngState / 0x7fffffff;
 }
 function randInt(min: number, max: number): number {
   return Math.floor(rand() * (max - min + 1)) + min;
@@ -86,82 +99,49 @@ function minutesAgo(minutes: number): Date {
   return d;
 }
 
-// ── Source data ──────────────────────────────────────────────────────
+// ── Brand colour palettes ────────────────────────────────────────────
+// Keyed by the `branding` field on each DEMO_ORGS brand. Distinct per brand so
+// the demo's careers pages look visually different across divisions.
 
-const CLIENTS = [
+const BRANDING: Record<
+  string,
   {
-    slug: "nedbank-digital", name: "Nedbank Digital",
-    contact_name: "Thandi Mkhize", contact_email: "thandi.mkhize@nedbank.co.za",
-    contact_phone: "+27 11 294 4444", billing_email: "accounts.digital@nedbank.co.za",
-    notes: "Expanding digital banking team. Key partner for Q1-Q2 hiring.",
+    brand_primary_color: string;
+    brand_secondary_color: string;
+    brand_accent_color: string;
+    brand_text_color: string;
+    logo_background: string;
+    logo_position: string;
+  }
+> = {
+  emerald: {
     brand_primary_color: "#006341", brand_secondary_color: "#f2f7f4",
     brand_accent_color: "#b4c905", brand_text_color: "#0b1f14",
     logo_background: "light", logo_position: "top-left",
   },
-  {
-    slug: "discovery-health", name: "Discovery Health",
-    contact_name: "Michael van der Merwe", contact_email: "michael.vdm@discovery.co.za",
-    contact_phone: "+27 11 529 2888", billing_email: "hr.invoicing@discovery.co.za",
-    notes: "Focus on data science and actuarial roles.",
+  azure: {
     brand_primary_color: "#00457c", brand_secondary_color: "#eef3f8",
     brand_accent_color: "#ff6b00", brand_text_color: "#0b1424",
     logo_background: "light", logo_position: "top-left",
   },
-  {
-    slug: "takealot-commerce", name: "Takealot Commerce",
-    contact_name: "Sizwe Dlamini", contact_email: "sizwe.d@takealot.com",
-    contact_phone: "+27 21 809 5900", billing_email: "finance@takealot.com",
-    notes: "Rapid scaling across engineering and product teams.",
-    brand_primary_color: "#00a862", brand_secondary_color: "#eefbf4",
-    brand_accent_color: "#ffb01f", brand_text_color: "#0b1f14",
-    logo_background: "light", logo_position: "top-left",
-  },
-  {
-    slug: "anglo-american", name: "Anglo American",
-    contact_name: "Priya Naidoo", contact_email: "priya.naidoo@angloamerican.com",
-    contact_phone: "+27 11 638 9111", billing_email: "talent.ops@angloamerican.com",
-    notes: "Technology modernisation programme. Platform and cloud roles.",
-    brand_primary_color: "#003057", brand_secondary_color: "#f2f4f7",
-    brand_accent_color: "#e4b80e", brand_text_color: "#0b1424",
-    logo_background: "light", logo_position: "top-centre",
-  },
-  {
-    slug: "woolworths-holdings", name: "Woolworths Holdings",
-    contact_name: "Lerato Mokoena", contact_email: "lerato.mokoena@woolworths.co.za",
-    contact_phone: "+27 21 407 9111", billing_email: "recruitment.finance@woolworths.co.za",
-    notes: "Retail technology transformation.",
+  forest: {
     brand_primary_color: "#00573c", brand_secondary_color: "#f3f5f2",
     brand_accent_color: "#9a8250", brand_text_color: "#0b1414",
     logo_background: "light", logo_position: "top-left",
   },
-  {
-    slug: "mtn-group", name: "MTN Group",
-    contact_name: "Johan Pretorius", contact_email: "johan.pretorius@mtn.com",
-    contact_phone: "+27 11 912 3000", billing_email: "vendor.payments@mtn.com",
-    notes: "Fintech and 5G platform initiatives.",
+  navy: {
+    brand_primary_color: "#003057", brand_secondary_color: "#f2f4f7",
+    brand_accent_color: "#e4b80e", brand_text_color: "#0b1424",
+    logo_background: "light", logo_position: "top-centre",
+  },
+  amber: {
     brand_primary_color: "#ffcc00", brand_secondary_color: "#1a1a1a",
     brand_accent_color: "#ff6b00", brand_text_color: "#1a1a1a",
     logo_background: "dark", logo_position: "top-left",
   },
-  {
-    slug: "standard-bank-tech", name: "Standard Bank Tech",
-    contact_name: "Ayesha Patel", contact_email: "ayesha.patel@standardbank.co.za",
-    contact_phone: "+27 11 721 5000", billing_email: "ap.tech@standardbank.co.za",
-    notes: "Core banking platform rewrite. Multiple senior roles.",
-    brand_primary_color: "#0033a0", brand_secondary_color: "#eef1f8",
-    brand_accent_color: "#e30613", brand_text_color: "#0b1424",
-    logo_background: "light", logo_position: "top-left",
-  },
-  {
-    slug: "adcorp-group", name: "Adcorp Group",
-    contact_name: "Ayesha Patel", contact_email: "ayesha.patel@adcorpgroup.com",
-    contact_phone: "+27 11 721 5000", billing_email: "ap.tech@adcorp-group.com",
-    notes: "Core banking platform rewrite. Multiple senior roles.",
-    brand_primary_color: "#6b2c91", brand_secondary_color: "#f5f1f8",
-    brand_accent_color: "#f39c12", brand_text_color: "#1a0b24",
-    logo_background: "light", logo_position: "top-left",
-  },
-] as const;
+};
+
+// ── Source data ──────────────────────────────────────────────────────
 
 const ROLES = [
   {
@@ -588,96 +568,230 @@ const RATIONALES_WEAK = [
   "Skills match is weak on several must-haves. Would not recommend without additional screening.",
 ];
 
-// ── Main seed function ───────────────────────────────────────────────
+// ── Demo password (single shared credential, guarded in production) ───
+// Decision F: one SEED_DEMO_PASSWORD hashed once and applied to every demo
+// user (and the operator). Mirrors seed-admin.ts's requirePassword guard —
+// refuses a weak/missing value under NODE_ENV=production.
 
-async function main() {
-  console.log("Seeding database...\n");
+const DEFAULT_DEMO_PASSWORD = "demo-password-1234";
+
+function resolveDemoPassword(): string {
+  const v = process.env.SEED_DEMO_PASSWORD?.trim();
+  if (process.env.NODE_ENV === "production") {
+    if (!v || v.length < 12) {
+      throw new Error(
+        "Refusing to seed demo users in production: set SEED_DEMO_PASSWORD to a strong (12+ char) value."
+      );
+    }
+    return v;
+  }
+  // Non-production: allow a sensible default so `npm run db:seed` works out of
+  // the box. A provided value still wins (and must be ≥8 chars to be honoured).
+  return v && v.length >= 8 ? v : DEFAULT_DEMO_PASSWORD;
+}
+
+// ── Seed summary ─────────────────────────────────────────────────────
+
+export interface SeedSummary {
+  orgs: number;
+  brands: number;
+  users: number;
+  memberships: number;
+  campaigns: number;
+  candidates: number;
+  scoringLogs: number;
+  messages: number;
+  conversations: number;
+  chatMessages: number;
+  events: number;
+  jobs: number;
+  usageEvents: number;
+  usageByKind: Record<string, number>;
+}
+
+// ── Main seed function (exported so a verify test can run it on a throwaway DB) ──
+
+const BATCH_SIZE = 500;
+
+export async function seed(db: Db): Promise<SeedSummary> {
+  resetRandom();
+  console.log("Seeding database (two-org demo)...\n");
 
   // ── Clear existing data in dependency order ──
-  console.log("Clearing existing data...");
+  // Full deterministic rebuild. Operators are PRESERVED (find-or-created by
+  // email below) so a re-run keeps their UUIDs stable; every other demo row is
+  // wiped and regenerated. Order respects FKs; usage_events/memberships/
+  // invitations are cleared explicitly for legibility even though they cascade.
+  console.log("Clearing existing demo data...");
   await db.delete(schema.chatMessages);
   await db.delete(schema.conversations);
   await db.delete(schema.chatTokens);
   await db.delete(schema.events);
   await db.delete(schema.jobs);
+  await db.delete(schema.usageEvents);
   await db.delete(schema.scoringLogs);
   await db.delete(schema.messages);
   await db.delete(schema.candidates);
   await db.delete(schema.campaigns);
+  await db.delete(schema.invitations);
+  await db.delete(schema.memberships);
   await db.delete(schema.passwordResetTokens);
-  await db.delete(schema.users);
+  // Keep operators; drop all tenant users (operator_audit only references
+  // operators, so this never trips its not-null set-null FK).
+  await db.delete(schema.users).where(eq(schema.users.is_operator, false));
   await db.delete(schema.clients);
   console.log("Done.\n");
 
-  // ── Organization (single demo tenant) ──
-  // S5 made org_id NOT NULL on every leaf, so the seed must stamp it. The
-  // full multi-org seed rework is S14; here all demo data lives under one
-  // find-or-create org so every insert below has a valid org_id.
-  const orgSlug = "demo-org";
-  let org = await db.query.organizations.findFirst({
-    where: eq(schema.organizations.slug, orgSlug),
-    columns: { id: true },
-  });
-  if (!org) {
-    const [inserted] = await db
-      .insert(schema.organizations)
-      .values({ slug: orgSlug, name: "Demo Org" })
-      .returning({ id: schema.organizations.id });
-    org = inserted;
+  // ── Organizations (find-or-create by slug; durable top-level rows) ──
+  const orgIdBySlug = new Map<string, string>();
+  for (const o of DEMO_ORGS) {
+    const existing = await db.query.organizations.findFirst({
+      where: eq(schema.organizations.slug, o.slug),
+      columns: { id: true },
+    });
+    if (existing) {
+      await db
+        .update(schema.organizations)
+        .set({ name: o.name, status: "active" })
+        .where(eq(schema.organizations.id, existing.id));
+      orgIdBySlug.set(o.slug, existing.id);
+    } else {
+      const [inserted] = await db
+        .insert(schema.organizations)
+        .values({ slug: o.slug, name: o.name, status: "active" })
+        .returning({ id: schema.organizations.id });
+      orgIdBySlug.set(o.slug, inserted.id);
+    }
   }
-  const orgId = org.id;
+  console.log(`Organizations: ${orgIdBySlug.size} (${DEMO_ORGS.map((o) => o.slug).join(", ")})`);
 
-  // ── Shared sample CV (S6 Resolved Decision 2) ──
-  // Seeded cv_url values must resolve to a real blob. When storage is
-  // configured, upload ONE shared sample CV for the org and point every seeded
-  // CV at it (all seeded CVs are synthetic, so a shared blob is fine and keeps
-  // the demo CV preview/download working). Otherwise leave cv_url null — cv_text
-  // still drives scoring/report copy. Either branch leaves no dangling cv_url.
-  let sampleCvPath: string | null = null;
+  // ── Brands (clients) — globally-distinct slugs (S12 contract) ──
+  const brandRows: { id: string; slug: string; name: string; orgId: string }[] = [];
+  for (const o of DEMO_ORGS) {
+    const orgId = orgIdBySlug.get(o.slug)!;
+    const inserted = await db
+      .insert(schema.clients)
+      .values(
+        o.brands.map((b) => ({
+          org_id: orgId,
+          slug: b.slug,
+          name: b.name,
+          contact_name: b.contact_name,
+          contact_email: b.contact_email,
+          contact_phone: b.contact_phone,
+          billing_email: b.billing_email,
+          notes: b.notes,
+          is_active: true,
+          ...BRANDING[b.branding],
+        }))
+      )
+      .returning({ id: schema.clients.id, slug: schema.clients.slug, name: schema.clients.name });
+    for (const r of inserted) brandRows.push({ ...r, orgId });
+  }
+  const brandIdBySlug = new Map(brandRows.map((b) => [b.slug, b.id]));
+  const brandNameById = new Map(brandRows.map((b) => [b.id, b.name]));
+  console.log(`Brands: ${brandRows.length} (${brandRows.map((b) => b.slug).join(", ")})\n`);
+
+  // ── One sample CV per org (S6 Resolved Decision 2) ──
+  // org-scoped blob path cvs/{orgId}/{brandSlug}/{candidateId}. When storage is
+  // not configured every seeded cv_url stays null (cv_text still drives scoring).
+  const sampleCvByOrg = new Map<string, string | null>();
   if (isStorageConfigured()) {
-    sampleCvPath = await uploadCV(
-      orgId,
-      "_sample",
-      "shared",
-      buildSamplePdf("Sample CV"),
-      "sample.pdf"
-    );
-    console.log(
-      sampleCvPath
-        ? `Uploaded shared sample CV → ${sampleCvPath}`
-        : "Sample CV upload skipped (storage returned null)"
-    );
+    for (const [slug, orgId] of orgIdBySlug) {
+      const path = await uploadCV(
+        orgId,
+        "_sample",
+        "shared",
+        buildSamplePdf(`Sample CV — ${slug}`),
+        "sample.pdf"
+      );
+      sampleCvByOrg.set(orgId, path);
+    }
+    console.log("Uploaded one sample CV per org.");
   } else {
     console.log("Storage not configured — seeded cv_url will be null.");
   }
+  const cvUrlFor = (orgId: string): string | null => sampleCvByOrg.get(orgId) ?? null;
 
-  // ── Insert clients ──
-  console.log(`Inserting ${CLIENTS.length} clients...`);
-  const insertedClients = await db.insert(schema.clients).values(
-    CLIENTS.map((c) => ({
-      org_id: orgId,
-      slug: c.slug,
-      name: c.name,
-      contact_name: c.contact_name,
-      contact_email: c.contact_email,
-      contact_phone: c.contact_phone,
-      billing_email: c.billing_email,
-      notes: c.notes,
-      is_active: true,
-      brand_primary_color: c.brand_primary_color,
-      brand_secondary_color: c.brand_secondary_color,
-      brand_accent_color: c.brand_accent_color,
-      brand_text_color: c.brand_text_color,
-      logo_background: c.logo_background,
-      logo_position: c.logo_position,
-    }))
-  ).returning({ id: schema.clients.id, slug: schema.clients.slug, name: schema.clients.name });
+  // ── Users + memberships ──
+  const passwordHash = await bcrypt.hash(resolveDemoPassword(), 12);
 
-  // ── Generate campaigns — 2-4 per client ──
+  // Operator — find-or-create by email so the UUID is stable across re-runs.
+  const operatorDef = DEMO_USERS.find((u) => u.isOperator)!;
+  const existingOperator = await db.query.users.findFirst({
+    where: eq(schema.users.email, operatorDef.email),
+    columns: { id: true },
+  });
+  if (!existingOperator) {
+    const [inserted] = await db
+      .insert(schema.users)
+      .values({
+        org_id: null,
+        org_role: null,
+        is_operator: true,
+        first_name: operatorDef.firstName,
+        last_name: operatorDef.lastName,
+        email: operatorDef.email,
+        password_hash: passwordHash,
+        is_active: true,
+      })
+      .returning({ id: schema.users.id, org_id: schema.users.org_id });
+    if (inserted.org_id !== null) {
+      throw new Error(
+        `Operator ${operatorDef.email} was created with a non-NULL org_id; expected an explicit NULL org binding.`
+      );
+    }
+  } else {
+    // Keep the credential current on a re-run.
+    await db
+      .update(schema.users)
+      .set({ password_hash: passwordHash, is_active: true })
+      .where(eq(schema.users.id, existingOperator.id));
+  }
+
+  // Tenant users — the shared email appears twice (different org_id), one active
+  // and one inactive (Decision E). buildMembershipRows enforces the grant rules.
+  const tenantDefs = DEMO_USERS.filter((u) => !u.isOperator);
+  const castWithId: CastUserWithId[] = [];
+  for (const u of tenantDefs) {
+    const orgId = orgIdBySlug.get(u.orgSlug!)!;
+    const [inserted] = await db
+      .insert(schema.users)
+      .values({
+        org_id: orgId,
+        org_role: u.orgRole,
+        is_operator: false,
+        first_name: u.firstName,
+        last_name: u.lastName,
+        email: u.email,
+        password_hash: passwordHash,
+        is_active: u.isActive,
+      })
+      .returning({ id: schema.users.id });
+    castWithId.push({
+      id: inserted.id,
+      email: u.email,
+      orgRole: u.orgRole,
+      isOperator: false,
+      memberships: u.memberships,
+    });
+  }
+
+  const membershipRows = buildMembershipRows(castWithId, brandIdBySlug);
+  if (membershipRows.length > 0) {
+    await db.insert(schema.memberships).values(membershipRows);
+  }
+  console.log(
+    `Users: ${tenantDefs.length} tenant + 1 operator; Memberships: ${membershipRows.length}\n`
+  );
+
+  // Accumulator for metered usage events (awaited + batched at the end).
+  const usageEventsToInsert: (typeof schema.usageEvents.$inferInsert)[] = [];
+
+  // ── Campaigns — 2–4 per brand ──
   console.log("Generating campaigns...");
-  const campaignsToInsert: typeof schema.campaigns.$inferInsert[] = [];
-
-  for (const c of insertedClients) {
+  const campaignsToInsert: (typeof schema.campaigns.$inferInsert)[] = [];
+  for (const brand of brandRows) {
     const count = randInt(2, 4);
     const usedRoles = new Set<string>();
     for (let i = 0; i < count; i++) {
@@ -692,13 +806,16 @@ async function main() {
         { value: "closed", weight: 2 },
       ]);
 
-      const campaignStart = status === "active" || status === "paused" || status === "closed"
-        ? daysAgo(randInt(5, 45)) : null;
+      const campaignStart =
+        status === "active" || status === "paused" || status === "closed"
+          ? daysAgo(randInt(5, 45))
+          : null;
       const campaignEnd = status === "closed" ? daysAgo(randInt(1, 10)) : null;
+      const createdAt = campaignStart ?? daysAgo(randInt(5, 45));
 
       campaignsToInsert.push({
-        org_id: orgId,
-        client_id: c.id,
+        org_id: brand.orgId,
+        client_id: brand.id,
         slug: baseSlug,
         role_title: role.title,
         role_description: role.description,
@@ -713,6 +830,8 @@ async function main() {
         salary_range_min: role.salary_min,
         salary_range_max: role.salary_max,
         chat_lifecycle: pick(["topics_complete", "topics_complete", "dormant"]),
+        created_at: createdAt,
+        updated_at: createdAt,
       });
     }
   }
@@ -721,34 +840,47 @@ async function main() {
     id: schema.campaigns.id,
     slug: schema.campaigns.slug,
     client_id: schema.campaigns.client_id,
+    org_id: schema.campaigns.org_id,
     status: schema.campaigns.status,
     role_title: schema.campaigns.role_title,
     department: schema.campaigns.department,
     gating_config: schema.campaigns.gating_config,
     chat_lifecycle: schema.campaigns.chat_lifecycle,
+    created_at: schema.campaigns.created_at,
   });
 
-  // Build a lookup from campaign_id to client for chat scripts
-  const clientByCampaign = new Map<string, { slug: string; name: string }>();
+  // campaign_id → its brand + org + created_at (used to stamp downstream usage).
+  const campaignMeta = new Map<string, { clientId: string; orgId: string; createdAt: Date }>();
   for (const camp of insertedCampaigns) {
-    const cl = insertedClients.find((c) => c.id === camp.client_id);
-    if (cl) clientByCampaign.set(camp.id, { slug: cl.slug, name: cl.name });
+    campaignMeta.set(camp.id, {
+      clientId: camp.client_id,
+      orgId: camp.org_id,
+      createdAt: camp.created_at,
+    });
+    // usage: one campaign_created per campaign (mirrors campaigns POST).
+    usageEventsToInsert.push({
+      org_id: camp.org_id,
+      brand_id: camp.client_id,
+      kind: "campaign_created",
+      campaign_id: camp.id,
+      created_at: camp.created_at,
+    });
   }
-
   console.log(`Inserted ${insertedCampaigns.length} campaigns.\n`);
 
-  // ── Generate candidates ──
+  // ── Candidates ──
   console.log("Generating candidates...");
   const candidatesToInsert: (typeof schema.candidates.$inferInsert & { _department: string })[] = [];
 
   for (const campaign of insertedCampaigns) {
     if (campaign.status === "draft") continue;
 
-    const candidateCount = campaign.status === "closed"
-      ? randInt(30, 60)
-      : campaign.status === "active"
-        ? randInt(15, 45)
-        : randInt(8, 20);
+    const candidateCount =
+      campaign.status === "closed"
+        ? randInt(30, 60)
+        : campaign.status === "active"
+          ? randInt(15, 45)
+          : randInt(8, 20);
 
     const gatingConfig = campaign.gating_config as {
       id: string; label: string; options: { value: string }[]; pass_criteria: string[];
@@ -851,7 +983,7 @@ async function main() {
 
       candidatesToInsert.push({
         _department: department,
-        org_id: orgId,
+        org_id: campaign.org_id,
         campaign_id: campaign.id,
         name,
         email,
@@ -859,7 +991,7 @@ async function main() {
         whatsapp_opted_in: rand() < 0.6,
         gating_answers: answers,
         gating_passed: gatingPassed,
-        cv_url: hasCv ? sampleCvPath : null,
+        cv_url: hasCv ? cvUrlFor(campaign.org_id) : null,
         cv_text: hasCv ? generateCvText(name, department, yearsExp, aiScore ?? 5) : null,
         ai_score: aiScore,
         ai_dimensions: aiDimensions,
@@ -884,12 +1016,11 @@ async function main() {
   }
 
   // Insert candidates in batches
-  const BATCH_SIZE = 500;
   const insertedCandidates: {
-    id: string; campaign_id: string; status: string; email: string;
+    id: string; campaign_id: string; org_id: string; status: string; email: string;
     name: string; ai_score: number | null; ai_rationale: string | null;
     ai_dimensions: unknown; ai_confidence: string | null; ai_flags: unknown;
-    _department: string;
+    created_at: Date; _department: string;
   }[] = [];
 
   for (let i = 0; i < candidatesToInsert.length; i += BATCH_SIZE) {
@@ -899,6 +1030,7 @@ async function main() {
     const result = await db.insert(schema.candidates).values(cleanBatch).returning({
       id: schema.candidates.id,
       campaign_id: schema.candidates.campaign_id,
+      org_id: schema.candidates.org_id,
       status: schema.candidates.status,
       email: schema.candidates.email,
       name: schema.candidates.name,
@@ -907,68 +1039,114 @@ async function main() {
       ai_dimensions: schema.candidates.ai_dimensions,
       ai_confidence: schema.candidates.ai_confidence,
       ai_flags: schema.candidates.ai_flags,
+      created_at: schema.candidates.created_at,
     });
     // Re-attach the department for downstream use
     for (let j = 0; j < result.length; j++) {
       insertedCandidates.push({ ...result[j], _department: batch[j]._department });
     }
   }
+  // usage: one candidate_created per candidate (mirrors apply route).
+  for (const cand of insertedCandidates) {
+    usageEventsToInsert.push({
+      org_id: cand.org_id,
+      brand_id: campaignMeta.get(cand.campaign_id)!.clientId,
+      kind: "candidate_created",
+      campaign_id: cand.campaign_id,
+      candidate_id: cand.id,
+      created_at: cand.created_at,
+    });
+  }
   console.log(`Inserted ${insertedCandidates.length} candidates.\n`);
 
-  // ── Generate scoring logs ──
+  // ── Scoring logs (+ ai_tokens usage) ──
   console.log("Generating scoring logs...");
-  const scoringLogsToInsert: typeof schema.scoringLogs.$inferInsert[] = [];
+  const scoringLogsToInsert: (typeof schema.scoringLogs.$inferInsert)[] = [];
   for (const cand of insertedCandidates) {
-    if (cand.ai_score !== null) {
-      scoringLogsToInsert.push({
-        org_id: orgId,
-        candidate_id: cand.id,
-        provider: pick(["anthropic", "anthropic", "openai"]),
-        model_version: pick(["claude-sonnet-4-20250514", "claude-sonnet-4-20250514", "gpt-4o-2024-08-06"]),
-        full_prompt: `You are an expert recruitment assessor...\n\n## Role\n[role details]\n\n## CV\n[cv text redacted for seed data]\n\n## Instructions\nScore 1-10 on each dimension.`,
-        full_response: JSON.stringify({
-          overall_score: cand.ai_score,
-          confidence: "medium",
-          rationale: cand.ai_rationale,
-          flags: [],
-          recommendation: cand.ai_score >= 8.5 ? "strong_recommend" : cand.ai_score >= 7.5 ? "recommend" : cand.ai_score >= 6 ? "recommend_with_caveats" : cand.ai_score >= 5 ? "borderline" : "reject",
-        }, null, 2),
-        score: cand.ai_score,
-        processing_time_ms: randInt(2800, 8500),
-        scoring_type: "initial",
-        dimensions: cand.ai_dimensions,
-        confidence: cand.ai_confidence ?? "medium",
-        rationale: cand.ai_rationale,
-        flags: cand.ai_flags ?? [],
-        recommendation: cand.ai_score >= 8.5 ? "strong_recommend" : cand.ai_score >= 7.5 ? "recommend" : cand.ai_score >= 6 ? "recommend_with_caveats" : cand.ai_score >= 5 ? "borderline" : "reject",
-      });
+    if (cand.ai_score === null) continue;
 
-      // Some follow_up candidates get a rescore
-      if (cand.status === "follow_up" && rand() < 0.3) {
-        const rescored = Math.round(normalScore(cand.ai_score + 0.5, 0.5) * 10) / 10;
-        scoringLogsToInsert.push({
-          org_id: orgId,
-          candidate_id: cand.id,
-          provider: "anthropic",
-          model_version: "claude-sonnet-4-20250514",
-          full_prompt: `You are an expert recruitment assessor. Re-evaluate with chat context...\n\n## Chat Transcript\n[redacted]\n\n## Previous Score: ${cand.ai_score}`,
-          full_response: JSON.stringify({
-            overall_score: rescored,
-            confidence: "high",
-            rationale: "Re-scored with additional context from candidate chat. Clarifications strengthened the assessment.",
-            flags: [],
-            recommendation: rescored >= 7.5 ? "recommend" : "recommend_with_caveats",
-          }, null, 2),
-          score: rescored,
-          processing_time_ms: randInt(3200, 9000),
-          scoring_type: "rescore_chat",
-          dimensions: cand.ai_dimensions,
+    const provider = pick(["anthropic", "anthropic", "openai"]);
+    const model = provider === "openai" ? "gpt-4o-2024-08-06" : "claude-sonnet-4-20250514";
+    const brandId = campaignMeta.get(cand.campaign_id)!.clientId;
+    const scoredAt = new Date(cand.created_at.getTime() + randInt(2, 30) * 60_000);
+
+    scoringLogsToInsert.push({
+      org_id: cand.org_id,
+      candidate_id: cand.id,
+      provider,
+      model_version: model,
+      full_prompt: `You are an expert recruitment assessor...\n\n## Role\n[role details]\n\n## CV\n[cv text redacted for seed data]\n\n## Instructions\nScore 1-10 on each dimension.`,
+      full_response: JSON.stringify({
+        overall_score: cand.ai_score,
+        confidence: "medium",
+        rationale: cand.ai_rationale,
+        flags: [],
+        recommendation: cand.ai_score >= 8.5 ? "strong_recommend" : cand.ai_score >= 7.5 ? "recommend" : cand.ai_score >= 6 ? "recommend_with_caveats" : cand.ai_score >= 5 ? "borderline" : "reject",
+      }, null, 2),
+      score: cand.ai_score,
+      processing_time_ms: randInt(2800, 8500),
+      scoring_type: "initial",
+      dimensions: cand.ai_dimensions,
+      confidence: cand.ai_confidence ?? "medium",
+      rationale: cand.ai_rationale,
+      flags: (cand.ai_flags as string[] | null) ?? [],
+      recommendation: cand.ai_score >= 8.5 ? "strong_recommend" : cand.ai_score >= 7.5 ? "recommend" : cand.ai_score >= 6 ? "recommend_with_caveats" : cand.ai_score >= 5 ? "borderline" : "reject",
+      created_at: scoredAt,
+      updated_at: scoredAt,
+    });
+    usageEventsToInsert.push({
+      org_id: cand.org_id,
+      brand_id: brandId,
+      kind: "ai_tokens",
+      provider,
+      model,
+      input_tokens: randInt(1500, 6000),
+      output_tokens: randInt(200, 900),
+      campaign_id: cand.campaign_id,
+      candidate_id: cand.id,
+      created_at: scoredAt,
+    });
+
+    // Some follow_up candidates get a rescore (with its own ai_tokens row).
+    if (cand.status === "follow_up" && rand() < 0.3) {
+      const rescored = Math.round(normalScore(cand.ai_score + 0.5, 0.5) * 10) / 10;
+      const rescoreAt = new Date(scoredAt.getTime() + randInt(1, 3) * 24 * 60 * 60_000);
+      scoringLogsToInsert.push({
+        org_id: cand.org_id,
+        candidate_id: cand.id,
+        provider: "anthropic",
+        model_version: "claude-sonnet-4-20250514",
+        full_prompt: `You are an expert recruitment assessor. Re-evaluate with chat context...\n\n## Chat Transcript\n[redacted]\n\n## Previous Score: ${cand.ai_score}`,
+        full_response: JSON.stringify({
+          overall_score: rescored,
           confidence: "high",
           rationale: "Re-scored with additional context from candidate chat. Clarifications strengthened the assessment.",
           flags: [],
           recommendation: rescored >= 7.5 ? "recommend" : "recommend_with_caveats",
-        });
-      }
+        }, null, 2),
+        score: rescored,
+        processing_time_ms: randInt(3200, 9000),
+        scoring_type: "rescore_chat",
+        dimensions: cand.ai_dimensions,
+        confidence: "high",
+        rationale: "Re-scored with additional context from candidate chat. Clarifications strengthened the assessment.",
+        flags: [],
+        recommendation: rescored >= 7.5 ? "recommend" : "recommend_with_caveats",
+        created_at: rescoreAt,
+        updated_at: rescoreAt,
+      });
+      usageEventsToInsert.push({
+        org_id: cand.org_id,
+        brand_id: brandId,
+        kind: "ai_tokens",
+        provider: "anthropic",
+        model: "claude-sonnet-4-20250514",
+        input_tokens: randInt(1500, 6000),
+        output_tokens: randInt(200, 900),
+        campaign_id: cand.campaign_id,
+        candidate_id: cand.id,
+        created_at: rescoreAt,
+      });
     }
   }
   for (let i = 0; i < scoringLogsToInsert.length; i += BATCH_SIZE) {
@@ -976,68 +1154,52 @@ async function main() {
   }
   console.log(`Inserted ${scoringLogsToInsert.length} scoring logs.\n`);
 
-  // ── Generate email messages ──
+  // ── Email messages (+ email_sent usage; one per outbound message) ──
   console.log("Generating messages...");
-  const messagesToInsert: typeof schema.messages.$inferInsert[] = [];
+  const messagesToInsert: (typeof schema.messages.$inferInsert)[] = [];
   for (const cand of insertedCandidates) {
+    const brandId = campaignMeta.get(cand.campaign_id)!.clientId;
+    const pushMessage = (content: string, offsetMinutes: number) => {
+      const createdAt = new Date(cand.created_at.getTime() + offsetMinutes * 60_000);
+      messagesToInsert.push({
+        org_id: cand.org_id,
+        candidate_id: cand.id,
+        channel: "email",
+        direction: "outbound",
+        content,
+        status: "sent",
+        external_id: `resend_${Math.random().toString(36).slice(2, 12)}`,
+        created_at: createdAt,
+        updated_at: createdAt,
+      });
+      usageEventsToInsert.push({
+        org_id: cand.org_id,
+        brand_id: brandId,
+        kind: "email_sent",
+        campaign_id: cand.campaign_id,
+        candidate_id: cand.id,
+        created_at: createdAt,
+      });
+    };
+
     // Application received email
-    messagesToInsert.push({
-      org_id: orgId,
-      candidate_id: cand.id,
-      channel: "email",
-      direction: "outbound",
-      content: "Application received — thank you for applying.",
-      status: "sent",
-      external_id: `resend_${Math.random().toString(36).slice(2, 12)}`,
-    });
+    pushMessage("Application received — thank you for applying.", 5);
 
     // Gating result email
     if (cand.status === "gating_failed") {
-      messagesToInsert.push({
-        org_id: orgId,
-        candidate_id: cand.id,
-        channel: "email",
-        direction: "outbound",
-        content: "Application update — unfortunately we are unable to progress your application at this time.",
-        status: "sent",
-        external_id: `resend_${Math.random().toString(36).slice(2, 12)}`,
-      });
+      pushMessage("Application update — unfortunately we are unable to progress your application at this time.", 60);
     } else if (cand.status !== "gating_passed") {
-      messagesToInsert.push({
-        org_id: orgId,
-        candidate_id: cand.id,
-        channel: "email",
-        direction: "outbound",
-        content: "Good news — your CV is being reviewed by our team.",
-        status: "sent",
-        external_id: `resend_${Math.random().toString(36).slice(2, 12)}`,
-      });
+      pushMessage("Good news — your CV is being reviewed by our team.", 60);
     }
 
     // Chat invitation emails for follow_up candidates
     if (cand.status === "follow_up") {
-      messagesToInsert.push({
-        org_id: orgId,
-        candidate_id: cand.id,
-        channel: "email",
-        direction: "outbound",
-        content: "We'd like to chat about your application — follow-up questions",
-        status: "sent",
-        external_id: `resend_${Math.random().toString(36).slice(2, 12)}`,
-      });
+      pushMessage("We'd like to chat about your application — follow-up questions", 120);
     }
 
     // Rejection emails for rejected candidates
     if (cand.status === "rejected") {
-      messagesToInsert.push({
-        org_id: orgId,
-        candidate_id: cand.id,
-        channel: "email",
-        direction: "outbound",
-        content: "Application update — after careful consideration, we've decided not to move forward.",
-        status: "sent",
-        external_id: `resend_${Math.random().toString(36).slice(2, 12)}`,
-      });
+      pushMessage("Application update — after careful consideration, we've decided not to move forward.", 240);
     }
   }
   for (let i = 0; i < messagesToInsert.length; i += BATCH_SIZE) {
@@ -1045,10 +1207,10 @@ async function main() {
   }
   console.log(`Inserted ${messagesToInsert.length} messages.\n`);
 
-  // ── Generate conversations & chat messages for follow_up/withdrawn candidates ──
+  // ── Conversations & chat messages (+ chat_message usage for user turns) ──
   console.log("Generating conversations and chat messages...");
+  const chatMessagesToInsert: (typeof schema.chatMessages.$inferInsert)[] = [];
   let conversationCount = 0;
-  let chatMessageCount = 0;
 
   const followUpCandidates = insertedCandidates.filter(
     (c) => c.status === "follow_up" || c.status === "withdrawn"
@@ -1058,8 +1220,9 @@ async function main() {
     const flags = (cand.ai_flags ?? []) as string[];
     if (flags.length === 0) continue;
 
+    const meta = campaignMeta.get(cand.campaign_id)!;
     const campaign = insertedCampaigns.find((c) => c.id === cand.campaign_id)!;
-    const clientInfo = clientByCampaign.get(campaign.id)!;
+    const companyName = brandNameById.get(meta.clientId) ?? "the company";
 
     // Determine chat outcome
     const outcome: "all_covered" | "partial" | "withdrawn" =
@@ -1069,13 +1232,7 @@ async function main() {
           ? "all_covered"
           : "partial";
 
-    const script = generateChatScript(
-      cand.name,
-      campaign.role_title,
-      clientInfo.name,
-      flags,
-      outcome
-    );
+    const script = generateChatScript(cand.name, campaign.role_title, companyName, flags, outcome);
 
     // Build topic objects
     const topics = flags.map((flag, idx) => ({
@@ -1109,7 +1266,7 @@ async function main() {
     const convCreatedAt = minutesAgo(convStartedMinutesAgo);
 
     const [conv] = await db.insert(schema.conversations).values({
-      org_id: orgId,
+      org_id: cand.org_id,
       candidate_id: cand.id,
       status: convStatus,
       lifecycle: campaign.chat_lifecycle ?? "dormant",
@@ -1124,27 +1281,43 @@ async function main() {
 
     conversationCount++;
 
-    // Insert chat messages with staggered timestamps
+    // Accumulate chat messages with staggered timestamps; user turns meter.
     let msgTime = new Date(convCreatedAt);
     for (const msg of script.messages) {
       msgTime = new Date(msgTime.getTime() + randInt(15, 180) * 1000);
-      await db.insert(schema.chatMessages).values({
-        org_id: orgId,
+      chatMessagesToInsert.push({
+        org_id: cand.org_id,
         conversation_id: conv.id,
         role: msg.role,
         content: msg.content,
         created_at: msgTime,
       });
-      chatMessageCount++;
+      if (msg.role === "user") {
+        usageEventsToInsert.push({
+          org_id: cand.org_id,
+          brand_id: meta.clientId,
+          kind: "chat_message",
+          campaign_id: cand.campaign_id,
+          candidate_id: cand.id,
+          created_at: msgTime,
+        });
+      }
     }
   }
-  console.log(`Inserted ${conversationCount} conversations with ${chatMessageCount} chat messages.\n`);
+  for (let i = 0; i < chatMessagesToInsert.length; i += BATCH_SIZE) {
+    await db.insert(schema.chatMessages).values(chatMessagesToInsert.slice(i, i + BATCH_SIZE));
+  }
+  console.log(`Inserted ${conversationCount} conversations with ${chatMessagesToInsert.length} chat messages.\n`);
 
-  // ── Generate visitor events ──
+  // ── Visitor events — the production analytics funnel vocabulary ──
+  // page_view → form_start → field_interact → (form_submit | form_abandon).
+  // Matches ALLOWED_EVENT_TYPES (api/events) and what analytics/route.ts reads,
+  // so the seeded analytics dashboards populate instead of showing zeroes.
   console.log("Generating visitor events...");
-  const eventsToInsert: typeof schema.events.$inferInsert[] = [];
+  const eventsToInsert: (typeof schema.events.$inferInsert)[] = [];
   const devices = ["desktop", "mobile", "tablet"] as const;
   const browsers = ["Chrome", "Safari", "Firefox", "Edge", "Samsung Internet"] as const;
+  const FORM_FIELDS = ["full_name", "email", "phone", "experience", "work_authorisation", "notice_period", "cv_upload"] as const;
 
   for (const campaign of insertedCampaigns) {
     if (campaign.status === "draft") continue;
@@ -1157,44 +1330,49 @@ async function main() {
       const device = pick(devices);
       const browser = pick(browsers);
       const eventDay = daysAgo(randInt(0, 30));
-
-      // Page view
-      eventsToInsert.push({
-        org_id: orgId,
+      const base = {
+        org_id: campaign.org_id,
         campaign_id: campaign.id,
-        event_type: "page_view",
         session_id: sessionId,
         visitor_id: visitorId,
         device_type: device,
         browser,
+      };
+
+      // Page view
+      eventsToInsert.push({
+        ...base,
+        event_type: "page_view",
         metadata: { referrer: pick(["google", "linkedin", "direct", "indeed", "email", "twitter"]) },
         created_at: eventDay,
       });
 
-      // Some visitors start the application
+      // Some visitors start the application form
       if (rand() < 0.45) {
-        eventsToInsert.push({
-          org_id: orgId,
-          campaign_id: campaign.id,
-          event_type: "application_started",
-          session_id: sessionId,
-          visitor_id: visitorId,
-          device_type: device,
-          browser,
-          created_at: new Date(eventDay.getTime() + randInt(30, 300) * 1000),
-        });
+        let t = eventDay.getTime() + randInt(20, 120) * 1000;
+        eventsToInsert.push({ ...base, event_type: "form_start", created_at: new Date(t) });
 
-        // Some complete it
-        if (rand() < 0.65) {
+        const reached = randInt(1, FORM_FIELDS.length);
+        for (let f = 0; f < reached; f++) {
+          t += randInt(10, 60) * 1000;
           eventsToInsert.push({
-            org_id: orgId,
-            campaign_id: campaign.id,
-            event_type: "application_submitted",
-            session_id: sessionId,
-            visitor_id: visitorId,
-            device_type: device,
-            browser,
-            created_at: new Date(eventDay.getTime() + randInt(300, 900) * 1000),
+            ...base,
+            event_type: "field_interact",
+            metadata: { field: FORM_FIELDS[f] },
+            created_at: new Date(t),
+          });
+        }
+
+        t += randInt(15, 120) * 1000;
+        // Most who start, submit; the rest abandon at the last field they touched.
+        if (rand() < 0.65) {
+          eventsToInsert.push({ ...base, event_type: "form_submit", created_at: new Date(t) });
+        } else {
+          eventsToInsert.push({
+            ...base,
+            event_type: "form_abandon",
+            metadata: { last_field: FORM_FIELDS[reached - 1] },
+            created_at: new Date(t),
           });
         }
       }
@@ -1205,9 +1383,9 @@ async function main() {
   }
   console.log(`Inserted ${eventsToInsert.length} events.\n`);
 
-  // ── Generate completed jobs ──
+  // ── Completed jobs — stamped org_id + org-namespaced dedup (mirror S10) ──
   console.log("Generating job history...");
-  const jobsToInsert: typeof schema.jobs.$inferInsert[] = [];
+  const jobsToInsert: (typeof schema.jobs.$inferInsert)[] = [];
 
   for (const cand of insertedCandidates) {
     // Processing job
@@ -1217,11 +1395,13 @@ async function main() {
         type: "candidate-processing",
         payload: { type: "candidate-processing", candidateId: cand.id },
         status: "completed",
+        org_id: cand.org_id,
         deliver_at: createdAt,
         attempts: 1,
         max_attempts: 3,
         created_at: createdAt,
         completed_at: new Date(createdAt.getTime() + randInt(5000, 15000)),
+        deduplication_id: namespaceDedup(cand.org_id, `candidate-processing-${cand.id}`),
       });
     }
 
@@ -1232,12 +1412,13 @@ async function main() {
         type: "send-email",
         payload: { type: "send-email", candidateId: cand.id, emailKind: "gating_failed" },
         status: "completed",
+        org_id: cand.org_id,
         deliver_at: new Date(createdAt.getTime() + 24 * 60 * 60 * 1000),
         attempts: 1,
         max_attempts: 3,
         created_at: createdAt,
         completed_at: new Date(createdAt.getTime() + 24 * 60 * 60 * 1000 + randInt(1000, 5000)),
-        deduplication_id: `gating-failed-${cand.id}`,
+        deduplication_id: namespaceDedup(cand.org_id, `gating-failed-${cand.id}`),
       });
     }
 
@@ -1247,12 +1428,13 @@ async function main() {
         type: "send-email",
         payload: { type: "send-email", candidateId: cand.id, emailKind: "rejected" },
         status: "completed",
+        org_id: cand.org_id,
         deliver_at: createdAt,
         attempts: 1,
         max_attempts: 3,
         created_at: createdAt,
         completed_at: new Date(createdAt.getTime() + randInt(1000, 5000)),
-        deduplication_id: `rejected-${cand.id}`,
+        deduplication_id: namespaceDedup(cand.org_id, `rejected-${cand.id}`),
       });
     }
 
@@ -1263,12 +1445,13 @@ async function main() {
         type: "send-chat-invitation",
         payload: { type: "send-chat-invitation", candidateId: cand.id },
         status: "completed",
+        org_id: cand.org_id,
         deliver_at: createdAt,
         attempts: 1,
         max_attempts: 3,
         created_at: createdAt,
         completed_at: new Date(createdAt.getTime() + randInt(2000, 8000)),
-        deduplication_id: `chat-invite-${cand.id}`,
+        deduplication_id: namespaceDedup(cand.org_id, `chat-invite-${cand.id}`),
       });
     }
 
@@ -1279,12 +1462,13 @@ async function main() {
         type: "rescore-after-chat",
         payload: { type: "rescore-after-chat", candidateId: cand.id, conversationId: "seed-placeholder" },
         status: "completed",
+        org_id: cand.org_id,
         deliver_at: createdAt,
         attempts: 1,
         max_attempts: 3,
         created_at: createdAt,
         completed_at: new Date(createdAt.getTime() + randInt(5000, 12000)),
-        deduplication_id: `rescore-chat-${cand.id}`,
+        deduplication_id: namespaceDedup(cand.org_id, `rescore-chat-${cand.id}`),
       });
     }
   }
@@ -1294,31 +1478,84 @@ async function main() {
   }
   console.log(`Inserted ${jobsToInsert.length} jobs.\n`);
 
-  // ── Summary ──
-  const [counts] = await db.select({
-    clients: sql<number>`(select count(*) from clients)::int`,
-    campaigns: sql<number>`(select count(*) from campaigns)::int`,
-    candidates: sql<number>`(select count(*) from candidates)::int`,
-    scoring_logs: sql<number>`(select count(*) from scoring_logs)::int`,
-    messages: sql<number>`(select count(*) from messages)::int`,
-    conversations: sql<number>`(select count(*) from conversations)::int`,
-    chat_messages: sql<number>`(select count(*) from chat_messages)::int`,
-    events: sql<number>`(select count(*) from events)::int`,
-    jobs: sql<number>`(select count(*) from jobs)::int`,
-  }).from(sql`(select 1) t`);
+  // ── Usage events — awaited + batched (not fire-and-forget) ──
+  console.log("Recording usage events...");
+  for (let i = 0; i < usageEventsToInsert.length; i += BATCH_SIZE) {
+    await db.insert(schema.usageEvents).values(usageEventsToInsert.slice(i, i + BATCH_SIZE));
+  }
+  const usageByKind = usageEventsToInsert.reduce<Record<string, number>>((acc, e) => {
+    acc[e.kind] = (acc[e.kind] ?? 0) + 1;
+    return acc;
+  }, {});
+  console.log(`Inserted ${usageEventsToInsert.length} usage events.\n`);
 
-  console.log("=== Seed complete ===");
-  console.log(`Clients:         ${counts.clients}`);
-  console.log(`Campaigns:       ${counts.campaigns}`);
-  console.log(`Candidates:      ${counts.candidates}`);
-  console.log(`Scoring Logs:    ${counts.scoring_logs}`);
-  console.log(`Messages:        ${counts.messages}`);
-  console.log(`Conversations:   ${counts.conversations}`);
-  console.log(`Chat Messages:   ${counts.chat_messages}`);
-  console.log(`Events:          ${counts.events}`);
-  console.log(`Jobs:            ${counts.jobs}`);
+  // ── End-of-seed verification (build-time guarantee of "0 mismatches") ──
+  await verifyTenantIntegrity(db);
 
-  await client.end();
+  return {
+    orgs: orgIdBySlug.size,
+    brands: brandRows.length,
+    users: tenantDefs.length + 1,
+    memberships: membershipRows.length,
+    campaigns: insertedCampaigns.length,
+    candidates: insertedCandidates.length,
+    scoringLogs: scoringLogsToInsert.length,
+    messages: messagesToInsert.length,
+    conversations: conversationCount,
+    chatMessages: chatMessagesToInsert.length,
+    events: eventsToInsert.length,
+    jobs: jobsToInsert.length,
+    usageEvents: usageEventsToInsert.length,
+    usageByKind,
+  };
+}
+
+// ── Tenant-integrity verification ────────────────────────────────────
+// Throws if any leaf row has a NULL org_id, or any leaf's org_id disagrees with
+// its parent's. This makes the "0 org_id mismatches" acceptance a hard, in-script
+// guarantee rather than a manual check.
+
+async function verifyTenantIntegrity(db: Db): Promise<void> {
+  const problems: string[] = [];
+
+  const scalar = async (query: SQL): Promise<number> => {
+    const rows = (await db.execute(query)) as unknown as { n: number }[];
+    return Number(rows[0]?.n ?? 0);
+  };
+
+  // Every leaf table carries a denormalised org_id — none may be NULL.
+  const leafTables = [
+    "clients", "campaigns", "candidates", "scoring_logs", "messages",
+    "conversations", "chat_messages", "chat_tokens", "events", "usage_events",
+  ];
+  for (const name of leafTables) {
+    const n = await scalar(sql`select count(*)::int as n from ${sql.raw(name)} where org_id is null`);
+    if (n > 0) problems.push(`${name}: ${n} row(s) with NULL org_id`);
+  }
+
+  const parentChecks: { label: string; query: SQL }[] = [
+    { label: "candidates.org_id ≠ campaign.org_id", query: sql`select count(*)::int as n from candidates c join campaigns p on c.campaign_id = p.id where c.org_id <> p.org_id` },
+    { label: "scoring_logs.org_id ≠ candidate.org_id", query: sql`select count(*)::int as n from scoring_logs s join candidates p on s.candidate_id = p.id where s.org_id <> p.org_id` },
+    { label: "messages.org_id ≠ candidate.org_id", query: sql`select count(*)::int as n from messages m join candidates p on m.candidate_id = p.id where m.org_id <> p.org_id` },
+    { label: "conversations.org_id ≠ candidate.org_id", query: sql`select count(*)::int as n from conversations co join candidates p on co.candidate_id = p.id where co.org_id <> p.org_id` },
+    { label: "chat_messages.org_id ≠ conversation.org_id", query: sql`select count(*)::int as n from chat_messages cm join conversations p on cm.conversation_id = p.id where cm.org_id <> p.org_id` },
+    { label: "events.org_id ≠ campaign.org_id", query: sql`select count(*)::int as n from events e join campaigns p on e.campaign_id = p.id where e.org_id <> p.org_id` },
+    { label: "campaigns.org_id ≠ brand.org_id", query: sql`select count(*)::int as n from campaigns c join clients p on c.client_id = p.id where c.org_id <> p.org_id` },
+    { label: "usage_events.org_id ≠ campaign.org_id", query: sql`select count(*)::int as n from usage_events u join campaigns p on u.campaign_id = p.id where u.org_id <> p.org_id` },
+    { label: "usage_events.org_id ≠ candidate.org_id", query: sql`select count(*)::int as n from usage_events u join candidates p on u.candidate_id = p.id where u.org_id <> p.org_id` },
+    { label: "usage_events.org_id ≠ brand.org_id", query: sql`select count(*)::int as n from usage_events u join clients p on u.brand_id = p.id where u.org_id <> p.org_id` },
+  ];
+  for (const { label, query } of parentChecks) {
+    const n = await scalar(query);
+    if (n > 0) problems.push(`${label}: ${n} mismatch(es)`);
+  }
+
+  if (problems.length > 0) {
+    throw new Error(
+      `Seed verification FAILED — tenant integrity violated:\n  - ${problems.join("\n  - ")}`
+    );
+  }
+  console.log("Verification passed: 0 org_id nulls, 0 parent/child mismatches.\n");
 }
 
 // ── Helper: reframe flag for topic generation ──────────────────────
@@ -1342,7 +1579,51 @@ function reframeFlag(flag: string): string {
   return `Ask about: ${flag}`;
 }
 
-main().catch((err) => {
-  console.error("Seed failed:", err);
-  process.exit(1);
-});
+// ── CLI entrypoint (only when run directly, not when imported by a test) ──
+
+function printSummary(s: SeedSummary): void {
+  console.log("=== Seed complete (two-org demo) ===");
+  console.log(`Organizations:   ${s.orgs}`);
+  console.log(`Brands:          ${s.brands}`);
+  console.log(`Users:           ${s.users}`);
+  console.log(`Memberships:     ${s.memberships}`);
+  console.log(`Campaigns:       ${s.campaigns}`);
+  console.log(`Candidates:      ${s.candidates}`);
+  console.log(`Scoring Logs:    ${s.scoringLogs}`);
+  console.log(`Messages:        ${s.messages}`);
+  console.log(`Conversations:   ${s.conversations}`);
+  console.log(`Chat Messages:   ${s.chatMessages}`);
+  console.log(`Events:          ${s.events}`);
+  console.log(`Jobs:            ${s.jobs}`);
+  console.log(`Usage Events:    ${s.usageEvents}`);
+  for (const [kind, n] of Object.entries(s.usageByKind)) {
+    console.log(`  · ${kind}: ${n}`);
+  }
+}
+
+async function main() {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    console.error("DATABASE_URL is not set");
+    process.exit(1);
+  }
+  const client = postgres(connectionString);
+  const db = drizzle(client, { schema });
+  try {
+    const summary = await seed(db);
+    printSummary(summary);
+  } finally {
+    await client.end();
+  }
+}
+
+// Run only when executed directly (`tsx src/db/seed.ts`) — importing this module
+// (e.g. from the seed-verify test) must NOT auto-run the destructive rebuild.
+const invokedDirectly =
+  !!process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (invokedDirectly) {
+  main().catch((err) => {
+    console.error("Seed failed:", err);
+    process.exit(1);
+  });
+}

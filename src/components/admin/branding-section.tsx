@@ -26,13 +26,13 @@ const MAX_SIZE = 2 * 1024 * 1024;
 
 const COLOR_HELP: Record<keyof BrandingValues | string, string> = {
   brand_primary_color:
-    "Client's main brand colour. Used for headlines, buttons, and key accents on their campaign page.",
+    "This brand's primary colour. Used for headlines, buttons, and key accents on its campaign page.",
   brand_secondary_color:
     "Supporting colour. Used for backgrounds and secondary elements.",
   brand_accent_color:
     "Optional highlight colour for badges and small accents.",
   brand_text_color:
-    "Body text colour for the client's campaign pages. Should have strong contrast against the background.",
+    "Body text colour for this brand's campaign pages. Should have strong contrast against the background.",
 };
 
 const LOGO_BG_SWATCHES: Record<LogoBackground, string> = {
@@ -207,7 +207,7 @@ export function BrandingSection({ clientId, values, onChange }: Props) {
       <div>
         <h2 className="font-display text-xl font-medium text-charcoal">Branding</h2>
         <p className="mt-1 text-xs text-txt-muted">
-          The client&apos;s logo and brand colours. These drive how their campaign pages appear to candidates.
+          This brand&apos;s logo and colours. These drive how its campaign pages appear to candidates.
         </p>
       </div>
 

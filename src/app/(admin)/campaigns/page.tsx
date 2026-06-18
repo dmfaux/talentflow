@@ -254,7 +254,7 @@ export default function CampaignsPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search role, client, location..."
+            placeholder="Search role, brand, location..."
             className="h-9 w-full rounded-lg border border-border bg-surface pl-8 pr-3 text-[0.78rem] text-charcoal outline-none placeholder:text-txt-muted focus:border-accent"
           />
           {search && (
@@ -283,14 +283,14 @@ export default function CampaignsPage() {
           ))}
         </select>
 
-        {/* Client filter */}
+        {/* Brand filter */}
         <select
           value={clientFilter}
           onChange={(e) => setClientFilter(e.target.value)}
           disabled={clients.length === 0}
           className="h-9 rounded-lg border border-border bg-surface px-2.5 text-[0.78rem] font-medium text-txt-secondary outline-none focus:border-accent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <option value="all">All clients</option>
+          <option value="all">All brands</option>
           {clients.map((name) => (
             <option key={name} value={name}>
               {name}
@@ -337,7 +337,7 @@ export default function CampaignsPage() {
             <thead>
               <tr className="border-b border-border">
                 <SortHeader label="Role" sortKey="role_title" currentKey={sortKey} currentDir={sortDir} onSort={toggleSort} />
-                <SortHeader label="Client" sortKey="client_name" currentKey={sortKey} currentDir={sortDir} onSort={toggleSort} />
+                <SortHeader label="Brand" sortKey="client_name" currentKey={sortKey} currentDir={sortDir} onSort={toggleSort} />
                 <SortHeader label="Department" sortKey="department" currentKey={sortKey} currentDir={sortDir} onSort={toggleSort} />
                 <SortHeader label="Location" sortKey="location" currentKey={sortKey} currentDir={sortDir} onSort={toggleSort} />
                 <SortHeader label="Status" sortKey="status" currentKey={sortKey} currentDir={sortDir} onSort={toggleSort} />

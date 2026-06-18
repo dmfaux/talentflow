@@ -272,7 +272,7 @@ export default function NewClientPage() {
                 id="notes"
                 name="notes"
                 rows={3}
-                placeholder="Internal notes about this client..."
+                placeholder="Internal notes about this brand..."
                 className="w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-cobalt focus:ring-1 focus:ring-cobalt/20 resize-none"
               />
             </div>
@@ -285,7 +285,7 @@ export default function NewClientPage() {
             Subscription Tier
           </h2>
           <p className="mb-5 text-[0.75rem] text-txt-muted">
-            Choose the plan that best fits this client&apos;s needs.
+            Choose the plan that best fits this brand&apos;s needs.
           </p>
           <div className="grid grid-cols-3 gap-2">
             {TIER_OPTIONS.map((opt) => {

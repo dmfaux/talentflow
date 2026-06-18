@@ -226,7 +226,7 @@ export function CampaignWizard({
             setSlugSuggestion("");
           } else {
             setSlugStatus("taken");
-            setSlugMessage(data.error || "This slug is already taken for this client");
+            setSlugMessage(data.error || "This slug is already taken for this brand");
             setSlugSuggestion(data.suggestion || "");
           }
         })
@@ -257,12 +257,12 @@ export function CampaignWizard({
     const errs: Record<string, string> = {};
 
     if (s === 0) {
-      if (!form.client_id) errs.client_id = "Select a client";
+      if (!form.client_id) errs.client_id = "Select a brand";
       if (!form.role_title.trim()) errs.role_title = "Role title is required";
       if (!form.slug.trim()) errs.slug = "Slug is required";
       else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug))
         errs.slug = "Lowercase alphanumeric and hyphens only";
-      else if (slugStatus === "taken") errs.slug = slugMessage || "This slug is already taken for this client";
+      else if (slugStatus === "taken") errs.slug = slugMessage || "This slug is already taken for this brand";
       else if (slugStatus === "checking") errs.slug = "Checking slug availability…";
     }
 
@@ -600,7 +600,7 @@ export function CampaignWizard({
             ) : (
               <div>
                 <label htmlFor="client_id" className={labelClass}>
-                  Client <span className="text-red">*</span>
+                  Brand <span className="text-red">*</span>
                 </label>
                 <select
                   id="client_id"
@@ -609,14 +609,14 @@ export function CampaignWizard({
                   disabled={lockClient}
                   className={`${inputClass} ${errors.client_id ? "border-red" : ""} ${lockClient ? "cursor-not-allowed opacity-70" : ""}`}
                 >
-                  <option value="">Select a client...</option>
+                  <option value="">Select a brand...</option>
                   {clients.map((c) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
                 {lockClient && (
                   <p className="mt-1 text-[0.7rem] text-txt-muted">
-                    Client can&apos;t change on an existing campaign.
+                    Brand can&apos;t change on an existing campaign.
                   </p>
                 )}
                 {errors.client_id && <p className="mt-1 text-xs text-red">{errors.client_id}</p>}
@@ -1162,7 +1162,7 @@ export function CampaignWizard({
             <div className="rounded-lg border border-border p-4 space-y-2">
               <h3 className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-txt-muted">Basics</h3>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-                <div><span className="text-txt-muted">Client:</span> <span className="text-charcoal">{clients.find((c) => c.id === form.client_id)?.name ?? "—"}</span></div>
+                <div><span className="text-txt-muted">Brand:</span> <span className="text-charcoal">{clients.find((c) => c.id === form.client_id)?.name ?? "—"}</span></div>
                 <div><span className="text-txt-muted">Role:</span> <span className="text-charcoal">{form.role_title || "—"}</span></div>
                 <div><span className="text-txt-muted">Slug:</span> <span className="font-mono text-xs text-charcoal">{form.slug || "—"}</span></div>
                 <div><span className="text-txt-muted">Type:</span> <span className="text-charcoal">{form.employment_type || "—"}</span></div>
@@ -1363,9 +1363,9 @@ function ClientBrandingSummary({ client }: { client: Client | undefined }) {
         <p className="mt-1">
           Add a logo and brand colours on the{" "}
           <a href={`/clients/${client.id}/edit`} className="text-cobalt-deep underline hover:text-charcoal">
-            client edit page
+            brand edit page
           </a>{" "}
-          so campaign landing pages can match the client&apos;s brand.
+          so campaign landing pages can match this brand&apos;s colours.
         </p>
       </div>
     );
@@ -1392,7 +1392,7 @@ function ClientBrandingSummary({ client }: { client: Client | undefined }) {
         {client.name} — Brand Kit
       </p>
       <p className="mt-1 text-xs text-txt-secondary">
-        This campaign will inherit the client&apos;s branding. The AI prompt will include these colours automatically.
+        This campaign will inherit this brand&apos;s branding. The AI prompt will include these colours automatically.
       </p>
 
       <div className="mt-3 flex items-center gap-3">

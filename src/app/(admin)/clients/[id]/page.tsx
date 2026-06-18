@@ -59,7 +59,7 @@ export default function ClientDetailPage() {
         return r.json();
       })
       .then((res) => setClient(res.data))
-      .catch(() => setError("Client not found"))
+      .catch(() => setError("Brand not found"))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -115,7 +115,7 @@ export default function ClientDetailPage() {
   if (error || !client) {
     return (
       <div className="py-20 text-center text-sm text-red">
-        {error || "Client not found"}
+        {error || "Brand not found"}
       </div>
     );
   }
@@ -137,13 +137,13 @@ export default function ClientDetailPage() {
       {/* Breadcrumb */}
       <div className="mb-6 flex items-center gap-2 text-xs text-txt-muted">
         <Link href="/clients" className="hover:text-charcoal transition-colors">
-          Clients
+          Brands
         </Link>
         <span>/</span>
         <span className="text-txt-secondary">{client.name}</span>
       </div>
 
-      {/* Client info card */}
+      {/* Brand info card */}
       <div className="mb-8 rounded-xl border border-border bg-surface p-6">
         <div className="mb-4 flex items-start justify-between">
           <div>
@@ -219,7 +219,7 @@ export default function ClientDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/30 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-xl border border-border bg-surface p-6 shadow-xl">
             <h2 className="mb-5 text-base font-semibold text-charcoal">
-              Edit Client
+              Edit Brand
             </h2>
 
             {saveError && (
