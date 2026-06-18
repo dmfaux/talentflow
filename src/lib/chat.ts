@@ -59,10 +59,17 @@ export async function createConversation(
 
 // ── Get active conversation ─────────────────────────────────────────
 
-export async function getActiveConversation(candidateId: string) {
+// Every helper below takes a required `orgId` (the caller's already-resolved
+// effective org) and ANDs `conversations.org_id = orgId` into its query. These
+// are dual-use (request routes + queue worker) and key off a caller-supplied
+// candidate/conversation id; the org filter makes a cross-org id resolve to
+// nothing — identical to "does not exist" — so tenant isolation no longer rests
+// solely on every caller having org-scoped the id first (defence in depth).
+export async function getActiveConversation(candidateId: string, orgId: string) {
   return db.query.conversations.findFirst({
     where: and(
       eq(conversations.candidate_id, candidateId),
+      eq(conversations.org_id, orgId),
       inArray(conversations.status, ["active", "dormant"])
     ),
   });
@@ -71,7 +78,8 @@ export async function getActiveConversation(candidateId: string) {
 // ── Reactivate dormant conversation ─────────────────────────────────
 
 export async function reactivateConversation(
-  conversationId: string
+  conversationId: string,
+  orgId: string
 ): Promise<void> {
   await db
     .update(conversations)
@@ -80,7 +88,9 @@ export async function reactivateConversation(
       last_activity_at: new Date(),
       updated_at: new Date(),
     })
-    .where(eq(conversations.id, conversationId));
+    .where(
+      and(eq(conversations.id, conversationId), eq(conversations.org_id, orgId))
+    );
 }
 
 // ── Record per-message topic progress ───────────────────────────────
@@ -107,13 +117,19 @@ export interface TopicProgress {
  */
 export async function recordTopicProgress(
   conversationId: string,
+  orgId: string,
   progress: TopicProgress
 ): Promise<void> {
   const completed = await db.transaction(async (tx) => {
     const [conv] = await tx
       .select()
       .from(conversations)
-      .where(eq(conversations.id, conversationId))
+      .where(
+        and(
+          eq(conversations.id, conversationId),
+          eq(conversations.org_id, orgId)
+        )
+      )
       .for("update");
 
     if (!conv) return null;
@@ -196,12 +212,16 @@ export async function recordTopicProgress(
  */
 export async function closeChatWithRejection(
   conversationId: string,
+  orgId: string,
   roleTitle: string,
   companyName: string,
   adminReason?: string
 ): Promise<void> {
   const conv = await db.query.conversations.findFirst({
-    where: eq(conversations.id, conversationId),
+    where: and(
+      eq(conversations.id, conversationId),
+      eq(conversations.org_id, orgId)
+    ),
   });
 
   if (!conv || conv.status === "closed") return;
@@ -235,10 +255,14 @@ export async function closeChatWithRejection(
 // ── Withdraw conversation ──────────────────────────────────────────
 
 export async function withdrawConversation(
-  conversationId: string
+  conversationId: string,
+  orgId: string
 ): Promise<void> {
   const conv = await db.query.conversations.findFirst({
-    where: eq(conversations.id, conversationId),
+    where: and(
+      eq(conversations.id, conversationId),
+      eq(conversations.org_id, orgId)
+    ),
   });
 
   if (!conv || conv.status === "closed") return;
@@ -252,8 +276,12 @@ export async function withdrawConversation(
     })
     .where(eq(conversations.id, conversationId));
 
+  // conv is already org-verified above; scope the candidate write too so the
+  // status flip can never touch another org's row.
   await db
     .update(candidates)
     .set({ status: "withdrawn", updated_at: new Date() })
-    .where(eq(candidates.id, conv.candidate_id));
+    .where(
+      and(eq(candidates.id, conv.candidate_id), eq(candidates.org_id, orgId))
+    );
 }

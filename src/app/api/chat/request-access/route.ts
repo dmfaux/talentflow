@@ -64,7 +64,10 @@ export async function POST(request: NextRequest) {
     // this fallback (new device / cleared storage) has no id in the URL — and
     // the chat page resolves the conversation only from ?t=, so without this
     // the verified candidate lands on "no active conversation".
-    const conversation = await getActiveConversation(candidate.id);
+    const conversation = await getActiveConversation(
+      candidate.id,
+      candidate.org_id
+    );
 
     // Build magic link URL
     const origin =

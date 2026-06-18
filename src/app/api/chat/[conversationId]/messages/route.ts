@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { chatMessages, conversations } from "@/db/schema";
 import { verifyChatAuth } from "@/lib/chat-auth";
+import { getOrgStatus } from "@/lib/org-status";
 import { eq, and, gt, asc } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -21,13 +22,24 @@ export async function GET(
       eq(conversations.id, conversationId),
       eq(conversations.candidate_id, candidate.id)
     ),
-    columns: { status: true },
+    columns: { status: true, org_id: true },
   });
 
   if (!conv) {
     return NextResponse.json(
       { error: "Conversation not found" },
       { status: 404 }
+    );
+  }
+
+  // Parity with the POST handler (S11): a suspended/deleted org's chat is
+  // unavailable for reads too, so a candidate can't keep polling their
+  // transcript after the tenant is suspended/deleted. 503 (suspended) / 410 (gone).
+  const orgStatus = await getOrgStatus(conv.org_id);
+  if (orgStatus !== "active") {
+    return NextResponse.json(
+      { error: orgStatus === "suspended" ? "chat_unavailable" : "chat_closed" },
+      { status: orgStatus === "suspended" ? 503 : 410 }
     );
   }
 

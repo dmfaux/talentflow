@@ -91,9 +91,13 @@ export async function POST(request: NextRequest) {
       }));
     } catch (e) {
       if (e instanceof InvitationConflictError) {
-        return e.sameOrg
-          ? error("A member with this email already exists", 409)
-          : error("This email is already in use", 409);
+        // One identical 409 for both the same-org and cross-org case. Branching
+        // the message on `sameOrg` was a cross-tenant existence oracle: any
+        // org_admin+ could distinguish "this email is in MY org" from "…exists
+        // in ANOTHER org" and probe arbitrary emails across tenants. The global
+        // uniqueness guard itself is required (login resolvability), so we keep
+        // it but never disclose WHICH org the collision is in.
+        return error("This email is already in use", 409);
       }
       throw e;
     }

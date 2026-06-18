@@ -42,7 +42,7 @@ export async function POST(
     }
 
     // Check for existing active/dormant conversation
-    const existing = await getActiveConversation(id);
+    const existing = await getActiveConversation(id, candidate.org_id);
     if (existing) {
       return success({ conversationId: existing.id, existing: true });
     }

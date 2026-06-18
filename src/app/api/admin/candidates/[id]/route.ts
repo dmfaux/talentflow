@@ -42,7 +42,7 @@ async function handleFollowUpRejection(
   // Grace period is anchored to the conversation, not the candidate row.
   // If somehow there's no active conversation, treat the candidate as a
   // ghost past grace and allow immediate reject.
-  const conv = await getActiveConversation(candidateId);
+  const conv = await getActiveConversation(candidateId, orgId);
   if (!conv) {
     return { blocked: false, tier: "B1", pending: false };
   }
@@ -76,7 +76,7 @@ async function handleFollowUpRejection(
   }
 
   // Tier B1/B2: proceed. Post the templated close message in the chat.
-  await closeChatWithRejection(conv.id, roleTitle, clientName, adminReason);
+  await closeChatWithRejection(conv.id, orgId, roleTitle, clientName, adminReason);
 
   // B1 is a ghost past grace — no reason to delay. B2 has engaged messages
   // so delay the email to preserve an undo window and to self-check against

@@ -65,7 +65,7 @@ export async function POST(
 
   // Reactivate dormant conversations
   if (conv.status === "dormant") {
-    await reactivateConversation(conversationId);
+    await reactivateConversation(conversationId, conv.org_id);
   }
 
   // Parse the incoming message from the request body
@@ -253,7 +253,10 @@ export async function POST(
       // completed conversation: classifyTopicCoverage covers nothing for
       // withdrawal-request messages, so there is no final transition to
       // record on a withdrawing candidate's message.
-      await recordTopicProgress(conversationId, { coveredIndices, askedIndex });
+      await recordTopicProgress(conversationId, conv.org_id, {
+        coveredIndices,
+        askedIndex,
+      });
 
       const withdrawal = await detectWithdrawal(history, cleanText);
       if (withdrawal.usage) {
@@ -268,7 +271,7 @@ export async function POST(
         });
       }
       if (withdrawal.withdrawn) {
-        await withdrawConversation(conversationId);
+        await withdrawConversation(conversationId, conv.org_id);
       }
     } catch (err) {
       console.error("Chat post-processing failed:", err);

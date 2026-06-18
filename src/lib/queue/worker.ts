@@ -288,7 +288,7 @@ async function handleChatNudge(
     return;
   }
 
-  const conv = await getActiveConversation(candidate.id);
+  const conv = await getActiveConversation(candidate.id, candidate.org_id);
   if (!conv) {
     console.log(`handleChatNudge: skipping ${payload.candidateId} — no active conversation`);
     return;
@@ -375,7 +375,7 @@ async function handleChatExpire(
     return;
   }
 
-  const conv = await getActiveConversation(candidate.id);
+  const conv = await getActiveConversation(candidate.id, candidate.org_id);
   if (!conv) {
     console.log(`handleChatExpire: skipping ${payload.candidateId} — no active conversation`);
     return;
