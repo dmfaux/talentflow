@@ -1,78 +1,119 @@
 import { NextRequest, NextResponse } from "next/server";
+import { appHostOrigin, classifyHost } from "@/lib/host";
 import { verifyJwt } from "@/lib/token";
 
 const COOKIE_NAME = "admin_session";
-const PUBLIC_ADMIN_PATHS = ["/", "/login"];
 
-function isLocalDev(hostname: string): boolean {
+// Public on the APP host — reachable without a session: the marketing/login
+// landing, the login gateway, password-reset, and the invite-accept page the
+// invitee opens before they have any session (S8).
+function isPublicAppPath(pathname: string): boolean {
   return (
-    hostname === "localhost" ||
-    hostname.startsWith("localhost:") ||
-    hostname.startsWith("127.0.0.1")
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname === "/reset-password" ||
+    pathname.startsWith("/reset-password/") ||
+    pathname === "/accept-invite" ||
+    pathname.startsWith("/accept-invite/")
+  );
+}
+
+// App / operator / auth surfaces that must live on the app host. Hitting one on
+// the marketing host (apex/www) bounces to the app-host login, so admin and the
+// operator console are reachable ONLY on the app host (acceptance). Kept small
+// and constant — a foreign path on the marketing host just 404s as usual.
+const APP_ONLY_PREFIXES = [
+  "/login",
+  "/dashboard",
+  "/operator",
+  "/campaigns",
+  "/candidates",
+  "/clients",
+  "/users",
+  "/settings",
+  "/reset-password",
+  "/accept-invite",
+];
+function isAppOnlyPath(pathname: string): boolean {
+  return APP_ONLY_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`)
   );
 }
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const host = classifyHost(
+    request.headers.get("host") ?? "",
+    process.env.NEXT_PUBLIC_APP_DOMAIN ?? ""
+  );
 
-  // Skip internals, API, and static assets
+  // ── /api + Next internals: NEVER subdomain-rewrite an API path ──────
   if (
     pathname.startsWith("/api/") ||
     pathname.startsWith("/_next/") ||
     pathname === "/favicon.ico"
   ) {
+    // Defence-in-depth (Decision C): tag careers-host API calls with the host
+    // brand so a handler may assert the path slug matches the host. NOT a gate —
+    // the canonical org_id is still resolved from the path slug downstream.
+    if (host.kind === "careers") {
+      const headers = new Headers(request.headers);
+      headers.set("x-careers-brand", host.brandSlug);
+      return NextResponse.next({ request: { headers } });
+    }
     return NextResponse.next();
   }
 
-  const hostname = request.headers.get("host") ?? "";
-  const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN ?? "";
-
-  // ── Subdomain rewriting (production only) ──────────────────────
-  if (!isLocalDev(hostname) && appDomain) {
-    // Extract subdomain: "nedbank.talentstream.co.za" → "nedbank"
-    const subdomain = hostname.replace(`.${appDomain}`, "").replace(appDomain, "");
-
-    if (subdomain && subdomain !== "www") {
-      // Rewrite to /c/[subdomain] transparently
+  switch (host.kind) {
+    case "careers": {
+      // Pin the brand from the host. Everything is served under /c/{brand}, so
+      // another brand cannot be reached by path: nedbank.{domain}/c/other →
+      // /c/nedbank/c/other, a non-route → 404. The slug is the boundary
+      // (clients.slug is globally unique → exactly one org). org.status refusal
+      // stays in the handlers (S11) — the proxy must never read the DB.
       const url = request.nextUrl.clone();
-      url.pathname = `/c/${subdomain}${pathname === "/" ? "" : pathname}`;
+      url.pathname = `/c/${host.brandSlug}${pathname === "/" ? "" : pathname}`;
       return NextResponse.rewrite(url);
     }
+
+    case "reserved":
+      // A reserved subdomain (api., admin., mail., …) never resolves to a brand.
+      // Serve the marketing landing rather than erroring (Decision D) — friendly
+      // and doesn't disclose which subdomains are special.
+      return NextResponse.rewrite(new URL("/", request.url));
+
+    case "marketing":
+      // Apex / www: the public landing only. App/operator/auth surfaces belong
+      // on the app host → bounce to its login, carrying the intended path.
+      if (isAppOnlyPath(pathname)) {
+        return NextResponse.redirect(
+          new URL(
+            `/login?from=${encodeURIComponent(pathname)}`,
+            appHostOrigin()
+          )
+        );
+      }
+      return NextResponse.next();
+
+    case "app": {
+      // The authenticated app host (+ localhost). Careers-by-path stays public
+      // here (Decision B) so existing /c/* links — worker chat invitations, the
+      // request-access magic link — keep working unchanged.
+      if (isPublicAppPath(pathname) || pathname.startsWith("/c/")) {
+        return NextResponse.next();
+      }
+      // Optimistic signature check only; the canonical tenant/operator guard is
+      // requireTenant()/requireOperator() in the layouts. The proxy must not read
+      // the DB (see Next.js Proxy docs).
+      const token = request.cookies.get(COOKIE_NAME)?.value;
+      if (!token || (await verifyJwt(token)) === null) {
+        const loginUrl = new URL("/login", request.url);
+        loginUrl.searchParams.set("from", pathname);
+        return NextResponse.redirect(loginUrl);
+      }
+      return NextResponse.next();
+    }
   }
-
-  // ── Admin auth (no subdomain / www / localhost) ────────────────
-
-  // Allow candidate routes and public paths through without auth
-  if (pathname.startsWith("/c/")) {
-    return NextResponse.next();
-  }
-
-  if (PUBLIC_ADMIN_PATHS.some((p) => pathname === p)) {
-    return NextResponse.next();
-  }
-
-  // Password reset flow is public (includes token subpaths)
-  if (pathname === "/reset-password" || pathname.startsWith("/reset-password/")) {
-    return NextResponse.next();
-  }
-
-  // Invite-accept page is public — the invitee has no session yet (S8). The
-  // accept API (/api/auth/invite/accept) is already exempt via the /api/ guard.
-  if (pathname === "/accept-invite" || pathname.startsWith("/accept-invite/")) {
-    return NextResponse.next();
-  }
-
-  // Protect admin routes. This is an optimistic signature check only; the
-  // canonical tenant guard is requireTenant() in (admin)/layout.tsx — the
-  // proxy must not read the DB (see Next.js Proxy docs).
-  const token = request.cookies.get(COOKIE_NAME)?.value;
-  if (!token || (await verifyJwt(token)) === null) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("from", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  return NextResponse.next();
 }
 
 export const config = {
@@ -80,8 +121,8 @@ export const config = {
     /*
      * Run proxy on all routes except:
      * - /_next (Next.js internals)
-     * - /api (handled inside proxy with early return)
      * - Static files with extensions
+     * (/api is matched but handled with an early return inside the proxy.)
      */
     "/((?!_next/|.*\\.).*)",
   ],

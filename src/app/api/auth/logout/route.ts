@@ -1,8 +1,11 @@
 import { COOKIE_NAME } from "@/lib/auth";
+import { appHostOrigin } from "@/lib/host";
 import { NextResponse } from "next/server";
 
 export async function POST() {
-  const response = NextResponse.redirect(new URL("/login", process.env.NEXT_PUBLIC_APP_DOMAIN ? `https://${process.env.NEXT_PUBLIC_APP_DOMAIN}` : "http://localhost:3000"));
+  // Login lives on the app host (S12), so log out back to app.{domain}/login —
+  // not the apex — so the cleared cookie and the next sign-in share a host.
+  const response = NextResponse.redirect(new URL("/login", appHostOrigin()));
   response.cookies.set(COOKIE_NAME, "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
