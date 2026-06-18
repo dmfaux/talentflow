@@ -7,7 +7,7 @@ import { CampaignActions } from "@/components/admin/campaign-actions";
 import { CampaignTabs } from "@/components/admin/campaign-tabs";
 import { CandidateTable } from "@/components/admin/candidate-table";
 import { ShortlistTab } from "@/components/admin/shortlist-tab";
-import { canAccessBrand, requireTenant } from "@/lib/tenant";
+import { canAccessBrand, orgScope, requireTenant } from "@/lib/tenant";
 import { Suspense } from "react";
 
 interface Props {
@@ -35,8 +35,13 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
   const sp = await searchParams;
   const activeTab = sp.tab ?? "candidates";
 
+  // S4: requireTenant() (the cached layout guard) resolves first so its ctx
+  // org-scopes the read — a cross-org campaign id notFound()s instead of
+  // rendering another tenant's pipeline.
+  const ctx = await requireTenant();
+
   const campaign = await db.query.campaigns.findFirst({
-    where: eq(campaigns.id, id),
+    where: and(eq(campaigns.id, id), orgScope(campaigns, ctx)),
     with: { client: true },
   });
 
@@ -44,7 +49,6 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
 
   // Role-gate the mutation controls (recruiter+ on this brand). Cosmetic only —
   // the campaign routes enforce the same check server-side.
-  const ctx = await requireTenant();
   const canManageCampaign = await canAccessBrand(ctx, campaign.client_id, "recruiter");
 
   // Candidate counts by status
@@ -54,7 +58,7 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
       count: sql<number>`count(*)::int`,
     })
     .from(candidates)
-    .where(eq(candidates.campaign_id, id))
+    .where(and(eq(candidates.campaign_id, id), orgScope(candidates, ctx)))
     .groupBy(candidates.status);
 
   const counts: Record<string, number> = {};
@@ -77,7 +81,7 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
       avg: sql<number>`avg(${candidates.ai_score})`,
     })
     .from(candidates)
-    .where(eq(candidates.campaign_id, id));
+    .where(and(eq(candidates.campaign_id, id), orgScope(candidates, ctx)));
   const topScore = scoreAgg?.top ?? null;
   const avgScore = scoreAgg?.avg ?? null;
 
@@ -86,7 +90,7 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
     ? await db
         .select({ name: candidates.name, confidence: candidates.ai_confidence })
         .from(candidates)
-        .where(and(eq(candidates.campaign_id, id), eq(candidates.ai_score, topScore)))
+        .where(and(eq(candidates.campaign_id, id), eq(candidates.ai_score, topScore), orgScope(candidates, ctx)))
         .limit(1)
     : [undefined];
 
@@ -98,6 +102,7 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
       and(
         eq(candidates.campaign_id, id),
         sql`jsonb_array_length(coalesce(${candidates.ai_flags}, '[]'::jsonb)) > 0`,
+        orgScope(candidates, ctx),
       ),
     );
   const flagged = flaggedRow?.count ?? 0;
@@ -109,7 +114,7 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
   const confidenceFilter = sp.confidence;
   const sort = sp.sort ?? "score_desc";
 
-  const conditions = [eq(candidates.campaign_id, id)];
+  const conditions = [eq(candidates.campaign_id, id), orgScope(candidates, ctx)];
   if (statusFilter) conditions.push(eq(candidates.status, statusFilter));
   if (confidenceFilter) conditions.push(eq(candidates.ai_confidence, confidenceFilter));
 
@@ -134,7 +139,7 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
   const shortlistRows = await db
     .select()
     .from(candidates)
-    .where(and(eq(candidates.campaign_id, id), eq(candidates.status, "shortlisted")))
+    .where(and(eq(candidates.campaign_id, id), eq(candidates.status, "shortlisted"), orgScope(candidates, ctx)))
     .orderBy(desc(candidates.ai_score));
 
   const pctOf = (num: number, den: number) =>

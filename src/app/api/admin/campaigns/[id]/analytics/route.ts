@@ -1,7 +1,8 @@
 import { db } from "@/db";
 import { campaigns, candidates, scoringLogs } from "@/db/schema";
-import { error, requireApiAuth, success } from "@/lib/api";
-import { eq, sql } from "drizzle-orm";
+import { error, getApiTenant, success } from "@/lib/api";
+import { orgScope, resolveOwnedResource } from "@/lib/tenant";
+import { and, eq, sql } from "drizzle-orm";
 
 // TODO: Extend the campaign dashboard page with charts (e.g. recharts or
 // chart.js) that consume this analytics data to visualise application
@@ -11,18 +12,19 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  // S4: resolve the campaign WITHIN the caller's org → cross-org id 404s before
+  // any analytics are computed. orgScope on each aggregate is defence-in-depth.
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const { id } = await params;
 
-    const campaign = await db.query.campaigns.findFirst({
-      where: eq(campaigns.id, id),
-      columns: { id: true },
-    });
+    const campaign = await resolveOwnedResource(campaigns, id, ctx);
 
     if (!campaign) return error("Campaign not found", 404);
+
+    const orgCandidates = orgScope(candidates, ctx);
 
     // All queries run in parallel
     const [
@@ -40,7 +42,7 @@ export async function GET(
           count: sql<number>`count(*)::int`,
         })
         .from(candidates)
-        .where(eq(candidates.campaign_id, id))
+        .where(and(eq(candidates.campaign_id, id), orgCandidates))
         .groupBy(sql`${candidates.created_at}::date`)
         .orderBy(sql`${candidates.created_at}::date`),
 
@@ -52,7 +54,7 @@ export async function GET(
           failed: sql<number>`count(*) filter (where ${candidates.gating_passed} = false)::int`,
         })
         .from(candidates)
-        .where(eq(candidates.campaign_id, id)),
+        .where(and(eq(candidates.campaign_id, id), orgCandidates)),
 
       // 3. Score distribution
       db
@@ -67,7 +69,7 @@ export async function GET(
           count: sql<number>`count(*)::int`,
         })
         .from(candidates)
-        .where(eq(candidates.campaign_id, id))
+        .where(and(eq(candidates.campaign_id, id), orgCandidates))
         .groupBy(sql`case
           when ${candidates.ai_score} < 2 then '0-2'
           when ${candidates.ai_score} < 4 then '2-4'
@@ -83,7 +85,7 @@ export async function GET(
           count: sql<number>`count(*)::int`,
         })
         .from(candidates)
-        .where(eq(candidates.campaign_id, id))
+        .where(and(eq(candidates.campaign_id, id), orgCandidates))
         .groupBy(sql`coalesce(${candidates.source}, 'direct')`)
         .orderBy(sql`count(*) desc`),
 
@@ -94,7 +96,7 @@ export async function GET(
           count: sql<number>`count(*)::int`,
         })
         .from(candidates)
-        .where(eq(candidates.campaign_id, id))
+        .where(and(eq(candidates.campaign_id, id), orgCandidates))
         .groupBy(candidates.status),
 
       // 6. Average processing time
@@ -106,7 +108,7 @@ export async function GET(
         })
         .from(scoringLogs)
         .innerJoin(candidates, eq(scoringLogs.candidate_id, candidates.id))
-        .where(eq(candidates.campaign_id, id)),
+        .where(and(eq(candidates.campaign_id, id), orgCandidates)),
     ]);
 
     const gating = gatingStats[0] ?? { total: 0, passed: 0, failed: 0 };

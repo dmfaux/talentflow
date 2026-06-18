@@ -1,7 +1,8 @@
 import { db } from "@/db";
 import { campaigns, candidates, clients } from "@/db/schema";
-import { error, requireApiAuth, success } from "@/lib/api";
-import { eq, sql } from "drizzle-orm";
+import { error, getApiTenant, success } from "@/lib/api";
+import { orgScope } from "@/lib/tenant";
+import { and, eq, sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
 type Range = "week" | "month" | "quarter" | "year" | "all";
@@ -22,8 +23,12 @@ function parseRange(param: string | null): Range {
 }
 
 export async function GET(request: NextRequest) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  // S4: org-scope every sub-query. Was an UNSCOPED requireApiAuth read that
+  // aggregated/listed every org's campaigns + candidates (the cross-tenant
+  // dashboard leak). org_id is the hard boundary; a non-acting operator's
+  // orgScope is FALSE → all-zero dashboard.
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const range = parseRange(request.nextUrl.searchParams.get("range"));
@@ -33,6 +38,10 @@ export async function GET(request: NextRequest) {
     const periodFilter = config.days !== null
       ? sql`${candidates.created_at} > now() - (${config.days} || ' days')::interval`
       : sql`true`;
+
+    // The hard org boundary, AND-ed into every candidate/campaign sub-query.
+    const orgCampaigns = orgScope(campaigns, ctx);
+    const orgCandidates = orgScope(candidates, ctx);
 
     const [
       campaignStats,
@@ -50,6 +59,7 @@ export async function GET(request: NextRequest) {
           count: sql<number>`count(*)::int`,
         })
         .from(campaigns)
+        .where(orgCampaigns)
         .groupBy(campaigns.status),
 
       // 2. Overall candidate totals (filtered by period)
@@ -61,7 +71,7 @@ export async function GET(request: NextRequest) {
           avg_score: sql<number>`round(avg(${candidates.ai_score})::numeric, 1)`,
         })
         .from(candidates)
-        .where(periodFilter),
+        .where(and(periodFilter, orgCandidates)),
 
       // 3. Gating funnel (filtered by period)
       db
@@ -72,7 +82,7 @@ export async function GET(request: NextRequest) {
           pending: sql<number>`count(*) filter (where ${candidates.gating_passed} is null)::int`,
         })
         .from(candidates)
-        .where(periodFilter),
+        .where(and(periodFilter, orgCandidates)),
 
       // 4. Candidate status breakdown (filtered by period)
       db
@@ -81,7 +91,7 @@ export async function GET(request: NextRequest) {
           count: sql<number>`count(*)::int`,
         })
         .from(candidates)
-        .where(periodFilter)
+        .where(and(periodFilter, orgCandidates))
         .groupBy(candidates.status)
         .orderBy(sql`count(*) desc`),
 
@@ -98,7 +108,7 @@ export async function GET(request: NextRequest) {
           count: sql<number>`count(*)::int`,
         })
         .from(candidates)
-        .where(sql`${candidates.ai_score} is not null and ${periodFilter}`)
+        .where(and(sql`${candidates.ai_score} is not null and ${periodFilter}`, orgCandidates))
         .groupBy(sql`case
           when ${candidates.ai_score} < 2 then '0-2'
           when ${candidates.ai_score} < 4 then '2-4'
@@ -123,6 +133,7 @@ export async function GET(request: NextRequest) {
         .from(campaigns)
         .leftJoin(clients, eq(campaigns.client_id, clients.id))
         .leftJoin(candidates, eq(candidates.campaign_id, campaigns.id))
+        .where(orgCampaigns)
         .groupBy(campaigns.id, clients.name)
         .orderBy(sql`case when ${campaigns.status} = 'active' then 0 else 1 end, ${campaigns.created_at} desc`)
         .limit(8),
@@ -145,7 +156,7 @@ export async function GET(request: NextRequest) {
             count: sql<number>`count(*)::int`,
           })
           .from(candidates)
-          .where(tsFilter)
+          .where(and(tsFilter, orgCandidates))
           .groupBy(bucketExpr)
           .orderBy(bucketExpr);
       })(),

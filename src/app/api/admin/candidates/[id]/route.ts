@@ -4,7 +4,6 @@ import {
   authorizeApiBrand,
   error,
   getApiTenant,
-  requireApiAuth,
   success,
 } from "@/lib/api";
 import { orgScope } from "@/lib/tenant";
@@ -104,14 +103,17 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  // S4: org-scope the read (keeps the `with` relations) so a cross-org id 404s,
+  // indistinguishable from "does not exist". Was an UNSCOPED requireApiAuth read
+  // that resolved any candidate by raw UUID across all orgs.
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const { id } = await params;
 
     const row = await db.query.candidates.findFirst({
-      where: eq(candidates.id, id),
+      where: and(eq(candidates.id, id), orgScope(candidates, ctx)),
       with: {
         scoringLogs: { orderBy: (logs, { desc }) => [desc(logs.created_at)] },
         messages: { orderBy: (msgs, { desc }) => [desc(msgs.created_at)] },

@@ -4,10 +4,9 @@ import {
   authorizeApiBrand,
   error,
   getApiTenant,
-  requireApiAuth,
   success,
 } from "@/lib/api";
-import { resolveOwnedResource } from "@/lib/tenant";
+import { orgScope, resolveOwnedResource } from "@/lib/tenant";
 import { validateSlug } from "@/lib/slug";
 import { validateHtmlTemplate } from "@/lib/slots";
 import { and, eq, sql } from "drizzle-orm";
@@ -17,27 +16,30 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  // S4: org-scope the read (keeps the client relation) → cross-org id 404s.
+  // Was an UNSCOPED requireApiAuth read resolving any campaign by raw UUID.
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const { id } = await params;
 
     const campaign = await db.query.campaigns.findFirst({
-      where: eq(campaigns.id, id),
+      where: and(eq(campaigns.id, id), orgScope(campaigns, ctx)),
       with: { client: true },
     });
 
     if (!campaign) return error("Campaign not found", 404);
 
-    // Get candidate counts by status
+    // Get candidate counts by status (defence-in-depth org filter; the campaign
+    // is already ownership-checked above).
     const statusCounts = await db
       .select({
         status: candidates.status,
         count: sql<number>`count(*)::int`,
       })
       .from(candidates)
-      .where(eq(candidates.campaign_id, id))
+      .where(and(eq(candidates.campaign_id, id), orgScope(candidates, ctx)))
       .groupBy(candidates.status);
 
     const candidate_counts: Record<string, number> = {};

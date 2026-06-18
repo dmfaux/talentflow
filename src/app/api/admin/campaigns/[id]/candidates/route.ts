@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { campaigns, candidates } from "@/db/schema";
-import { error, requireApiAuth, success } from "@/lib/api";
+import { error, getApiTenant, success } from "@/lib/api";
+import { orgScope, resolveOwnedResource } from "@/lib/tenant";
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
@@ -8,17 +9,17 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  // S4: resolve the campaign WITHIN the caller's org → cross-org id 404s before
+  // any candidate is read. Was an UNSCOPED requireApiAuth read exposing every
+  // org's applicants. orgScope on the candidate query is defence-in-depth.
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const { id } = await params;
 
-    // Verify campaign exists
-    const campaign = await db.query.campaigns.findFirst({
-      where: eq(campaigns.id, id),
-      columns: { id: true },
-    });
+    // Verify campaign exists AND belongs to the caller's org.
+    const campaign = await resolveOwnedResource(campaigns, id, ctx);
     if (!campaign) return error("Campaign not found", 404);
 
     const { searchParams } = request.nextUrl;
@@ -29,7 +30,7 @@ export async function GET(
     const limit = Math.min(parseInt(searchParams.get("limit") || "50", 10), 200);
     const offset = parseInt(searchParams.get("offset") || "0", 10);
 
-    const conditions = [eq(candidates.campaign_id, id)];
+    const conditions = [eq(candidates.campaign_id, id), orgScope(candidates, ctx)];
     if (statusFilter) conditions.push(eq(candidates.status, statusFilter));
     if (minScore) conditions.push(gte(candidates.ai_score, parseFloat(minScore)));
     if (maxScore) conditions.push(lte(candidates.ai_score, parseFloat(maxScore)));

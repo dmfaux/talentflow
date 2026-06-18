@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { campaigns } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { orgScope, requireTenant } from "@/lib/tenant";
 import {
   CampaignWizard,
   type FormData as WizardFormData,
@@ -31,8 +32,12 @@ export default async function EditCampaignPage({ params, searchParams }: Props) 
   const { id } = await params;
   const { from } = await searchParams;
 
+  // S4: org-scope the read — a cross-org campaign id notFound()s instead of
+  // loading another tenant's campaign config into the edit wizard.
+  const ctx = await requireTenant();
+
   const campaign = await db.query.campaigns.findFirst({
-    where: eq(campaigns.id, id),
+    where: and(eq(campaigns.id, id), orgScope(campaigns, ctx)),
   });
 
   // Only draft campaigns can be edited. Everything else (active, paused,

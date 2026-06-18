@@ -1,20 +1,24 @@
 import { db } from "@/db";
 import { campaigns, candidates, clients } from "@/db/schema";
-import { error, requireApiAuth, success } from "@/lib/api";
+import { error, getApiTenant, success } from "@/lib/api";
+import { orgScope } from "@/lib/tenant";
 import { and, desc, eq } from "drizzle-orm";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  // S4: org-scope the campaign read (keeps the client relation) → cross-org id
+  // 404s before any candidate PII is assembled. orgScope on the candidate
+  // queries is defence-in-depth.
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const { id } = await params;
 
     const campaign = await db.query.campaigns.findFirst({
-      where: eq(campaigns.id, id),
+      where: and(eq(campaigns.id, id), orgScope(campaigns, ctx)),
       with: { client: true },
     });
 
@@ -24,7 +28,7 @@ export async function GET(
     const allCandidates = await db
       .select({ status: candidates.status })
       .from(candidates)
-      .where(eq(candidates.campaign_id, id));
+      .where(and(eq(candidates.campaign_id, id), orgScope(candidates, ctx)));
 
     const totalApplied = allCandidates.length;
     const totalPassed = allCandidates.filter((c) =>
@@ -39,7 +43,7 @@ export async function GET(
     const shortlisted = await db
       .select()
       .from(candidates)
-      .where(and(eq(candidates.campaign_id, id), eq(candidates.status, "shortlisted")))
+      .where(and(eq(candidates.campaign_id, id), eq(candidates.status, "shortlisted"), orgScope(candidates, ctx)))
       .orderBy(desc(candidates.ai_score));
 
     const report = {

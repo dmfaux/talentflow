@@ -5,6 +5,7 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { ReportToolbar } from "@/components/admin/report-toolbar";
 import { ReportCvPreview } from "@/components/admin/report-cv-preview";
 import { buildCvManifest } from "@/lib/cv-files";
+import { orgScope, requireTenant } from "@/lib/tenant";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -39,8 +40,13 @@ function getRecommendation(score: number | null): string {
 export default async function ReportPage({ params }: Props) {
   const { id } = await params;
 
+  // S4: org-scope the campaign read (keeps the client relation) → a cross-org id
+  // notFound()s before any shortlist PII/CV manifest is built. orgScope on the
+  // candidate counts/list is defence-in-depth.
+  const ctx = await requireTenant();
+
   const campaign = await db.query.campaigns.findFirst({
-    where: eq(campaigns.id, id),
+    where: and(eq(campaigns.id, id), orgScope(campaigns, ctx)),
     with: { client: true },
   });
 
@@ -49,7 +55,7 @@ export default async function ReportPage({ params }: Props) {
   const [summaryRow] = await db
     .select({ total: sql<number>`count(*)::int` })
     .from(candidates)
-    .where(eq(candidates.campaign_id, id));
+    .where(and(eq(candidates.campaign_id, id), orgScope(candidates, ctx)));
 
   const [passedRow] = await db
     .select({ total: sql<number>`count(*)::int` })
@@ -57,7 +63,8 @@ export default async function ReportPage({ params }: Props) {
     .where(
       and(
         eq(candidates.campaign_id, id),
-        sql`${candidates.status} IN ('gating_passed','scoring','scored','follow_up','shortlisted')`
+        sql`${candidates.status} IN ('gating_passed','scoring','scored','follow_up','shortlisted')`,
+        orgScope(candidates, ctx)
       )
     );
 
@@ -67,14 +74,15 @@ export default async function ReportPage({ params }: Props) {
     .where(
       and(
         eq(candidates.campaign_id, id),
-        sql`${candidates.status} IN ('scored','follow_up','shortlisted')`
+        sql`${candidates.status} IN ('scored','follow_up','shortlisted')`,
+        orgScope(candidates, ctx)
       )
     );
 
   const shortlisted = await db
     .select()
     .from(candidates)
-    .where(and(eq(candidates.campaign_id, id), eq(candidates.status, "shortlisted")))
+    .where(and(eq(candidates.campaign_id, id), eq(candidates.status, "shortlisted"), orgScope(candidates, ctx)))
     // Tie-break on id so the order is stable and matches the CV archive.
     .orderBy(desc(candidates.ai_score), asc(candidates.id));
 

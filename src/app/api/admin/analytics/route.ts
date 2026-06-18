@@ -1,6 +1,7 @@
 import { db } from "@/db";
-import { events } from "@/db/schema";
-import { error, requireApiAuth, success } from "@/lib/api";
+import { campaigns, events } from "@/db/schema";
+import { error, getApiTenant, success } from "@/lib/api";
+import { orgScope, resolveOwnedResource } from "@/lib/tenant";
 import { sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
@@ -22,13 +23,22 @@ function parseRange(param: string | null): Range {
 }
 
 export async function GET(request: NextRequest) {
-  const authError = await requireApiAuth();
-  if (authError) return authError;
+  // S4: org-scope every events query. Was an UNSCOPED requireApiAuth read that
+  // aggregated every org's visitor analytics. A scoped campaign_id is also
+  // ownership-checked → 404 (no cross-org existence/aggregate disclosure).
+  const { ctx, response } = await getApiTenant();
+  if (response) return response;
 
   try {
     const range = parseRange(request.nextUrl.searchParams.get("range"));
     const campaignId = request.nextUrl.searchParams.get("campaign_id");
     const config = RANGE_CONFIG[range];
+
+    // A supplied campaign_id must belong to the caller's org → 404 otherwise.
+    if (campaignId) {
+      const owned = await resolveOwnedResource(campaigns, campaignId, ctx);
+      if (!owned) return error("Campaign not found", 404);
+    }
 
     // Build filters
     const periodFilter = config.days !== null
@@ -39,7 +49,10 @@ export async function GET(request: NextRequest) {
       ? sql`${events.campaign_id} = ${campaignId}`
       : sql`true`;
 
-    const baseFilter = sql`${periodFilter} and ${campaignFilter}`;
+    // Hard org boundary, AND-ed into every events query below.
+    const orgEvents = orgScope(events, ctx);
+
+    const baseFilter = sql`${periodFilter} and ${campaignFilter} and ${orgEvents}`;
 
     const [
       pageViewStats,
@@ -122,7 +135,7 @@ export async function GET(request: NextRequest) {
             unique: sql<number>`count(distinct coalesce(${events.visitor_id}, ${events.session_id}))::int`,
           })
           .from(events)
-          .where(sql`${events.event_type} = 'page_view' and ${tsFilter} and ${campaignCond}`)
+          .where(sql`${events.event_type} = 'page_view' and ${tsFilter} and ${campaignCond} and ${orgEvents}`)
           .groupBy(bucketExpr)
           .orderBy(bucketExpr);
       })(),

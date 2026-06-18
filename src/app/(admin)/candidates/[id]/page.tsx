@@ -2,12 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { candidates, chatMessages, messages, scoringLogs } from "@/db/schema";
-import { eq, desc, asc } from "drizzle-orm";
+import { and, eq, desc, asc } from "drizzle-orm";
 import { CandidateActions } from "@/components/admin/candidate-actions";
 import { CandidateNotes } from "@/components/admin/candidate-notes";
 import { AuditLog } from "@/components/admin/audit-log";
 import { AssessmentHistory } from "@/components/admin/assessment-history";
-import { canAccessBrand, requireTenant } from "@/lib/tenant";
+import { canAccessBrand, orgScope, requireTenant } from "@/lib/tenant";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -49,8 +49,13 @@ const DIMENSION_LABELS: Record<string, string> = {
 export default async function CandidateDetailPage({ params }: Props) {
   const { id } = await params;
 
+  // S4: requireTenant() (the cached layout guard) resolves first so its ctx
+  // org-scopes the read — a cross-org candidate id notFound()s instead of
+  // exposing another tenant's scoring, CV, and chat transcript.
+  const ctx = await requireTenant();
+
   const candidate = await db.query.candidates.findFirst({
-    where: eq(candidates.id, id),
+    where: and(eq(candidates.id, id), orgScope(candidates, ctx)),
     with: {
       campaign: { with: { client: true } },
       scoringLogs: { orderBy: [desc(scoringLogs.created_at)] },
@@ -65,7 +70,6 @@ export default async function CandidateDetailPage({ params }: Props) {
 
   // Role-gate candidate mutation controls (recruiter+ on this brand). Cosmetic;
   // the candidate routes enforce the same check server-side.
-  const ctx = await requireTenant();
   const canManageCandidate = await canAccessBrand(
     ctx,
     candidate.campaign.client_id,

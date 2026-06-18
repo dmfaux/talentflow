@@ -7,18 +7,18 @@ import {
 } from "@/lib/api";
 import type { TenantContext } from "@/lib/tenant";
 
-// ── Static guard-coverage check (S5) ─────────────────────────────────
+// ── Static guard-coverage check (S4 + S5) ────────────────────────────
 //
-// Mechanically asserts that every mutating admin route handler routes its auth
-// through getApiTenant + a tenant guard, so a future write route can't silently
-// ship on the payload-discarding requireApiAuth. This is the structural half of
-// the acceptance gate; the behavioural half is the DB-backed write-denial
-// matrix (*.itest.ts), which only runs when DATABASE_URL is set.
+// Mechanically asserts that every admin route handler — READ (GET) and WRITE
+// (POST/PATCH/PUT/DELETE) alike — routes its auth through getApiTenant + a
+// tenant guard, so a future handler can't silently ship on the
+// payload-discarding requireApiAuth. This is the structural half of the
+// acceptance gate; the behavioural half is the DB-backed denial matrix
+// (*.itest.ts), which only runs when DATABASE_URL is set.
 //
-// Sequencing: S4 (read conversions) has NOT landed at this commit, so
-// mixed-method files still call requireApiAuth for their GET. The "no
-// requireApiAuth" assertion therefore applies only to WRITE-ONLY routes (which
-// S5 fully converted); once S4 converts the GETs it can widen to every route.
+// The GET arm is the regression guard for the S4 cross-tenant read leak: an
+// UNSCOPED requireApiAuth GET (the dashboard/candidate/applicant breach) fails
+// this test because it neither references getApiTenant nor a scoping guard.
 
 const ADMIN_API_DIR = join(process.cwd(), "src/app/api/admin");
 const WRITE_METHODS = ["POST", "PATCH", "PUT", "DELETE"] as const;
@@ -53,25 +53,33 @@ describe("guard coverage: mutating admin routes", () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
+  const assertSeamAndGuard = (src: string, rel: string, kind: string) => {
+    expect(src, `${rel} (${kind}) must call getApiTenant`).toContain(
+      "getApiTenant"
+    );
+    expect(
+      GUARDS.some((g) => src.includes(g)),
+      `${rel} (${kind}) must use one of ${GUARDS.join("/")}`
+    ).toBe(true);
+  };
+
   for (const file of files) {
     const src = readFileSync(file, "utf8");
     const rel = file.slice(Math.max(0, file.indexOf("src/")));
-    if (!WRITE_METHODS.some((m) => exportsFn(src, m))) continue;
+    const hasWrite = WRITE_METHODS.some((m) => exportsFn(src, m));
+    const hasGet = exportsFn(src, "GET");
 
-    it(`${rel} resolves tenant via getApiTenant + a guard`, () => {
-      expect(src, `${rel} must call getApiTenant`).toContain("getApiTenant");
-      expect(
-        GUARDS.some((g) => src.includes(g)),
-        `${rel} must use one of ${GUARDS.join("/")}`
-      ).toBe(true);
-    });
+    if (hasWrite) {
+      it(`${rel} (write) resolves tenant via getApiTenant + a guard`, () => {
+        assertSeamAndGuard(src, rel, "write");
+      });
+    }
 
-    if (!exportsFn(src, "GET")) {
-      it(`${rel} (write-only) drops requireApiAuth`, () => {
-        expect(
-          src.includes("requireApiAuth"),
-          `${rel} is write-only and must not use requireApiAuth`
-        ).toBe(false);
+    // S4: the read arm — every admin GET must be org-scoped, not a bare
+    // requireApiAuth read. This is what the dashboard/candidate leak tripped on.
+    if (hasGet) {
+      it(`${rel} (GET) resolves tenant via getApiTenant + a guard`, () => {
+        assertSeamAndGuard(src, rel, "GET");
       });
     }
   }
