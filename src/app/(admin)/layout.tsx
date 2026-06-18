@@ -4,6 +4,7 @@ import { asc, eq, inArray } from "drizzle-orm";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { ActiveCampaignCount } from "@/components/admin/active-campaign-count";
 import { BrandSwitcher } from "@/components/admin/brand-switcher";
+import { NoBrandBanner } from "@/components/admin/no-brand-banner";
 import { TenantProvider } from "@/components/admin/tenant-provider";
 import { ActingAsBanner } from "@/components/operator/acting-as-banner";
 import { ToastProvider } from "@/components/ui/toast-provider";
@@ -99,6 +100,9 @@ export default async function AdminLayout({
             </div>
           </div>
         </header>
+
+        {/* Persistent onboarding nudge — self-hides once a brand exists. */}
+        <NoBrandBanner />
 
         <div className="flex">
           {/* Sidebar */}

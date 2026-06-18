@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { canManageOrg, useTenant } from "@/components/admin/tenant-provider";
 
 type Range = "week" | "month" | "quarter" | "year" | "all";
 
@@ -537,13 +538,84 @@ function NewCampaignDropdown() {
   );
 }
 
+// Shown when the org has no brands yet. For a manager it's the welcome/CTA that
+// pairs with the post-invite redirect to /onboarding; for a plain member with no
+// brand access it's an admin-resolved dead-end, not a create prompt.
+function DashboardEmptyState({ canManage }: { canManage: boolean }) {
+  if (!canManage) {
+    return (
+      <div>
+        <h1 className="mb-6 text-lg font-semibold text-charcoal">Dashboard</h1>
+        <div className="rounded-xl border border-border bg-surface px-6 py-16 text-center">
+          <h2 className="font-display text-xl font-medium text-charcoal">
+            No brands yet
+          </h2>
+          <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-txt-muted">
+            You don’t have access to any brands in this organisation yet. Ask an
+            org admin to add you to one.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h1 className="mb-6 text-lg font-semibold text-charcoal">Dashboard</h1>
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-surface px-8 py-14 sm:px-14">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-cobalt/[0.07] blur-[120px]" />
+        <div className="pointer-events-none absolute -left-20 bottom-[-30%] h-64 w-64 rounded-full bg-gold/[0.08] blur-[110px]" />
+        <div className="relative max-w-xl">
+          <p className="eyebrow text-cobalt">Welcome to TalentStream</p>
+          <h2 className="mt-4 font-display text-[2rem] font-medium leading-tight tracking-[-0.02em] text-charcoal sm:text-[2.4rem]">
+            Your workspace is ready —{" "}
+            <span className="font-display-italic text-cobalt">almost</span>.
+          </h2>
+          <p className="mt-4 max-w-md text-[0.95rem] leading-relaxed text-txt-secondary">
+            Add your first brand to unlock campaigns, candidate scoring, and
+            analytics. It only takes a minute, and you can change everything
+            later.
+          </p>
+          <Link
+            href="/onboarding"
+            className="group mt-8 inline-flex h-11 items-center gap-2 rounded-full bg-cobalt px-6 text-[0.88rem] font-medium text-white transition-colors hover:bg-cobalt-deep"
+          >
+            Create your first brand
+            <svg
+              className="arrow-slide"
+              width="15"
+              height="15"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 8h10M9 4l4 4-4 4" />
+            </svg>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
+  const tenant = useTenant();
   const [data, setData] = useState<DashboardData | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<Range>("month");
 
+  // No accessible brands → nothing to chart. Skip the fetch and show the gated
+  // welcome state instead (the "auto-redirect, gated dashboard" onboarding).
+  const noBrands = tenant.brands.length === 0;
+
   useEffect(() => {
+    // No brands → we render the gated empty state before `loading` is ever
+    // read, so just skip the fetch (no setState needed here).
+    if (noBrands) return;
     setLoading(true);
     Promise.all([
       fetch(`/api/admin/dashboard?range=${range}`).then((r) => r.json()),
@@ -554,7 +626,11 @@ export default function DashboardPage() {
         setAnalytics(analyticsRes.data ?? null);
       })
       .finally(() => setLoading(false));
-  }, [range]);
+  }, [range, noBrands]);
+
+  if (noBrands) {
+    return <DashboardEmptyState canManage={canManageOrg(tenant)} />;
+  }
 
   if (loading) {
     return (

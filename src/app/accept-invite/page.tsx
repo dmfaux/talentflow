@@ -54,8 +54,10 @@ function AcceptInviteForm() {
         return;
       }
 
-      // The session cookie is set by the accept route — land in the app.
-      router.push("/dashboard");
+      // The session cookie is set by the accept route — land in onboarding.
+      // The wizard self-redirects to /dashboard when onboarding isn't owed
+      // (a brand already exists, or the invitee can't manage the org).
+      router.push("/onboarding");
     } catch {
       setError("Something went wrong. Try again.");
     } finally {
