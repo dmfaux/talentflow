@@ -200,14 +200,12 @@ async function seed() {
     .insert(users)
     .values({
       org_id: fx.orgA,
-      client_id: fx.brandA,
       org_role: null,
       is_operator: false,
       first_name: "Mem",
       last_name: "A",
       email: "member@org-a.test",
       password_hash: "x",
-      security_group: "user",
     })
     .returning({ id: users.id });
   fx.brandMemberA = member.id;
@@ -233,7 +231,6 @@ async function seed() {
       last_name: "User",
       email: "operator@ops.test",
       password_hash: "x",
-      security_group: "admin",
     })
     .returning({ id: users.id });
   fx.operator = op.id;

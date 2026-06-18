@@ -43,9 +43,9 @@ export const clients = pgTable(
   "clients",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    // DB-level NOT NULL is enforced by migration 0026 (+ sole-org trigger).
-    // S5 flips the model to .notNull() now that every brand writer stamps it;
-    // the trigger remains the runtime backstop until S13.
+    // DB-level NOT NULL is enforced by migration 0026. S5 flipped the model to
+    // .notNull() once every brand writer stamps org_id explicitly; S13 dropped
+    // the sole-org trigger backstop now that coverage is complete.
     org_id: uuid("org_id")
       .notNull()
       .references(() => organizations.id, {
@@ -119,7 +119,7 @@ export const campaigns = pgTable(
       .notNull()
       .references(() => organizations.id, {
         onDelete: "cascade",
-      }), // DB + model NOT NULL (S5 flip); trigger backstop stays until S13
+      }), // DB + model NOT NULL (S5 flip); every writer stamps org_id (S13 dropped the trigger backstop)
     slug: text("slug").notNull(),
     role_title: text("role_title").notNull(),
     role_description: text("role_description"),
@@ -163,7 +163,7 @@ export const candidates = pgTable(
       .notNull()
       .references(() => organizations.id, {
         onDelete: "cascade",
-      }), // DB + model NOT NULL (S5 flip); trigger backstop stays until S13
+      }), // DB + model NOT NULL (S5 flip); every writer stamps org_id (S13 dropped the trigger backstop)
     name: text("name").notNull(),
     email: text("email").notNull(),
     phone: text("phone"),
@@ -220,7 +220,7 @@ export const scoringLogs = pgTable(
       .notNull()
       .references(() => organizations.id, {
         onDelete: "cascade",
-      }), // DB + model NOT NULL (S5 flip); trigger backstop stays until S13
+      }), // DB + model NOT NULL (S5 flip); every writer stamps org_id (S13 dropped the trigger backstop)
     provider: text("provider"),
     model_version: text("model_version").notNull(),
     full_prompt: text("full_prompt").notNull(),
@@ -250,14 +250,6 @@ export const users = pgTable(
   "users",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    // NULLABLE (S8): an org-level invitee (Owner/Org-Admin spanning all brands)
-    // is created with no brand to point at — the S9 empty-org bootstrap. This is
-    // a scoped pull-forward of S13's full DROP COLUMN; the sole-org trigger
-    // (set_org_id_from_client_user) never dereferences client_id on the accept
-    // path because org_id is always set explicitly. operators also carry it null.
-    client_id: uuid("client_id").references(() => clients.id, {
-      onDelete: "cascade",
-    }),
     org_id: uuid("org_id").references(() => organizations.id, {
       onDelete: "cascade",
     }), // NULLABLE: operators have no org (DB + model nullable)
@@ -267,7 +259,6 @@ export const users = pgTable(
     last_name: text("last_name").notNull(),
     email: text("email").notNull(),
     password_hash: text("password_hash").notNull(),
-    security_group: text("security_group").notNull(),
     is_active: boolean("is_active").default(true).notNull(),
     created_at: timestamp("created_at").defaultNow().notNull(),
     updated_at: timestamp("updated_at").defaultNow().notNull(),
@@ -281,7 +272,6 @@ export const users = pgTable(
     uniqueIndex("users_operator_email_idx")
       .on(table.email)
       .where(sql`${table.is_operator}`),
-    index("users_client_id_idx").on(table.client_id),
     index("users_org_id_idx").on(table.org_id),
   ]
 );
@@ -381,7 +371,7 @@ export const messages = pgTable(
       .notNull()
       .references(() => organizations.id, {
         onDelete: "cascade",
-      }), // DB + model NOT NULL (S5 flip); trigger backstop stays until S13
+      }), // DB + model NOT NULL (S5 flip); every writer stamps org_id (S13 dropped the trigger backstop)
     channel: text("channel").notNull(),
     direction: text("direction").notNull(),
     content: text("content").notNull(),
@@ -411,7 +401,7 @@ export const conversations = pgTable(
       .notNull()
       .references(() => organizations.id, {
         onDelete: "cascade",
-      }), // DB + model NOT NULL (S5 flip); trigger backstop stays until S13
+      }), // DB + model NOT NULL (S5 flip); every writer stamps org_id (S13 dropped the trigger backstop)
     status: text("status").notNull().default("active"),
     lifecycle: text("lifecycle").notNull().default("dormant"),
     topics: jsonb("topics"),
@@ -443,7 +433,7 @@ export const chatMessages = pgTable(
       .notNull()
       .references(() => organizations.id, {
         onDelete: "cascade",
-      }), // DB + model NOT NULL (S5 flip); trigger backstop stays until S13
+      }), // DB + model NOT NULL (S5 flip); every writer stamps org_id (S13 dropped the trigger backstop)
     role: text("role").notNull(),
     content: text("content").notNull(),
     created_at: timestamp("created_at").defaultNow().notNull(),
@@ -468,7 +458,7 @@ export const chatTokens = pgTable(
       .notNull()
       .references(() => organizations.id, {
         onDelete: "cascade",
-      }), // DB + model NOT NULL (S5 flip); trigger backstop stays until S13
+      }), // DB + model NOT NULL (S5 flip); every writer stamps org_id (S13 dropped the trigger backstop)
     token_hash: text("token_hash").notNull(),
     expires_at: timestamp("expires_at").notNull(),
     used_at: timestamp("used_at"),
@@ -494,7 +484,7 @@ export const events = pgTable(
       .notNull()
       .references(() => organizations.id, {
         onDelete: "cascade",
-      }), // DB + model NOT NULL (S5 flip); trigger backstop stays until S13
+      }), // DB + model NOT NULL (S5 flip); every writer stamps org_id (S13 dropped the trigger backstop)
     event_type: text("event_type").notNull(),
     session_id: text("session_id").notNull(),
     visitor_id: text("visitor_id"),
@@ -538,7 +528,6 @@ export const clientsRelations = relations(clients, ({ one, many }) => ({
     references: [organizations.id],
   }),
   campaigns: many(campaigns),
-  users: many(users),
   memberships: many(memberships),
 }));
 
@@ -546,10 +535,6 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   organization: one(organizations, {
     fields: [users.org_id],
     references: [organizations.id],
-  }),
-  client: one(clients, {
-    fields: [users.client_id],
-    references: [clients.id],
   }),
   passwordResetTokens: many(passwordResetTokens),
   memberships: many(memberships),

@@ -158,14 +158,12 @@ describe.skipIf(!RUN)("S7 operator console + act-as (DB-backed)", () => {
       .insert(users)
       .values({
         org_id: fx.orgA,
-        client_id: fx.brandA,
         org_role: "owner",
         is_operator: false,
         first_name: "Owner",
         last_name: "A",
         email: "owner@org-a.test",
         password_hash: PW,
-        security_group: "user",
       })
       .returning({ id: users.id });
     fx.owner = owner.id;
@@ -174,14 +172,12 @@ describe.skipIf(!RUN)("S7 operator console + act-as (DB-backed)", () => {
       .insert(users)
       .values({
         org_id: null,
-        client_id: fx.brandA, // vestigial placeholder
         org_role: null,
         is_operator: true,
         first_name: "Ops",
         last_name: "User",
         email: "operator@ops.test",
         password_hash: PW,
-        security_group: "admin",
       })
       .returning({ id: users.id });
     fx.operator = operator.id;

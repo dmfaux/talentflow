@@ -11,10 +11,6 @@ import { getOrgStatus } from "@/lib/org-status";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
-// Legacy security_group is NOT NULL until S13 and gates nothing — write the
-// fixed default so creation works without exposing it (mirrors users POST).
-const LEGACY_SECURITY_GROUP = "user";
-
 // PUBLIC: the invitee has no session yet. This is a SECOND login surface — it
 // signs the same admin_session as login/route.ts. Token validation mirrors
 // password-reset/confirm (sha256 hash, single-use via accepted_at, TTL).
@@ -102,14 +98,12 @@ export async function POST(request: NextRequest) {
       .insert(users)
       .values({
         org_id: inv.org_id,
-        client_id: inv.client_id ?? null, // brand invite → brand; org invite → null
         org_role: inv.org_role,
         is_operator: false,
         first_name: first,
         last_name: last,
         email: inv.email,
         password_hash: passwordHash,
-        security_group: LEGACY_SECURITY_GROUP,
       })
       .returning({ id: users.id });
 

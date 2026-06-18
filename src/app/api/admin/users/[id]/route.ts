@@ -71,7 +71,8 @@ export async function GET(
     if (!row || row.is_operator) return error("User not found", 404);
 
     // Membership view: the brands this member can act in (org-level owners/admins
-    // carry none and span every brand).
+    // carry none and span every brand). This replaces the legacy single-brand
+    // users.client_id display/edit, dropped in S13.
     const mships = await db
       .select({
         client_id: memberships.client_id,
@@ -82,24 +83,12 @@ export async function GET(
       .innerJoin(clients, eq(memberships.client_id, clients.id))
       .where(eq(memberships.user_id, row.id));
 
-    // Legacy single-brand name (users.client_id), kept for the existing detail/
-    // edit page until S14; client_id is now nullable (org-level members).
-    const legacyClient = row.client_id
-      ? await db.query.clients.findFirst({
-          where: eq(clients.id, row.client_id),
-          columns: { name: true },
-        })
-      : null;
-
     return success({
       id: row.id,
       first_name: row.first_name,
       last_name: row.last_name,
       email: row.email,
       org_role: row.org_role,
-      security_group: row.security_group, // legacy (dropped S13)
-      client_id: row.client_id,
-      client_name: legacyClient?.name ?? null,
       is_active: row.is_active,
       created_at: row.created_at,
       updated_at: row.updated_at,
@@ -176,14 +165,6 @@ export async function PATCH(
       updates.email = v;
     }
 
-    // Brand reassignment is allowed only WITHIN the actor's org — never a
-    // cross-org move (the body clientId must resolve in-org).
-    if (body.clientId !== undefined) {
-      const brand = await resolveOwnedResource(clients, body.clientId, ctx);
-      if (!brand) return error("Selected brand does not exist", 404);
-      updates.client_id = brand.id;
-    }
-
     // Org-role change: rank-bounded, owner-protected, last-owner-safe.
     if (body.orgRole !== undefined) {
       const newRole: OrgRole | null =
@@ -236,7 +217,6 @@ export async function PATCH(
         last_name: users.last_name,
         email: users.email,
         org_role: users.org_role,
-        client_id: users.client_id,
         is_active: users.is_active,
         updated_at: users.updated_at,
       });

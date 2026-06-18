@@ -127,7 +127,6 @@ const future = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
 
 async function seedUser(
   orgId: string | null,
-  clientId: string,
   email: string,
   orgRole: "owner" | "org_admin" | null,
   isOperator = false
@@ -136,14 +135,12 @@ async function seedUser(
     .insert(users)
     .values({
       org_id: orgId,
-      client_id: clientId,
       org_role: orgRole,
       is_operator: isOperator,
       first_name: "Test",
       last_name: email.split("@")[0],
       email,
       password_hash: PW,
-      security_group: "user",
     })
     .returning({ id: users.id });
   return u.id;
@@ -218,14 +215,14 @@ describe.skipIf(!RUN)("S5 write-isolation & RBAC (DB-backed)", () => {
 
     // Org A: the five roles. owner/org_admin carry org_role; brand_admin/
     // recruiter/viewer are plain members with a per-brand membership on brand A.
-    fx.owner = await seedUser(fx.orgA, fx.brandA, "owner@org-a.test", "owner");
-    fx.orgAdmin = await seedUser(fx.orgA, fx.brandA, "orgadmin@org-a.test", "org_admin");
-    fx.brandAdmin = await seedUser(fx.orgA, fx.brandA, "brandadmin@org-a.test", null);
-    fx.recruiter = await seedUser(fx.orgA, fx.brandA, "recruiter@org-a.test", null);
-    fx.viewer = await seedUser(fx.orgA, fx.brandA, "viewer@org-a.test", null);
-    fx.operator = await seedUser(null, fx.brandA, "operator@ops.test", null, true);
+    fx.owner = await seedUser(fx.orgA, "owner@org-a.test", "owner");
+    fx.orgAdmin = await seedUser(fx.orgA, "orgadmin@org-a.test", "org_admin");
+    fx.brandAdmin = await seedUser(fx.orgA, "brandadmin@org-a.test", null);
+    fx.recruiter = await seedUser(fx.orgA, "recruiter@org-a.test", null);
+    fx.viewer = await seedUser(fx.orgA, "viewer@org-a.test", null);
+    fx.operator = await seedUser(null, "operator@ops.test", null, true);
     // Org B owner (cross-org target).
-    fx.ownerB = await seedUser(fx.orgB, fx.brandB, "owner@org-b.test", "owner");
+    fx.ownerB = await seedUser(fx.orgB, "owner@org-b.test", "owner");
 
     await db.insert(memberships).values([
       { user_id: fx.brandAdmin, client_id: fx.brandA, brand_role: "brand_admin" },

@@ -15,9 +15,6 @@ import { NextRequest } from "next/server";
 
 const BRAND_ROLES = ["brand_admin", "recruiter", "viewer"] as const;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-// Legacy security_group is NOT NULL until S13 and no longer gates anything;
-// write a fixed default so creation works without exposing it to callers.
-const LEGACY_SECURITY_GROUP = "user";
 
 /** Org-role assignment authority (Resolved Decision 5): an org_admin+ actor may
  *  grant a target an org_role of rank ≤ their own (owner → owner/org_admin;
@@ -47,7 +44,6 @@ export async function GET() {
         last_name: users.last_name,
         email: users.email,
         org_role: users.org_role,
-        client_id: users.client_id,
         is_active: users.is_active,
         created_at: users.created_at,
         updated_at: users.updated_at,
@@ -56,9 +52,9 @@ export async function GET() {
       .where(and(orgScope(users, ctx), eq(users.is_operator, false)))
       .orderBy(desc(users.created_at));
 
-    // Membership view (preferred over the legacy users.client_id join): a member
-    // may belong to several brands; an org-level owner/admin has none and spans
-    // every brand. Fetch all memberships for these users in one query + assemble.
+    // Membership view: a member may belong to several brands; an org-level
+    // owner/admin has none and spans every brand. Fetch all memberships for
+    // these users in one query + assemble.
     const ids = rows.map((r) => r.id);
     const mships = ids.length
       ? await db
@@ -154,14 +150,12 @@ export async function POST(request: NextRequest) {
       .values({
         // Bind to the actor's org; never trust a body org_id.
         org_id: ctx.effectiveOrgId!,
-        client_id: brand.id,
         org_role: orgRoleToSet,
         is_operator: false,
         first_name: firstName,
         last_name: lastName,
         email: emailRaw,
         password_hash: passwordHash,
-        security_group: LEGACY_SECURITY_GROUP,
       })
       .returning({
         id: users.id,
@@ -170,7 +164,6 @@ export async function POST(request: NextRequest) {
         last_name: users.last_name,
         email: users.email,
         org_role: users.org_role,
-        client_id: users.client_id,
         is_active: users.is_active,
         created_at: users.created_at,
       });

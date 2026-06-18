@@ -110,7 +110,6 @@ async function cleanup() {
 
 async function seedUser(
   orgId: string,
-  clientId: string | null,
   email: string,
   orgRole: "owner" | "org_admin" | null
 ): Promise<string> {
@@ -118,14 +117,12 @@ async function seedUser(
     .insert(users)
     .values({
       org_id: orgId,
-      client_id: clientId,
       org_role: orgRole,
       is_operator: false,
       first_name: "Test",
       last_name: email.split("@")[0],
       email,
       password_hash: PW,
-      security_group: "user",
     })
     .returning({ id: users.id });
   return u.id;
@@ -177,11 +174,11 @@ describe.skipIf(!RUN)("S8 invitations + brand context (DB-backed)", () => {
         .returning({ id: clients.id })
     ).map((c) => c.id);
 
-    fx.owner = await seedUser(fx.orgA, fx.brandA1, "owner@s8inv-a.test", "owner");
-    fx.orgAdmin = await seedUser(fx.orgA, fx.brandA1, "orgadmin@s8inv-a.test", "org_admin");
-    fx.recruiter = await seedUser(fx.orgA, fx.brandA1, "recruiter@s8inv-a.test", null);
-    fx.viewer = await seedUser(fx.orgA, fx.brandA1, "viewer@s8inv-a.test", null);
-    fx.ownerB = await seedUser(fx.orgB, fx.brandB, "owner@s8inv-b.test", "owner");
+    fx.owner = await seedUser(fx.orgA, "owner@s8inv-a.test", "owner");
+    fx.orgAdmin = await seedUser(fx.orgA, "orgadmin@s8inv-a.test", "org_admin");
+    fx.recruiter = await seedUser(fx.orgA, "recruiter@s8inv-a.test", null);
+    fx.viewer = await seedUser(fx.orgA, "viewer@s8inv-a.test", null);
+    fx.ownerB = await seedUser(fx.orgB, "owner@s8inv-b.test", "owner");
 
     await db.insert(memberships).values([
       { user_id: fx.recruiter, client_id: fx.brandA1, brand_role: "recruiter" },
@@ -261,7 +258,7 @@ describe.skipIf(!RUN)("S8 invitations + brand context (DB-backed)", () => {
   });
 
   // 3. Org-level invite → empty-brand member (S9 bootstrap shape)
-  it("org-level invite accepts with client_id null + org_role", async () => {
+  it("org-level invite accepts with no brand membership + org_role", async () => {
     login({ userId: fx.owner, orgId: fx.orgA, orgRole: "owner", isOperator: false });
     const create = await inviteCreate(
       jsonReq({ email: "orglevel@s8inv-a.test", orgRole: "org_admin" })
@@ -275,8 +272,12 @@ describe.skipIf(!RUN)("S8 invitations + brand context (DB-backed)", () => {
     const user = await db.query.users.findFirst({
       where: and(eq(users.org_id, fx.orgA), eq(users.email, "orglevel@s8inv-a.test")),
     });
-    expect(user!.client_id).toBeNull();
     expect(user!.org_role).toBe("org_admin");
+    // Org-level bootstrap shape: no brand membership (users.client_id dropped S13).
+    const m = await db.query.memberships.findFirst({
+      where: eq(memberships.user_id, user!.id),
+    });
+    expect(m).toBeFalsy();
   });
 
   // 4. Token hardening

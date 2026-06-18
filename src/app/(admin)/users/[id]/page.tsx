@@ -4,28 +4,27 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 
+interface MemberBrand {
+  client_id: string;
+  client_name: string;
+  brand_role: string;
+}
+
 interface UserRecord {
   id: string;
   first_name: string;
   last_name: string;
   email: string;
-  security_group: string;
-  client_id: string;
-  client_name: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  memberships: MemberBrand[];
 }
 
-interface ClientOption {
-  id: string;
-  name: string;
-}
-
-const GROUP_LABELS: Record<string, string> = {
-  admin: "Admin",
-  manager: "Manager",
-  user: "User",
+const BRAND_ROLE_LABEL: Record<string, string> = {
+  brand_admin: "Brand Admin",
+  recruiter: "Recruiter",
+  viewer: "Viewer",
 };
 
 const inputClass =
@@ -48,8 +47,6 @@ export default function UserDetailPage() {
   const [pwdSaving, setPwdSaving] = useState(false);
   const [pwdError, setPwdError] = useState("");
 
-  const [clientOptions, setClientOptions] = useState<ClientOption[]>([]);
-
   useEffect(() => {
     fetch(`/api/admin/users/${id}`)
       .then(async (r) => {
@@ -61,14 +58,6 @@ export default function UserDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  useEffect(() => {
-    if (editing) {
-      fetch("/api/admin/clients")
-        .then((r) => r.json())
-        .then((res) => setClientOptions(res.data ?? []));
-    }
-  }, [editing]);
-
   async function handleSave(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSaveError("");
@@ -78,8 +67,6 @@ export default function UserDetailPage() {
     const firstName = (form.get("firstName") as string).trim();
     const lastName = (form.get("lastName") as string).trim();
     const email = (form.get("email") as string).trim();
-    const securityGroup = form.get("securityGroup") as string;
-    const clientId = form.get("clientId") as string;
     const isActive = form.get("isActive") === "on";
 
     if (!firstName || !lastName || !email) {
@@ -96,8 +83,6 @@ export default function UserDetailPage() {
           firstName,
           lastName,
           email,
-          securityGroup,
-          clientId,
           isActive,
         }),
       });
@@ -109,16 +94,7 @@ export default function UserDetailPage() {
       }
 
       const { data } = await res.json();
-      const chosenClient = clientOptions.find((c) => c.id === data.client_id);
-      setUser((prev) =>
-        prev
-          ? {
-              ...prev,
-              ...data,
-              client_name: chosenClient?.name ?? prev.client_name,
-            }
-          : prev
-      );
+      setUser((prev) => (prev ? { ...prev, ...data } : prev));
       setEditing(false);
     } catch {
       setSaveError("Something went wrong");
@@ -192,10 +168,15 @@ export default function UserDetailPage() {
     );
   }
 
+  const brandsLabel = user.memberships.length
+    ? user.memberships
+        .map((m) => `${m.client_name} (${BRAND_ROLE_LABEL[m.brand_role] ?? m.brand_role})`)
+        .join(", ")
+    : "—";
+
   const infoItems = [
     { label: "Email", value: user.email, mono: true },
-    { label: "Security Group", value: GROUP_LABELS[user.security_group] ?? user.security_group },
-    { label: "Client", value: user.client_name ?? "—" },
+    { label: "Brands", value: brandsLabel },
     { label: "Status", value: user.is_active ? "Active" : "Inactive" },
   ];
 
@@ -320,46 +301,6 @@ export default function UserDetailPage() {
                   className={inputClass}
                   required
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="securityGroup" className={labelClass}>
-                    Security Group
-                  </label>
-                  <select
-                    id="securityGroup"
-                    name="securityGroup"
-                    defaultValue={user.security_group}
-                    className={inputClass}
-                  >
-                    <option value="admin">Admin</option>
-                    <option value="manager">Manager</option>
-                    <option value="user">User</option>
-                  </select>
-                </div>
-                <div>
-                  <label htmlFor="clientId" className={labelClass}>
-                    Client
-                  </label>
-                  <select
-                    id="clientId"
-                    name="clientId"
-                    defaultValue={user.client_id}
-                    className={inputClass}
-                  >
-                    {clientOptions.length === 0 && (
-                      <option value={user.client_id}>
-                        {user.client_name ?? "Loading…"}
-                      </option>
-                    )}
-                    {clientOptions.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
               </div>
 
               <label className="flex items-center gap-2 text-sm text-charcoal">

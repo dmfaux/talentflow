@@ -37,10 +37,10 @@ async function main() {
   const password = requirePassword("SEED_ADMIN_PASSWORD");
   const firstName = requireEnv("SEED_ADMIN_FIRST_NAME").trim();
   const lastName = requireEnv("SEED_ADMIN_LAST_NAME").trim();
-  // OPTIONAL now (S9): unset → the Owner is org-level (client_id null, no
-  // membership) seating a clean, EMPTY org the Owner self-serves — the S9
-  // acceptance shape. Set → also find-or-create the brand + brand_admin
-  // membership (back-compat / richer local demo).
+  // OPTIONAL now (S9): unset → the Owner is org-level (no membership) seating a
+  // clean, EMPTY org the Owner self-serves — the S9 acceptance shape. Set → also
+  // find-or-create the brand + brand_admin membership (back-compat / richer
+  // local demo).
   const clientSlug =
     process.env.SEED_ADMIN_CLIENT_SLUG?.trim().toLowerCase() || null;
   // Optional, defaults to "demo-org" so a DB that already ran 0026's backfill
@@ -59,9 +59,9 @@ async function main() {
   });
 
   try {
-    // 1. Organization — find-or-create by slug. On a fresh DB there are zero
-    //    orgs, so the clients trigger can't help the brand insert below; create
-    //    the org first and pass org_id explicitly.
+    // 1. Organization — find-or-create by slug. Create the org first so the
+    //    brand insert below can pass a concrete org_id explicitly (every writer
+    //    stamps org_id now that S13 dropped the sole-org backstop trigger).
     let org = await db.query.organizations.findFirst({
       where: eq(organizations.slug, orgSlug),
       columns: { id: true },
@@ -94,10 +94,10 @@ async function main() {
       }
     }
 
-    // 3. Owner user — find-or-create. security_group: 'admin' is transitional
-    //    (dropped in S13); org_role: 'owner' is the real authz. An org-level
-    //    Owner carries client_id null (nullable since S8); the org_role grants
-    //    org-wide reach across every (future) brand.
+    // 3. Owner user — find-or-create. org_role: 'owner' is the authz; an
+    //    org-level Owner needs no brand to point at (S13 dropped users.client_id),
+    //    and the org_role grants org-wide reach across every (future) brand. A
+    //    brand_admin membership is added below when a brand was created.
     let owner = await db.query.users.findFirst({
       where: eq(users.email, email),
       columns: { id: true },
@@ -107,7 +107,6 @@ async function main() {
       const [inserted] = await db
         .insert(users)
         .values({
-          client_id: brand?.id ?? null,
           org_id: org.id,
           org_role: "owner",
           is_operator: false,
@@ -115,7 +114,6 @@ async function main() {
           last_name: lastName,
           email,
           password_hash: passwordHash,
-          security_group: "admin",
         })
         .returning({ id: users.id });
       owner = inserted;
@@ -144,9 +142,8 @@ async function main() {
     }
 
     // 5. Operator user — tenant-less (org_id NULL, org_role NULL, is_operator
-    //    true). client_id is NULL (nullable since S8). is_operator MUST be set
-    //    in this insert so the set_org_id_from_client_user trigger's guard fires
-    //    and leaves org_id NULL.
+    //    true). org_id is set explicitly to NULL here; the assertion below just
+    //    guards against a stray default ever reintroducing an org binding.
     const existingOperator = await db.query.users.findFirst({
       where: eq(users.email, operatorEmail),
       columns: { id: true },
@@ -156,7 +153,6 @@ async function main() {
       const [inserted] = await db
         .insert(users)
         .values({
-          client_id: null,
           org_id: null,
           org_role: null,
           is_operator: true,
@@ -164,12 +160,11 @@ async function main() {
           last_name: operatorLastName,
           email: operatorEmail,
           password_hash: operatorHash,
-          security_group: "admin",
         })
         .returning({ id: users.id, org_id: users.org_id });
       if (inserted.org_id !== null) {
         throw new Error(
-          `Operator ${operatorEmail} was created with a non-NULL org_id (${inserted.org_id}); the trigger guard did not fire.`
+          `Operator ${operatorEmail} was created with a non-NULL org_id (${inserted.org_id}); expected an explicit NULL org binding.`
         );
       }
       console.log(`Operator user created: ${operatorEmail} (tenant-less)`);

@@ -134,7 +134,6 @@ async function cleanup() {
 
 async function seedUser(
   orgId: string,
-  clientId: string | null,
   email: string,
   orgRole: "owner" | "org_admin" | null
 ): Promise<string> {
@@ -142,14 +141,12 @@ async function seedUser(
     .insert(users)
     .values({
       org_id: orgId,
-      client_id: clientId,
       org_role: orgRole,
       is_operator: false,
       first_name: "Test",
       last_name: email.split("@")[0],
       email,
       password_hash: PW,
-      security_group: "user",
     })
     .returning({ id: users.id });
   return u.id;
@@ -163,14 +160,12 @@ describe.skipIf(!RUN)("S9 provisioning + org/brand settings (DB-backed)", () => 
       .insert(users)
       .values({
         org_id: null,
-        client_id: null,
         org_role: null,
         is_operator: true,
         first_name: "Ops",
         last_name: "User",
         email: OPERATOR_EMAIL,
         password_hash: PW,
-        security_group: "admin",
       })
       .returning({ id: users.id });
     fx.operator = operator.id;
@@ -201,11 +196,11 @@ describe.skipIf(!RUN)("S9 provisioning + org/brand settings (DB-backed)", () => 
         .returning({ id: clients.id })
     ).map((c) => c.id);
 
-    fx.ownerA = await seedUser(fx.orgA, fx.brandA1, "owner@s9prov-a.test", "owner");
-    fx.orgAdminA = await seedUser(fx.orgA, fx.brandA1, "orgadmin@s9prov-a.test", "org_admin");
-    fx.recruiterA = await seedUser(fx.orgA, fx.brandA1, "recruiter@s9prov-a.test", null);
-    fx.brandAdminA1 = await seedUser(fx.orgA, fx.brandA1, "brandadmin@s9prov-a.test", null);
-    fx.ownerB = await seedUser(fx.orgB, fx.brandB, "owner@s9prov-b.test", "owner");
+    fx.ownerA = await seedUser(fx.orgA, "owner@s9prov-a.test", "owner");
+    fx.orgAdminA = await seedUser(fx.orgA, "orgadmin@s9prov-a.test", "org_admin");
+    fx.recruiterA = await seedUser(fx.orgA, "recruiter@s9prov-a.test", null);
+    fx.brandAdminA1 = await seedUser(fx.orgA, "brandadmin@s9prov-a.test", null);
+    fx.ownerB = await seedUser(fx.orgB, "owner@s9prov-b.test", "owner");
 
     await db.insert(memberships).values([
       { user_id: fx.recruiterA, client_id: fx.brandA1, brand_role: "recruiter" },
@@ -313,7 +308,8 @@ describe.skipIf(!RUN)("S9 provisioning + org/brand settings (DB-backed)", () => 
     });
     expect(owner!.org_id).toBe(newOrgId);
     expect(owner!.org_role).toBe("owner");
-    expect(owner!.client_id).toBeNull(); // empty-org bootstrap shape
+    // Empty-org bootstrap shape: an org-level Owner has no membership row
+    // (users.client_id was dropped in S13).
     const m = await db.query.memberships.findFirst({
       where: eq(memberships.user_id, owner!.id),
     });

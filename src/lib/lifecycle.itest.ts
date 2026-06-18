@@ -181,7 +181,6 @@ describe.skipIf(!RUN)("S11 tenant lifecycle (DB-backed)", () => {
         last_name: "A",
         email: "owner@org-a.test",
         password_hash: PW,
-        security_group: "user",
       })
       .returning({ id: users.id });
     fx.ownerA = oa.id;
@@ -196,7 +195,6 @@ describe.skipIf(!RUN)("S11 tenant lifecycle (DB-backed)", () => {
         last_name: "B",
         email: "owner@org-b.test",
         password_hash: PW,
-        security_group: "user",
       })
       .returning({ id: users.id });
     fx.ownerB = ob.id;
@@ -211,7 +209,6 @@ describe.skipIf(!RUN)("S11 tenant lifecycle (DB-backed)", () => {
         last_name: "User",
         email: "operator@ops.test",
         password_hash: PW,
-        security_group: "admin",
       })
       .returning({ id: users.id });
     fx.operator = op.id;
