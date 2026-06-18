@@ -33,6 +33,8 @@ const COLOR_HELP: Record<keyof BrandingValues | string, string> = {
     "Optional highlight colour for badges and small accents.",
   brand_text_color:
     "Body text colour for this brand's campaign pages. Should have strong contrast against the background.",
+  logo_background:
+    "Choose the background that makes your logo look best. This preview helps you see how the logo will appear on your campaign pages.",
 };
 
 const LOGO_BG_SWATCHES: Record<LogoBackground, string> = {
@@ -254,10 +256,11 @@ export function BrandingSection({ clientId, values, onChange }: Props) {
       </div>
 
       {/* ── Logo background ─────────────────────────────────────── */}
-      <div>
-        <label className="block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted mb-2">
+      <div className="space-y-2">
+        <label className="block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
           Logo Background
         </label>
+        <p className="text-[0.7rem] text-txt-muted">{COLOR_HELP.logo_background}</p>
         <div className="grid grid-cols-3 gap-2">
           {(Object.keys(LOGO_BG_SWATCHES) as LogoBackground[]).map((bg) => (
             <button
@@ -287,7 +290,7 @@ export function BrandingSection({ clientId, values, onChange }: Props) {
             </button>
           ))}
         </div>
-      </div>
+        </div>
 
       {/* ── Logo position ───────────────────────────────────────── */}
       <div>
