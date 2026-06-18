@@ -7,6 +7,7 @@ import {
   signToken,
   type OrgRole,
 } from "@/lib/auth";
+import { getOrgStatus } from "@/lib/org-status";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -58,6 +59,24 @@ export async function POST(request: NextRequest) {
       { error: "This invitation is invalid or has expired" },
       { status: 400 }
     );
+  }
+
+  // Don't seat a new user into a suspended/deleted org (S11). The invite stays
+  // valid (unburned) for after a restore; codes mirror the login fast-fail.
+  if (inv.org_id) {
+    const status = await getOrgStatus(inv.org_id);
+    if (status === "suspended") {
+      return NextResponse.json(
+        { error: "This organisation is suspended. Please contact support." },
+        { status: 403 }
+      );
+    }
+    if (status !== "active") {
+      return NextResponse.json(
+        { error: "This organisation is no longer available." },
+        { status: 401 }
+      );
+    }
   }
 
   // Re-check global email uniqueness at accept time (not just create): the email

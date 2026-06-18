@@ -14,6 +14,12 @@ export const OPERATOR_AUDIT_ACTIONS = [
   "set_tier",
   "set_billing_email",
   "provision_org", // S9: operator provisions an org + first Owner (resend reuses this with metadata.resend)
+  // S11 org lifecycle. purge_org snapshots slug/name/counts in metadata so the
+  // row stays queryable after the cascade nulls operator_audit.target_org_id.
+  "suspend",
+  "restore",
+  "soft_delete",
+  "purge_org",
 ] as const;
 
 export type OperatorAuditAction = (typeof OPERATOR_AUDIT_ACTIONS)[number];

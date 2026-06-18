@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import { db } from "@/db";
-import { campaigns, clients } from "@/db/schema";
+import { campaigns, clients, organizations } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { replaceSlots, type SlotData } from "@/lib/slots";
 import { renderMarkdown } from "@/lib/markdown";
@@ -24,6 +24,9 @@ async function getCampaign(clientSlug: string, campaignSlug: string) {
       salary_range_max: campaigns.salary_range_max,
       gating_config: campaigns.gating_config,
       status: campaigns.status,
+      // Org lifecycle status (S11) — the public seam doesn't run here, so we
+      // refuse a suspended/deleted org's careers page in the handler.
+      org_status: organizations.status,
       html_template: campaigns.html_template,
       client_slug: clients.slug,
       client_name: clients.name,
@@ -34,6 +37,7 @@ async function getCampaign(clientSlug: string, campaignSlug: string) {
     })
     .from(campaigns)
     .innerJoin(clients, eq(campaigns.client_id, clients.id))
+    .innerJoin(organizations, eq(campaigns.org_id, organizations.id))
     .where(and(eq(clients.slug, clientSlug), eq(campaigns.slug, campaignSlug)))
     .limit(1);
 
@@ -44,7 +48,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { clientSlug, campaignSlug } = await params;
   const campaign = await getCampaign(clientSlug, campaignSlug);
 
-  if (!campaign || campaign.status !== "active") {
+  if (!campaign || campaign.status !== "active" || campaign.org_status !== "active") {
     return { title: "Campaign Not Available" };
   }
 
@@ -78,6 +82,17 @@ export default async function CampaignPage({ params }: Props) {
       <CampaignError
         title="This campaign is no longer active"
         message="Applications for this position have closed. If you believe this is an error, please contact the employer directly."
+      />
+    );
+  }
+
+  // Suspended/deleted org → freeze the careers page (S11). No PII, no org-state
+  // detail leaked — the same generic "unavailable" surface for both states.
+  if (campaign.org_status !== "active") {
+    return (
+      <CampaignError
+        title="This organisation isn't currently accepting applications"
+        message="Applications for this position aren't available right now. If you believe this is an error, please contact the employer directly."
       />
     );
   }

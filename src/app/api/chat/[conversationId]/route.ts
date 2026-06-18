@@ -12,6 +12,7 @@ import { buildChatSystemPrompt } from "@/lib/ai/chat-prompt";
 import { getChatModel, getChatModelMeta } from "@/lib/ai/chat-provider";
 import { extractUsage, type TokenUsage } from "@/lib/ai";
 import { recordUsageEvent } from "@/lib/usage";
+import { getOrgStatus } from "@/lib/org-status";
 import { eq, and, asc } from "drizzle-orm";
 import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
@@ -41,6 +42,17 @@ export async function POST(
     return NextResponse.json(
       { error: "Conversation not found" },
       { status: 404 }
+    );
+  }
+
+  // Refuse a suspended/deleted org's chat (S11) — the public path skips the
+  // seam, so this handler gates on the resolved org: 503 (suspended) / 410
+  // (deleted/gone).
+  const orgStatus = await getOrgStatus(conv.org_id);
+  if (orgStatus !== "active") {
+    return NextResponse.json(
+      { error: orgStatus === "suspended" ? "chat_unavailable" : "chat_closed" },
+      { status: orgStatus === "suspended" ? 503 : 410 }
     );
   }
 

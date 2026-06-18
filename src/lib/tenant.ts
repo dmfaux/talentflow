@@ -10,6 +10,7 @@ import {
   type SessionPayload,
 } from "@/lib/auth";
 import { decideBrandAccess, type BrandRole } from "@/lib/rbac";
+import { getOrgStatus, orgInactiveFrom, OrgInactiveError } from "@/lib/org-status";
 import { db } from "@/db";
 import { memberships } from "@/db/schema";
 
@@ -66,6 +67,22 @@ export async function tenantFromSession(
     effectiveOrgId: session.orgId ?? actingOrgId,
     activeBrandId: null,
   };
+
+  // ── The universal org-lifecycle gate (S11, Resolved Decision A) ──────
+  // The seam is the one chokepoint every authenticated tenant surface flows
+  // through, and getSession()/this function do no other per-request DB read —
+  // so a user logged in BEFORE suspension would otherwise keep full access for
+  // up to the 8h token TTL. One cheap PK lookup here (behind requireTenant's
+  // React cache()) makes "suspend blocks the org's users" true for live
+  // sessions, not just new logins. Operators are EXEMPT (the impersonate route
+  // states verbatim that any org status is allowed): an at-rest operator has no
+  // effectiveOrgId, and an ACTING operator's effectiveOrgId is the acted org —
+  // both must reach suspended/deleted tenants, so the gate keys on !isOperator.
+  if (!ctx.isOperator && ctx.effectiveOrgId) {
+    const status = await getOrgStatus(ctx.effectiveOrgId);
+    if (status !== "active") throw orgInactiveFrom(status);
+  }
+
   // Re-validate the active-brand cookie EVERY request (plan §5.7: UI gating is
   // cosmetic; activeBrandId re-validated server-side every request). Only honour
   // a brand the caller can actually access — owner/org_admin/acting-operator can
@@ -85,7 +102,17 @@ export async function tenantFromSession(
 export const requireTenant = cache(async (): Promise<TenantContext> => {
   const session = await getSession();
   if (!session) redirect("/login");
-  return tenantFromSession(session);
+  // A suspended/deleted org bounces the (live) session to /login with a reason
+  // the page surfaces (S11). redirect() throws NEXT_REDIRECT, so it is called
+  // OUTSIDE the try — catching only OrgInactiveError keeps real errors loud.
+  let inactive: OrgInactiveError | null = null;
+  try {
+    return await tenantFromSession(session);
+  } catch (err) {
+    if (err instanceof OrgInactiveError) inactive = err;
+    else throw err;
+  }
+  redirect(`/login?reason=${inactive.status}`);
 });
 
 /** Operator-only surfaces (operator console lands in S7). A tenant user hitting

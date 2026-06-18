@@ -2,6 +2,7 @@
 
 import { TierBadge, type Tier } from "@/components/admin/tier-badge";
 import { ImpersonateButton } from "@/components/operator/impersonate-button";
+import { LifecycleActions } from "@/components/operator/lifecycle-actions";
 import { useToast } from "@/components/ui/toast-provider";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -382,6 +383,19 @@ export default function OperatorOrgDetailPage() {
             </p>
           )}
         </div>
+      </div>
+
+      {/* Lifecycle — suspend / soft-delete / restore / purge (S11) */}
+      <div className="mt-6">
+        <LifecycleActions
+          orgId={org.id}
+          orgName={org.name}
+          orgSlug={org.slug}
+          status={org.status}
+          onChanged={(updated) =>
+            setOrg((prev) => (prev ? { ...prev, ...updated } : prev))
+          }
+        />
       </div>
     </div>
   );

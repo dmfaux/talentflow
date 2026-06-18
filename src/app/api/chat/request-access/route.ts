@@ -3,6 +3,7 @@ import { campaigns, candidates, chatTokens, clients } from "@/db/schema";
 import { generateMagicLinkToken } from "@/lib/chat-auth";
 import { getActiveConversation } from "@/lib/chat";
 import { chatAccessEmail, sendCandidateEmail } from "@/lib/email";
+import { getOrgStatus } from "@/lib/org-status";
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -40,6 +41,13 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (!candidate) return successResponse;
+
+    // Suspended/deleted org (S11): return the SAME enumeration-safe success as
+    // an unknown candidate — don't leak org state via this endpoint — but issue
+    // no token and send no email.
+    if ((await getOrgStatus(candidate.org_id)) !== "active") {
+      return successResponse;
+    }
 
     // Generate magic link token
     const token = generateMagicLinkToken();

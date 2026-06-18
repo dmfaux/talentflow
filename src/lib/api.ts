@@ -6,6 +6,7 @@ import {
   tenantFromSession,
   type TenantContext,
 } from "./tenant";
+import { OrgInactiveError } from "./org-status";
 import {
   can,
   decideBrandAccess,
@@ -50,8 +51,17 @@ export async function getApiTenant(): Promise<
 > {
   const session = await getSession();
   if (!session) return { ctx: null, response: error("Unauthorized", 401) };
-  const ctx = await tenantFromSession(session);
-  return { ctx, response: null };
+  try {
+    const ctx = await tenantFromSession(session);
+    return { ctx, response: null };
+  } catch (err) {
+    // A suspended/deleted org (non-operator) → 403 (suspended) / 401 (deleted),
+    // the route-handler analog of requireTenant's /login redirect (S11).
+    if (err instanceof OrgInactiveError) {
+      return { ctx: null, response: error(err.message, err.httpStatus) };
+    }
+    throw err;
+  }
 }
 
 /** Operator-only route gate (S7). The route-handler analog of the RSC

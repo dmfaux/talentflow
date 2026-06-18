@@ -316,9 +316,10 @@ export default function SettingsPage() {
               Confirm Data Deletion
             </h3>
             <p className="mt-2 text-sm text-txt-secondary">
-              This will permanently delete all personal data, CVs, messages, and scoring
-              logs for <strong className="text-charcoal">{deleteEmail}</strong>.
-              This action cannot be undone.
+              This will permanently delete all personal data, CVs, messages, chat
+              conversations, and scoring logs for{" "}
+              <strong className="text-charcoal">{deleteEmail}</strong>. This action
+              cannot be undone.
             </p>
             <div className="mt-5 flex items-center justify-end gap-3">
               <button

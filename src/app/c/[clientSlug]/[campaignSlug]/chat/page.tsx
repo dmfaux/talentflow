@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import { db } from "@/db";
-import { campaigns, clients } from "@/db/schema";
+import { campaigns, clients, organizations } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { renderMarkdown } from "@/lib/markdown";
 import { ChatPageClient } from "@/components/candidate/ChatPageClient";
@@ -19,6 +19,8 @@ async function getCampaignForChat(clientSlug: string, campaignSlug: string) {
       salary_range_min: campaigns.salary_range_min,
       salary_range_max: campaigns.salary_range_max,
       status: campaigns.status,
+      // Org lifecycle status (S11) — refuse a suspended/deleted org's chat.
+      org_status: organizations.status,
       client_name: clients.name,
       brand_primary_color: clients.brand_primary_color,
       brand_secondary_color: clients.brand_secondary_color,
@@ -30,6 +32,7 @@ async function getCampaignForChat(clientSlug: string, campaignSlug: string) {
     })
     .from(campaigns)
     .innerJoin(clients, eq(campaigns.client_id, clients.id))
+    .innerJoin(organizations, eq(campaigns.org_id, organizations.id))
     .where(and(eq(clients.slug, clientSlug), eq(campaigns.slug, campaignSlug)))
     .limit(1);
 
@@ -40,7 +43,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { clientSlug, campaignSlug } = await params;
   const campaign = await getCampaignForChat(clientSlug, campaignSlug);
 
-  if (!campaign || campaign.status !== "active") {
+  if (!campaign || campaign.status !== "active" || campaign.org_status !== "active") {
     return { title: "Chat Not Available" };
   }
 
@@ -53,7 +56,7 @@ export default async function ChatPage({ params }: Props) {
   const { clientSlug, campaignSlug } = await params;
   const campaign = await getCampaignForChat(clientSlug, campaignSlug);
 
-  if (!campaign || campaign.status !== "active") {
+  if (!campaign || campaign.status !== "active" || campaign.org_status !== "active") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f5f4f0]">
         <div className="mx-auto max-w-md rounded-xl border border-[#e8e8e4] bg-white px-8 py-10 text-center">

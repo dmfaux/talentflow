@@ -14,6 +14,14 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
 
   const resetJustSucceeded = searchParams.get("reset") === "success";
+  // Set by the seam when a live session's org was suspended/deleted mid-flight.
+  const reason = searchParams.get("reason");
+  const orgInactiveMessage =
+    reason === "suspended"
+      ? "Your organisation has been suspended. Please contact support."
+      : reason === "deleted"
+        ? "Your organisation is no longer available."
+        : null;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -82,6 +90,12 @@ function LoginForm() {
           {resetJustSucceeded && (
             <div className="mb-6 rounded-lg border border-moss/25 bg-moss-soft px-4 py-3 text-[0.82rem] text-moss-deep">
               Password updated. You can now sign in.
+            </div>
+          )}
+
+          {orgInactiveMessage && (
+            <div className="mb-6 rounded-lg border border-saffron/30 bg-saffron-soft px-4 py-3 text-[0.82rem] text-saffron-deep">
+              {orgInactiveMessage}
             </div>
           )}
 

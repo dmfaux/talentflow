@@ -1,4 +1,5 @@
 import { COOKIE_NAME, signToken, verifyPassword, type OrgRole } from "@/lib/auth";
+import { getOrgStatus } from "@/lib/org-status";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -35,6 +36,25 @@ export async function POST(request: NextRequest) {
 
   if (!(await verifyPassword(password, user.password_hash))) {
     return invalidCredentials;
+  }
+
+  // Fast-fail for a suspended/deleted org so the user sees a clear reason
+  // (the seam would also block the resulting session on the next request, but
+  // login is where users read why). Operators are exempt — they have no org.
+  if (!user.is_operator && user.org_id) {
+    const status = await getOrgStatus(user.org_id);
+    if (status === "suspended") {
+      return NextResponse.json(
+        { error: "Your organisation is suspended. Please contact support." },
+        { status: 403 }
+      );
+    }
+    if (status !== "active") {
+      return NextResponse.json(
+        { error: "Your organisation is no longer available." },
+        { status: 401 }
+      );
+    }
   }
 
   const token = await signToken({

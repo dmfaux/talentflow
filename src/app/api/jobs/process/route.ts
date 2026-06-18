@@ -65,6 +65,15 @@ export async function POST(request: NextRequest) {
             AND ${candidates.updated_at} < now() - interval '15 minutes'
           )
         )
+        -- S11: never regenerate recovery work for a suspended/deleted org.
+        -- candidates.org_id is NOT NULL, so a live tenant is the only source of
+        -- new candidate-processing rows; on restore the backstop resumes.
+        AND EXISTS (
+          SELECT 1
+          FROM organizations o
+          WHERE o.id = ${candidates.org_id}
+            AND o.status = 'active'
+        )
         AND NOT EXISTS (
           SELECT 1
           FROM jobs existing
@@ -104,6 +113,16 @@ export async function POST(request: NextRequest) {
       WHERE status = 'pending'
         AND deliver_at <= ${sql.raw(`'${now}'::timestamptz`)}
         AND (locked_until IS NULL OR locked_until < ${sql.raw(`'${now}'::timestamptz`)})
+        -- S11: don't claim a suspended/deleted org's jobs (S10 populates
+        -- jobs.org_id). NULL-org global jobs stay claimable. handleJob is the
+        -- universal backstop for the Service Bus path, which has no claim loop.
+        AND (
+          jobs.org_id IS NULL
+          OR EXISTS (
+            SELECT 1 FROM organizations o
+            WHERE o.id = jobs.org_id AND o.status = 'active'
+          )
+        )
       ORDER BY deliver_at ASC
       LIMIT ${BATCH_SIZE}
       FOR UPDATE SKIP LOCKED

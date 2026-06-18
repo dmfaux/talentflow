@@ -166,6 +166,28 @@ export async function deleteCV(blobPath: string): Promise<void> {
   await blockBlob.deleteIfExists();
 }
 
+/** Org-wide prefix delete for the S11 hard purge. Both blob schemes put orgId
+ *  at path depth 1 (cvs/{orgId}/…, logos/{orgId}/…), so the prefix is a clean
+ *  tenant boundary. The SDK's async iterator handles listing pagination. Keys
+ *  off the path scheme, not the stored value, so it wipes CVs (relative paths)
+ *  and logos (public URLs) alike. Unconfigured (local dev) → safe no-op; the
+ *  DB cascade remains the source of truth for "zero rows". Idempotent via
+ *  deleteIfExists, mirroring deleteCV. */
+export async function deleteOrgBlobsByPrefix(
+  orgId: string,
+  kind: "cv" | "logo"
+): Promise<void> {
+  if (!isConfigured()) return;
+  if (kind === "logo" && !getLogoContainerName()) return; // logo container optional
+
+  const container = kind === "cv" ? getContainerClient() : getLogoContainerClient();
+  const prefix = `${kind === "cv" ? "cvs" : "logos"}/${orgId}/`;
+
+  for await (const blob of container.listBlobsFlat({ prefix })) {
+    await container.getBlockBlobClient(blob.name).deleteIfExists();
+  }
+}
+
 export function generateSasUrl(
   blobPath: string,
   expiresInHours: number

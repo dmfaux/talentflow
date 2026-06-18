@@ -17,10 +17,39 @@ import { generateChatToken } from "../chat-auth";
 import { createConversation, getActiveConversation } from "../chat";
 import { rescoreWithChatContext } from "../ai-scoring";
 import { processNewCandidate } from "../process-candidate";
+import { getOrgStatus } from "../org-status";
 import { getQueue } from "./index";
 import type { JobPayload } from "./types";
 
+/** Resolve a job's owning org via its candidate and report whether it is active
+ *  (S11). Every JobPayload variant carries a candidateId, so this is the single
+ *  org resolver for the universal handleJob gate. A missing candidate → true:
+ *  don't mask a genuinely-absent candidate as an org-status skip; let the
+ *  handler log its own not-found. A purged org (getOrgStatus → null) → false. */
+async function jobOrgIsActive(candidateId: string): Promise<boolean> {
+  const candidate = await db.query.candidates.findFirst({
+    where: eq(candidates.id, candidateId),
+    columns: { org_id: true },
+  });
+  if (!candidate) return true;
+  return (await getOrgStatus(candidate.org_id)) === "active";
+}
+
 export async function handleJob(payload: JobPayload): Promise<void> {
+  // ── Universal queue-resurrection gate (S11, Resolved Decision D) ─────
+  // The ONE gate that covers BOTH drivers: the Service Bus path has no claim
+  // loop, so messages dispatch straight here. Skip-and-complete a job whose org
+  // isn't active — returning cleanly marks the DbQueue row 'completed' (no
+  // requeue) and acks the Service Bus message, so a dead tenant's work never
+  // piles up or regenerates. On restore, the jobs/process backstop re-recovers
+  // candidate-processing; chat nudges/expiries are best-effort.
+  if (!(await jobOrgIsActive(payload.candidateId))) {
+    console.log(
+      `handleJob: skipping ${payload.type} for candidate ${payload.candidateId} — org not active`
+    );
+    return;
+  }
+
   switch (payload.type) {
     case "candidate-processing":
       await processNewCandidate(payload.candidateId);
@@ -274,6 +303,10 @@ async function handleChatNudge(
   // dedup key ensures retries of this re-enqueue are dropped, and engaged-
   // then-ghost candidates still get nudged after the full inactive window.
   if (msSinceActivity < nudgeThresholdMs) {
+    // Don't re-arm work for an org suspended/deleted since this job was claimed
+    // (S11). The handleJob gate would skip the re-enqueued job at fire time
+    // anyway, but not creating it keeps a dead tenant's queue clean.
+    if ((await getOrgStatus(candidate.org_id)) !== "active") return;
     const newDeliverAt = new Date(lastActivityMs + nudgeThresholdMs);
     await getQueue().enqueue(
       { type: "chat-nudge", candidateId: candidate.id },
@@ -357,6 +390,9 @@ async function handleChatExpire(
   // for the new anchor. Activity-based dedup key means duplicate re-enqueues
   // (from worker retries) collapse to one row.
   if (msSinceActivity < ttlMs) {
+    // Don't re-arm work for an org suspended/deleted since this job was claimed
+    // (S11) — mirrors the chat-nudge guard.
+    if ((await getOrgStatus(candidate.org_id)) !== "active") return;
     const newDeliverAt = new Date(lastActivityMs + ttlMs);
     await getQueue().enqueue(
       { type: "chat-expire", candidateId: candidate.id },

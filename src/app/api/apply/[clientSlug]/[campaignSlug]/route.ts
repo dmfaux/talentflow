@@ -8,6 +8,7 @@ import {
   sendCandidateEmail,
 } from "@/lib/email";
 import { evaluateGating, GatingQuestion } from "@/lib/gating";
+import { getOrgStatus } from "@/lib/org-status";
 import { getQueue } from "@/lib/queue";
 import { recordUsageEvent } from "@/lib/usage";
 import { and, eq } from "drizzle-orm";
@@ -48,6 +49,16 @@ export async function POST(
 
     if (!campaign || campaign.status !== "active") {
       return json({ error: "Campaign not found or not active" }, 404);
+    }
+
+    // Freeze the careers surface for a suspended/deleted org (S11). The seam
+    // never runs on this public path, so each handler refuses on its own:
+    // 503 (suspended, temporary) / 410 (deleted, gone).
+    const orgStatus = await getOrgStatus(campaign.org_id);
+    if (orgStatus !== "active") {
+      return orgStatus === "suspended"
+        ? json({ error: "Applications are temporarily paused" }, 503)
+        : json({ error: "This organisation is no longer accepting applications" }, 410);
     }
 
     // Parse body (JSON or FormData)

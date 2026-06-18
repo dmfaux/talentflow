@@ -28,6 +28,15 @@ vi.mock("@/lib/auth", async (importOriginal) => {
   return { ...actual, getSession: async () => sessionHolder.current };
 });
 
+// S11: tenantFromSession now does one org-status PK lookup per request for
+// non-operators. This is a DB-free seam unit test, so stub getOrgStatus → the
+// org is live; OrgInactiveError + the rest of the module stay real. The
+// suspended/deleted enforcement itself is covered by the DB-backed itests.
+vi.mock("@/lib/org-status", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/org-status")>();
+  return { ...actual, getOrgStatus: async () => "active" as const };
+});
+
 import { getActAsClaim, type SessionPayload } from "@/lib/auth";
 import { tenantFromSession } from "@/lib/tenant";
 import { requireApiOperator } from "@/lib/api";
@@ -149,8 +158,15 @@ describe("operator_audit action allow-list", () => {
     expect(isOperatorAuditAction("provision_org")).toBe(true);
   });
 
+  it("recognises the S11 lifecycle actions", () => {
+    for (const a of ["suspend", "restore", "soft_delete", "purge_org"]) {
+      expect(isOperatorAuditAction(a)).toBe(true);
+    }
+  });
+
   it("rejects unknown / future-slice actions (until they are added in code)", () => {
-    expect(isOperatorAuditAction("purge")).toBe(false); // S11
+    expect(isOperatorAuditAction("purge")).toBe(false); // not the slug — it's purge_org
+    expect(isOperatorAuditAction("delete_org")).toBe(false);
     expect(isOperatorAuditAction("")).toBe(false);
     expect(isOperatorAuditAction(42)).toBe(false);
   });
