@@ -271,6 +271,45 @@ export async function assertThemeAvailableForBrand(
 }
 
 /**
+ * Landing-page precedence (CT4, decision 7): the frozen snapshot landing wins
+ * (it already encodes "tenant override beats theme default" at activation), then
+ * a live tenant override (html_template), then the theme-provided default. A
+ * draft has no snapshot, so it resolves override → theme default live. Returns
+ * null when nothing supplies a landing (the page then renders today's
+ * no-template surface). Pure, so the public render and tests share one rule.
+ */
+export function pickLandingHtml(
+  snapshotLanding: string | null | undefined,
+  override: string | null | undefined,
+  themeLanding: string | null | undefined
+): string | null {
+  return snapshotLanding ?? override ?? themeLanding ?? null;
+}
+
+/**
+ * Resolve the landing HTML the public careers page should render for a campaign
+ * (CT4). Applies pickLandingHtml's precedence, but resolves the theme LIVE only
+ * when neither the frozen snapshot nor a tenant override already supplies a
+ * landing — so an active campaign reads its snapshot without a DB hit, and a
+ * draft falls through to its theme's landing_html. Returns null when nothing
+ * supplies a landing (the page then shows today's no-template surface).
+ */
+export async function resolveEffectiveLanding(
+  campaign: ResolverCampaign & {
+    html_template: string | null;
+    theme_snapshot: ThemeSnapshot | null;
+  }
+): Promise<string | null> {
+  const snapshotLanding = campaign.theme_snapshot?.landingHtml ?? null;
+  const override = campaign.html_template ?? null;
+  const themeLanding =
+    snapshotLanding === null && override === null
+      ? (await resolveCampaignTheme(campaign)).landingHtml
+      : null;
+  return pickLandingHtml(snapshotLanding, override, themeLanding);
+}
+
+/**
  * Freeze the resolved look at activation (RD-1). Captures the live resolver's
  * email theme plus the EFFECTIVE landing — a tenant's html_template override
  * wins over the theme's landing_html and stays authoritative for the active

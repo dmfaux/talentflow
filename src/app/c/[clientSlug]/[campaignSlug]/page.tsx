@@ -6,6 +6,7 @@ import { replaceSlots, type SlotData } from "@/lib/slots";
 import { renderMarkdown } from "@/lib/markdown";
 import { HtmlTemplateRenderer } from "@/components/candidate/HtmlTemplateRenderer";
 import type { GatingQuestion } from "@/lib/gating";
+import { resolveEffectiveLanding } from "@/lib/theme";
 
 interface Props {
   params: Promise<{ clientSlug: string; campaignSlug: string }>;
@@ -34,6 +35,14 @@ async function getCampaign(clientSlug: string, campaignSlug: string) {
       brand_secondary_color: clients.brand_secondary_color,
       brand_accent_color: clients.brand_accent_color,
       brand_text_color: clients.brand_text_color,
+      // Theme/landing resolution inputs (CT4). theme_snapshot wins for active
+      // campaigns; drafts resolve the brand's theme default live.
+      theme_id: campaigns.theme_id,
+      theme_snapshot: campaigns.theme_snapshot,
+      default_theme_id: clients.default_theme_id,
+      branding_logo_url: clients.branding_logo_url,
+      logo_background: clients.logo_background,
+      logo_position: clients.logo_position,
     })
     .from(campaigns)
     .innerJoin(clients, eq(campaigns.client_id, clients.id))
@@ -97,9 +106,22 @@ export default async function CampaignPage({ params }: Props) {
     );
   }
 
-  if (!campaign.html_template) {
+  // Effective landing (CT4): frozen snapshot → tenant override → theme default.
+  const landingHtml = await resolveEffectiveLanding({
+    theme_id: campaign.theme_id,
+    html_template: campaign.html_template,
+    theme_snapshot: campaign.theme_snapshot,
+    client: {
+      default_theme_id: campaign.default_theme_id,
+      branding_logo_url: campaign.branding_logo_url,
+      logo_background: campaign.logo_background,
+      logo_position: campaign.logo_position,
+    },
+  });
+
+  if (!landingHtml) {
     console.error(
-      `[candidate-landing] Campaign has no html_template (client="${clientSlug}", campaign="${campaignSlug}").`
+      `[candidate-landing] Campaign has no landing template (client="${clientSlug}", campaign="${campaignSlug}").`
     );
     return (
       <CampaignError
@@ -122,7 +144,7 @@ export default async function CampaignPage({ params }: Props) {
       salary_range_max: campaign.salary_range_max,
     },
   };
-  const processedHtml = replaceSlots(campaign.html_template, slotData);
+  const processedHtml = replaceSlots(landingHtml, slotData);
 
   return (
     <HtmlTemplateRenderer

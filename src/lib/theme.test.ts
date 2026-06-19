@@ -45,6 +45,7 @@ import {
   FONT_DISPLAY,
   FONT_SANS,
   freezeCampaignTheme,
+  pickLandingHtml,
   resolveCampaignTheme,
 } from "@/lib/theme";
 
@@ -399,5 +400,27 @@ describe("freezeCampaignTheme", () => {
     });
 
     expect(snapshot.theme_id).toBeNull();
+  });
+});
+
+// ── CT4 · landing-page precedence (pickLandingHtml) ──────────────────
+
+describe("pickLandingHtml", () => {
+  it("prefers the frozen snapshot landing over an override and the theme default", () => {
+    expect(pickLandingHtml("<snap/>", "<override/>", "<theme/>")).toBe("<snap/>");
+  });
+
+  it("uses the tenant override when there is no snapshot (draft)", () => {
+    expect(pickLandingHtml(null, "<override/>", "<theme/>")).toBe("<override/>");
+    expect(pickLandingHtml(undefined, "<override/>", "<theme/>")).toBe("<override/>");
+  });
+
+  it("falls back to the theme default when there is no snapshot and no override", () => {
+    expect(pickLandingHtml(null, null, "<theme/>")).toBe("<theme/>");
+  });
+
+  it("returns null when nothing supplies a landing (today's no-template surface)", () => {
+    expect(pickLandingHtml(null, null, null)).toBeNull();
+    expect(pickLandingHtml(undefined, undefined, undefined)).toBeNull();
   });
 });

@@ -172,6 +172,24 @@ export function CampaignWizard({
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
   // Theme step state (CT3): availability feed for the campaign's brand.
   const [themes, setThemes] = useState<Theme[]>([]);
+  // CT4: reveal the custom-HTML flow even when the selected theme provides a
+  // landing default. Starts open in edit mode if an override is already pasted.
+  const [showLandingOverride, setShowLandingOverride] = useState(
+    () => Boolean(initialForm?.html_template?.trim())
+  );
+
+  // CT4 landing resolution, mirrored client-side: the campaign's effective theme
+  // is its own override (form.theme_id) or the brand default; that theme may
+  // carry a landing_html the campaign inherits unless the tenant pastes custom
+  // HTML (which wins, matching the server's precedence).
+  const selectedClient = clients.find((c) => c.id === form.client_id);
+  const resolvedThemeId = form.theme_id ?? selectedClient?.default_theme_id ?? null;
+  const resolvedTheme = themes.find((t) => t.id === resolvedThemeId) ?? null;
+  const themeLandingHtml = resolvedTheme?.landing_html ?? null;
+  // Show the custom-HTML flow when the theme has no landing to inherit, when an
+  // override is already present, or when the user explicitly opts to override.
+  const landingOverrideMode =
+    !themeLandingHtml || form.html_template.trim().length > 0 || showLandingOverride;
 
   useEffect(() => {
     fetch("/api/admin/clients")
@@ -322,12 +340,17 @@ export function CampaignWizard({
     }
 
     if (s === 3) {
-      if (!form.html_template.trim()) {
-        errs.html_template = "Paste your HTML template";
-      } else {
+      const override = form.html_template.trim();
+      if (override) {
+        // A pasted override always wins and must pass the slot/mount contract.
         const check = validateHtmlTemplate(form.html_template);
         if (!check.ok) errs.html_template = check.errors.join("; ");
+      } else if (!themeLandingHtml) {
+        // No override and no theme-provided landing → nothing would render.
+        errs.html_template =
+          "Paste your HTML template, or choose a theme that includes a landing page";
       }
+      // else: the selected theme supplies a landing default — no override needed.
     }
 
     setErrors(errs);
@@ -454,6 +477,9 @@ export function CampaignWizard({
       brief: form.design_brief || `A professional job application landing page for the ${form.role_title || "open"} role at ${client?.name || "the company"}.`,
       brandColors,
       logo,
+      // CT4: tier-flip the copied prompt — Standard gets TalentStream colours +
+      // the powered-by footer, Premium+ gets brand colours and no footer.
+      tier: client?.tier,
     });
   }
 
@@ -1092,100 +1118,133 @@ export function CampaignWizard({
             <div className="h-px bg-border" />
 
             <div className="space-y-5">
-            <div>
-              <h2 className="text-base font-semibold text-charcoal">Landing Page</h2>
-              <p className="mt-1 text-xs text-txt-muted">
-                Copy the AI prompt below into Claude or ChatGPT. It will generate a live preview as an artifact — tweak the design until you&apos;re happy, then paste the final HTML here.
-              </p>
-            </div>
-
-            {/* Design brief */}
-            <div>
-              <label htmlFor="design_brief" className={labelClass}>Design Brief (optional)</label>
-              <textarea
-                id="design_brief"
-                value={form.design_brief}
-                onChange={(e) => updateForm({ design_brief: e.target.value })}
-                placeholder="Describe any specific design preferences — layout style, tone, sections to include..."
-                rows={3}
-                className="w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none"
-              />
-            </div>
-
-            {/* Copy prompt button */}
-            <button
-              type="button"
-              onClick={copyPrompt}
-              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border bg-cream/40 px-4 text-[0.8rem] font-medium text-charcoal transition-colors hover:bg-cream hover:border-txt-muted cursor-pointer"
-            >
-              {promptCopied ? (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 8.5L6.5 12L13 4" />
-                  </svg>
-                  Copied to clipboard
-                </>
-              ) : (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="5" y="5" width="8" height="8" rx="1.5" />
-                    <path d="M3 11V3.5A1.5 1.5 0 014.5 2H11" />
-                  </svg>
-                  Copy AI Prompt to Clipboard
-                </>
-              )}
-            </button>
-
-            <div className="relative">
-              <div className="absolute inset-x-0 top-0 h-px bg-border" />
-              <p className="relative -top-2 mx-auto w-fit bg-surface px-3 text-[0.65rem] font-medium uppercase tracking-[0.15em] text-txt-muted">
-                Then paste the generated HTML below
-              </p>
-            </div>
-
-            {/* HTML paste area */}
-            <div>
-              <label htmlFor="html_template" className={labelClass}>
-                HTML Template <span className="text-red">*</span>
-              </label>
-              <textarea
-                id="html_template"
-                value={form.html_template}
-                onChange={(e) => handleHtmlChange(e.target.value)}
-                placeholder="Paste the complete HTML page here..."
-                rows={12}
-                className={`w-full rounded-lg border bg-cream/40 px-3.5 py-2.5 font-mono text-xs text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none ${
-                  errors.html_template ? "border-red" : htmlValidation?.ok ? "border-green" : "border-border"
-                }`}
-              />
-              {errors.html_template && (
-                <p className="mt-1 text-xs text-red">{errors.html_template}</p>
-              )}
-              {htmlValidation?.ok && (
-                <p className="mt-1 flex items-center gap-1 text-xs text-green">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M2.5 6.5L5 9l4.5-6" />
-                  </svg>
-                  Valid HTML template ({form.html_template.length.toLocaleString()} characters)
-                </p>
-              )}
-              {htmlValidation && !htmlValidation.ok && !errors.html_template && (
-                <div className="mt-1 space-y-0.5">
-                  {htmlValidation.errors?.map((err, i) => (
-                    <p key={i} className="text-xs text-red">{err}</p>
-                  ))}
+            {landingOverrideMode ? (
+              <>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-charcoal">Landing Page</h2>
+                    <p className="mt-1 text-xs text-txt-muted">
+                      {themeLandingHtml
+                        ? `Your custom HTML overrides ${resolvedTheme?.name ?? "the theme"}'s landing page. Copy the AI prompt into Claude or ChatGPT, tweak the live preview, then paste the final HTML here.`
+                        : "Copy the AI prompt below into Claude or ChatGPT. It will generate a live preview as an artifact — tweak the design until you're happy, then paste the final HTML here."}
+                    </p>
+                  </div>
+                  {themeLandingHtml && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowLandingOverride(false);
+                        handleHtmlChange("");
+                      }}
+                      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[0.72rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M8.5 3L4.5 7l4 4" />
+                      </svg>
+                      Use theme default
+                    </button>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Live preview */}
-            {htmlValidation?.ok && form.html_template.trim() && (
-              <TemplatePreview
-                html={form.html_template}
+                {/* Design brief */}
+                <div>
+                  <label htmlFor="design_brief" className={labelClass}>Design Brief (optional)</label>
+                  <textarea
+                    id="design_brief"
+                    value={form.design_brief}
+                    onChange={(e) => updateForm({ design_brief: e.target.value })}
+                    placeholder="Describe any specific design preferences — layout style, tone, sections to include..."
+                    rows={3}
+                    className="w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none"
+                  />
+                </div>
+
+                {/* Copy prompt button */}
+                <button
+                  type="button"
+                  onClick={copyPrompt}
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border bg-cream/40 px-4 text-[0.8rem] font-medium text-charcoal transition-colors hover:bg-cream hover:border-txt-muted cursor-pointer"
+                >
+                  {promptCopied ? (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 8.5L6.5 12L13 4" />
+                      </svg>
+                      Copied to clipboard
+                    </>
+                  ) : (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="5" y="5" width="8" height="8" rx="1.5" />
+                        <path d="M3 11V3.5A1.5 1.5 0 014.5 2H11" />
+                      </svg>
+                      Copy AI Prompt to Clipboard
+                    </>
+                  )}
+                </button>
+
+                <div className="relative">
+                  <div className="absolute inset-x-0 top-0 h-px bg-border" />
+                  <p className="relative -top-2 mx-auto w-fit bg-surface px-3 text-[0.65rem] font-medium uppercase tracking-[0.15em] text-txt-muted">
+                    Then paste the generated HTML below
+                  </p>
+                </div>
+
+                {/* HTML paste area */}
+                <div>
+                  <label htmlFor="html_template" className={labelClass}>
+                    HTML Template {!themeLandingHtml && <span className="text-red">*</span>}
+                  </label>
+                  <textarea
+                    id="html_template"
+                    value={form.html_template}
+                    onChange={(e) => handleHtmlChange(e.target.value)}
+                    placeholder="Paste the complete HTML page here..."
+                    rows={12}
+                    className={`w-full rounded-lg border bg-cream/40 px-3.5 py-2.5 font-mono text-xs text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none ${
+                      errors.html_template ? "border-red" : htmlValidation?.ok ? "border-green" : "border-border"
+                    }`}
+                  />
+                  {errors.html_template && (
+                    <p className="mt-1 text-xs text-red">{errors.html_template}</p>
+                  )}
+                  {htmlValidation?.ok && (
+                    <p className="mt-1 flex items-center gap-1 text-xs text-green">
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2.5 6.5L5 9l4.5-6" />
+                      </svg>
+                      Valid HTML template ({form.html_template.length.toLocaleString()} characters)
+                    </p>
+                  )}
+                  {htmlValidation && !htmlValidation.ok && !errors.html_template && (
+                    <div className="mt-1 space-y-0.5">
+                      {htmlValidation.errors?.map((err, i) => (
+                        <p key={i} className="text-xs text-red">{err}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Live preview */}
+                {htmlValidation?.ok && form.html_template.trim() && (
+                  <TemplatePreview
+                    html={form.html_template}
+                    form={form}
+                    clientName={selectedClient?.name}
+                    previewDevice={previewDevice}
+                    setPreviewDevice={setPreviewDevice}
+                  />
+                )}
+              </>
+            ) : (
+              <ThemeLandingDefault
+                themeName={resolvedTheme?.name ?? null}
+                html={themeLandingHtml!}
                 form={form}
-                clientName={clients.find((c) => c.id === form.client_id)?.name}
+                clientName={selectedClient?.name}
                 previewDevice={previewDevice}
                 setPreviewDevice={setPreviewDevice}
+                onOverride={() => setShowLandingOverride(true)}
               />
             )}
             </div>
@@ -1261,10 +1320,17 @@ export function CampaignWizard({
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green">
                     <path d="M3 7.5L5.5 10l5.5-6" />
                   </svg>
-                  HTML template pasted ({form.html_template.length.toLocaleString()} characters)
+                  Custom HTML template ({form.html_template.length.toLocaleString()} characters)
+                </p>
+              ) : themeLandingHtml ? (
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-charcoal">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green">
+                    <path d="M3 7.5L5.5 10l5.5-6" />
+                  </svg>
+                  Landing page from {resolvedTheme?.name ?? "the selected theme"}
                 </p>
               ) : (
-                <p className="mt-1 text-sm text-red">No HTML template — go back to Step 4 to paste one</p>
+                <p className="mt-1 text-sm text-red">No landing page — go back to the Landing Page step to paste HTML or pick a theme that includes one</p>
               )}
             </div>
           </div>
@@ -1655,6 +1721,85 @@ function ThemeSection({
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Theme landing default (CT4) ──────────────────────────────────────
+// When the selected theme ships a landing_html, the campaign inherits it — no
+// custom HTML required. We frame that with a short explainer, the same live
+// preview the override flow uses, and an unobtrusive affordance to override with
+// bespoke HTML. Mirrors the server precedence (a pasted override wins).
+
+function ThemeLandingDefault({
+  themeName,
+  html,
+  form,
+  clientName,
+  previewDevice,
+  setPreviewDevice,
+  onOverride,
+}: {
+  themeName: string | null;
+  html: string;
+  form: FormData;
+  clientName: string | undefined;
+  previewDevice: "desktop" | "mobile";
+  setPreviewDevice: (d: "desktop" | "mobile") => void;
+  onOverride: () => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-base font-semibold text-charcoal">Landing Page</h2>
+        <p className="mt-1 text-xs text-txt-muted">
+          This campaign inherits its landing page from its theme — nothing to paste.
+        </p>
+      </div>
+
+      {/* Theme-provides-landing banner */}
+      <div className="flex items-start gap-3 rounded-xl border border-accent/30 bg-accent/10 px-4 py-3.5">
+        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2.5" y="3.5" width="15" height="13" rx="2" />
+            <path d="M2.5 7.5h15M6 3.5v4" />
+          </svg>
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-charcoal">
+            Landing page from {themeName ?? "your theme"}
+          </p>
+          <p className="mt-0.5 text-xs leading-relaxed text-txt-secondary">
+            This theme ships with a ready-made landing page, so this campaign is good to go without any HTML. Prefer something bespoke? Override it below.
+          </p>
+        </div>
+      </div>
+
+      {/* Live preview of the theme's landing default */}
+      <TemplatePreview
+        html={html}
+        form={form}
+        clientName={clientName}
+        previewDevice={previewDevice}
+        setPreviewDevice={setPreviewDevice}
+      />
+
+      {/* Override affordance */}
+      <div className="flex flex-col items-center gap-1.5 border-t border-border pt-5 text-center">
+        <button
+          type="button"
+          onClick={onOverride}
+          className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-[0.78rem] font-medium text-charcoal transition-colors hover:bg-cream hover:border-txt-muted cursor-pointer"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 2.5l2.5 2.5L6 12.5 3 13l.5-3z" />
+          </svg>
+          Override with custom HTML
+        </button>
+        <p className="text-[0.7rem] text-txt-muted">
+          Replace the theme&apos;s landing with your own design for this campaign only.
+        </p>
       </div>
     </div>
   );

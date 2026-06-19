@@ -11,6 +11,7 @@
 //   6. User inputs (name + brief) verbatim.
 
 import { SLOT_ALLOW_LIST } from "./slots";
+import { isPremiumTier } from "./theme-fields";
 
 export interface BrandColors {
   primary: string;
@@ -30,14 +31,40 @@ export interface BuildPromptInput {
   brief: string;
   brandColors?: BrandColors | null;
   logo?: LogoInput | null;
+  /**
+   * The brand's tier (CT4). Standard/null campaigns are white-label-free: the
+   * landing uses the shared TalentStream palette + the "Powered by TalentStream"
+   * footer, matching their emails. Premium+ campaigns use the brand's own colours
+   * and drop the powered-by footer — coherent with the email kit's showPoweredBy.
+   */
+  tier?: string | null;
 }
+
+/**
+ * The TalentStream palette mapped to the prompt's BrandColors shape — the
+ * DEFAULT_EMAIL_THEME hexes (theme.ts). Standard/null campaigns embed THIS rather
+ * than the brand's colours, so the landing matches the (also-default-themed)
+ * emails a Standard brand sends.
+ */
+export const TALENTSTREAM_PROMPT_PALETTE: BrandColors = {
+  primary: "#2c5bff",
+  secondary: "#f0f3f7",
+  accent: "#05dbd6",
+  text: "#11123c",
+};
 
 export function buildTemplatePrompt({
   name,
   brief,
   brandColors,
   logo,
+  tier,
 }: BuildPromptInput): string {
+  // Tier lever (CT4) — single-sourced here so callers just pass the tier.
+  // Premium+ is the white-label tier: brand colours, no powered-by footer.
+  // Standard/null gets the shared TalentStream palette + the powered-by footer.
+  const isPremium = isPremiumTier(tier);
+  const paletteColors = isPremium ? brandColors : TALENTSTREAM_PROMPT_PALETTE;
   const slotDocs = SLOT_ALLOW_LIST.map((s) => {
     const descs: Record<string, string> = {
       "client.name": "Company/client name (short text, e.g. \"Acme Corp\")",
@@ -51,13 +78,23 @@ export function buildTemplatePrompt({
     return `- \`{{${s}}}\` — ${descs[s] ?? s}`;
   }).join("\n");
 
-  const brandSection = brandColors
+  const brandSection = paletteColors
     ? `Use these exact brand colours throughout the template:
-- Primary: ${brandColors.primary}
-- Secondary: ${brandColors.secondary}
-${brandColors.accent ? `- Accent: ${brandColors.accent}` : "- Accent: choose one that complements the primary and secondary"}
-- Text: ${brandColors.text}`
+- Primary: ${paletteColors.primary}
+- Secondary: ${paletteColors.secondary}
+${paletteColors.accent ? `- Accent: ${paletteColors.accent}` : "- Accent: choose one that complements the primary and secondary"}
+- Text: ${paletteColors.text}`
     : `Choose a sophisticated, distinctive colour palette appropriate for a professional recruitment page. Do NOT default to generic blue/white. Pick a palette that feels confident and intentional.`;
+
+  // The powered-by footer is the white-label lever (D-4): present for
+  // Standard/null, dropped for Premium+.
+  const footerSection = isPremium
+    ? ""
+    : `# Footer
+
+Include a subtle footer at the very bottom of the page with the text "Powered by TalentStream". Style it small, muted, and unobtrusive — it should not compete with the page content. Centre-align it with generous top margin.
+
+`;
 
   return `You MUST use your frontend-design skill to complete this task. You are producing a campaign landing-page template as a single self-contained HTML page. The template renders a job-application page: dynamic campaign data (role title, department, location, etc.) is injected at runtime via slot markers, and a rich interactive application form is mounted into a designated container element by the application framework.
 
@@ -120,11 +157,7 @@ The injected form has its own internal styling and is approximately 500–700px 
 - Style the container area to frame the form attractively (a subtle background, border, or card treatment works well).
 - The form has its own styled inputs, selects, checkboxes, and buttons. Do NOT try to override its internal elements — but DO ensure the container area's background, padding, and border provide a cohesive frame that matches your template's design language.
 
-# Footer
-
-Include a subtle footer at the very bottom of the page with the text "Powered by TalentStream". Style it small, muted, and unobtrusive — it should not compete with the page content. Centre-align it with generous top margin.
-
-# Colours
+${footerSection}# Colours
 
 ${brandSection}
 

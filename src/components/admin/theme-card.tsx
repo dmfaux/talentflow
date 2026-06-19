@@ -10,6 +10,8 @@ export interface Theme {
   scope: "gallery" | "custom";
   preview_image_url: string | null;
   show_powered_by: boolean;
+  /** The theme's landing-page default (CT4); null when the theme provides none. */
+  landing_html: string | null;
 }
 
 export const themeBadgeClass =

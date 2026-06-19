@@ -54,6 +54,10 @@ export async function GET(request: NextRequest) {
         scope: true,
         preview_image_url: true,
         show_powered_by: true,
+        // CT4: the wizard reflects a theme's landing default (and lets the tenant
+        // override it). Sent so the picker can preview "this theme includes a
+        // landing page" without a second fetch.
+        landing_html: true,
       },
       orderBy: [desc(themes.created_at)],
     });
