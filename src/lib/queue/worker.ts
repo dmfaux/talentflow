@@ -18,6 +18,7 @@ import { createConversation, getActiveConversation } from "../chat";
 import { rescoreWithChatContext } from "../ai-scoring";
 import { processNewCandidate } from "../process-candidate";
 import { getOrgStatus } from "../org-status";
+import { resolveCampaignTheme } from "../theme";
 import { getQueue } from "./index";
 import type { JobPayload } from "./types";
 
@@ -98,13 +99,19 @@ async function handleEmailJob(
   const roleTitle = candidate.campaign.role_title;
   const clientName = candidate.campaign.client?.name ?? "the company";
   const identity = brandEmailIdentity(candidate.campaign.client);
+  // Resolve the email theme once (CT1): an active campaign prefers its frozen
+  // snapshot; otherwise resolve live. The relation shape already matches the
+  // resolver's expected { theme_id, client: {…} }.
+  const emailTheme =
+    candidate.campaign.theme_snapshot?.email ??
+    (await resolveCampaignTheme(candidate.campaign)).email;
 
   switch (payload.emailKind) {
     case "application_received":
       await sendCandidateEmail(
         email,
         `Application received — ${roleTitle}`,
-        applicationReceivedEmail(name, roleTitle, clientName),
+        applicationReceivedEmail(emailTheme, name, roleTitle, clientName),
         candidateId,
         identity
       );
@@ -113,7 +120,7 @@ async function handleEmailJob(
       await sendCandidateEmail(
         email,
         `Good news — ${roleTitle}`,
-        gatingPassedEmail(name, roleTitle, clientName),
+        gatingPassedEmail(emailTheme, name, roleTitle, clientName),
         candidateId,
         identity
       );
@@ -122,7 +129,7 @@ async function handleEmailJob(
       await sendCandidateEmail(
         email,
         `Application update — ${roleTitle}`,
-        gatingFailedEmail(name, roleTitle, clientName),
+        gatingFailedEmail(emailTheme, name, roleTitle, clientName),
         candidateId,
         identity
       );
@@ -131,7 +138,7 @@ async function handleEmailJob(
       await sendCandidateEmail(
         email,
         `Application update — ${roleTitle}`,
-        rejectionEmail(name, roleTitle, clientName),
+        rejectionEmail(emailTheme, name, roleTitle, clientName),
         candidateId,
         identity
       );
@@ -149,7 +156,7 @@ async function handleEmailJob(
       await sendCandidateEmail(
         email,
         `Application update — ${roleTitle}`,
-        rejectionConfirmationEmail(name, roleTitle, clientName, payload.adminReason),
+        rejectionConfirmationEmail(emailTheme, name, roleTitle, clientName, payload.adminReason),
         candidateId,
         identity
       );
@@ -166,7 +173,7 @@ async function handleEmailJob(
       await sendCandidateEmail(
         email,
         `Application update — ${roleTitle}`,
-        noResponseEmail(name, roleTitle, clientName),
+        noResponseEmail(emailTheme, name, roleTitle, clientName),
         candidateId,
         identity
       );
@@ -220,11 +227,15 @@ async function handleChatInvitation(
     process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const chatUrl = `${appUrl}/c/${clientSlug}/${campaignSlug}/chat?t=${conversationId}`;
 
-  // Send invitation email
+  // Send invitation email — themed (CT1; snapshot preferred for active campaigns).
+  const emailTheme =
+    candidate.campaign.theme_snapshot?.email ??
+    (await resolveCampaignTheme(candidate.campaign)).email;
   await sendCandidateEmail(
     candidate.email,
     `We'd like to chat about your application — ${candidate.campaign.role_title}`,
     chatInvitationEmail(
+      emailTheme,
       candidate.name,
       candidate.campaign.role_title,
       clientName,
@@ -335,10 +346,14 @@ async function handleChatNudge(
     year: "numeric",
   });
 
+  const emailTheme =
+    candidate.campaign.theme_snapshot?.email ??
+    (await resolveCampaignTheme(candidate.campaign)).email;
   await sendCandidateEmail(
     candidate.email,
     `Reminder — ${candidate.campaign.role_title}`,
     chatNudgeEmail(
+      emailTheme,
       candidate.name,
       candidate.campaign.role_title,
       clientName,

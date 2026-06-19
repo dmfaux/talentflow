@@ -10,6 +10,7 @@ import {
 import { evaluateGating, GatingQuestion } from "@/lib/gating";
 import { getOrgStatus } from "@/lib/org-status";
 import { getQueue } from "@/lib/queue";
+import { resolveCampaignTheme } from "@/lib/theme";
 import { recordUsageEvent } from "@/lib/usage";
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
@@ -41,6 +42,13 @@ export async function POST(
         client_name: clients.name,
         brand_from_name: clients.from_name,
         brand_reply_to: clients.reply_to_email,
+        // Theme resolution inputs (CT1).
+        theme_id: campaigns.theme_id,
+        theme_snapshot: campaigns.theme_snapshot,
+        default_theme_id: clients.default_theme_id,
+        branding_logo_url: clients.branding_logo_url,
+        logo_background: clients.logo_background,
+        logo_position: clients.logo_position,
       })
       .from(campaigns)
       .innerJoin(clients, eq(campaigns.client_id, clients.id))
@@ -187,11 +195,28 @@ export async function POST(
       }
     }
 
+    // Resolve the email theme (CT1): an active campaign prefers its frozen
+    // snapshot; a campaign activated before CT1 (null snapshot) resolves live,
+    // which falls through to today's look unless a theme is set (CT3).
+    const emailTheme =
+      campaign.theme_snapshot?.email ??
+      (
+        await resolveCampaignTheme({
+          theme_id: campaign.theme_id,
+          client: {
+            default_theme_id: campaign.default_theme_id,
+            branding_logo_url: campaign.branding_logo_url,
+            logo_background: campaign.logo_background,
+            logo_position: campaign.logo_position,
+          },
+        })
+      ).email;
+
     // Immediate confirmation email (fire-and-forget is acceptable here)
     sendCandidateEmail(
       trimmedEmail,
       `Application received — ${roleTitle}`,
-      applicationReceivedEmail(candidateName, roleTitle, clientName),
+      applicationReceivedEmail(emailTheme, candidateName, roleTitle, clientName),
       candidateId,
       brandEmailIdentity({
         from_name: campaign.brand_from_name,

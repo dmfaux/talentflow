@@ -4,6 +4,7 @@ import { authorizeApiBrand, error, getApiTenant, success } from "@/lib/api";
 import { brandScope, orgScope, resolveOwnedResource } from "@/lib/tenant";
 import { validateSlug } from "@/lib/slug";
 import { validateHtmlTemplate } from "@/lib/slots";
+import { freezeCampaignTheme } from "@/lib/theme";
 import { recordUsageEvent } from "@/lib/usage";
 import { and, desc, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
@@ -147,6 +148,24 @@ export async function POST(request: NextRequest) {
         salary_range_max: body.salary_range_max ?? null,
       })
       .returning();
+
+    // Freeze the resolved theme at activation (CT1, RD-1) when a campaign is
+    // created already-active. A draft freezes later, on the draft→active PATCH.
+    // theme_id is always null in CT1 (the body doesn't accept it until CT3), so
+    // this resolves to the brand default / today's look. `brand` already carries
+    // default_theme_id + branding from resolveOwnedResource.
+    if (row.status === "active") {
+      const theme_snapshot = await freezeCampaignTheme({
+        theme_id: row.theme_id,
+        html_template: row.html_template,
+        client: brand,
+      });
+      await db
+        .update(campaigns)
+        .set({ theme_snapshot })
+        .where(eq(campaigns.id, row.id));
+      row.theme_snapshot = theme_snapshot;
+    }
 
     // Volume counter (S10, best-effort).
     recordUsageEvent({

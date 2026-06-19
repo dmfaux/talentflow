@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { campaigns, candidates } from "@/db/schema";
+import { campaigns, candidates, clients } from "@/db/schema";
 import {
   authorizeApiBrand,
   error,
@@ -9,6 +9,7 @@ import {
 import { orgScope, resolveOwnedResource } from "@/lib/tenant";
 import { validateSlug } from "@/lib/slug";
 import { validateHtmlTemplate } from "@/lib/slots";
+import { freezeCampaignTheme } from "@/lib/theme";
 import { and, eq, sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
@@ -136,7 +137,32 @@ export async function PATCH(
 
     // Auto-set timestamps on status transitions
     if (body.status && body.status !== existing.status) {
-      if (body.status === "active") updates.campaign_start = new Date();
+      if (body.status === "active") {
+        updates.campaign_start = new Date();
+        // Freeze the resolved theme on the draft→active transition (CT1, RD-1).
+        // Keyed on the transition (not on any active edit), so editing an
+        // already-active campaign never re-freezes; a genuine active→draft→active
+        // republish re-freezes the then-current theme. resolveOwnedResource did
+        // NOT eager-load the client, so load the theming columns separately. Use
+        // the post-update html_template (a publish PATCH may set it in the same
+        // request) so a tenant override is captured.
+        const client = await db.query.clients.findFirst({
+          where: eq(clients.id, existing.client_id),
+          columns: {
+            default_theme_id: true,
+            branding_logo_url: true,
+            logo_background: true,
+            logo_position: true,
+          },
+        });
+        updates.theme_snapshot = await freezeCampaignTheme({
+          theme_id: existing.theme_id,
+          html_template:
+            (updates.html_template as string | null | undefined) ??
+            existing.html_template,
+          client: client ?? null,
+        });
+      }
       if (body.status === "closed") updates.campaign_end = new Date();
     }
 

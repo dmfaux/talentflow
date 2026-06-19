@@ -225,6 +225,13 @@
       "when": 1781750104340,
       "tag": "0031_lean_sharon_ventura",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1781853390944,
+      "tag": "0032_stiff_roland_deschain",
+      "breakpoints": true
     }
   ]
 }

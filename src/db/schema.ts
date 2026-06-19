@@ -1,5 +1,7 @@
 import { relations, sql } from "drizzle-orm";
+import type { ThemeSnapshot } from "@/lib/theme";
 import {
+  type AnyPgColumn,
   boolean,
   index,
   integer,
@@ -72,6 +74,15 @@ export const clients = pgTable(
   brand_text_color: text("brand_text_color").default("#11123c"),
   logo_background: text("logo_background").default("light"),
   logo_position: text("logo_position").default("top-left"),
+  // Per-brand default campaign theme (Campaign Themes CT1). Nullable: a brand
+  // with no default inherits the gallery/default look. onDelete "set null" so a
+  // deleted theme degrades the brand to inheritance rather than orphaning it.
+  // The `: AnyPgColumn` annotation breaks the clients⟷themes circular-FK type
+  // inference cycle (themes.client_id → clients, clients.default_theme_id → themes).
+  default_theme_id: uuid("default_theme_id").references(
+    (): AnyPgColumn => themes.id,
+    { onDelete: "set null" }
+  ),
   notes: text("notes"),
     is_active: boolean("is_active").default(true),
     created_at: timestamp("created_at").defaultNow().notNull(),
@@ -82,6 +93,74 @@ export const clients = pgTable(
     index("clients_org_id_idx").on(table.org_id),
   ]
 );
+
+// ── Themes (Campaign Themes CT1) ────────────────────────────────────
+//
+// The baked look applied to a campaign's emails (CT1) and landing page (CT4).
+// A GALLERY theme (scope "gallery") has null org_id/client_id and is pickable by
+// every tenant; a CUSTOM theme (scope "custom") is org/brand-scoped and authored
+// by an operator (CT2). `palette` holds the EmailTheme palette keys; logo_url is
+// null on a gallery theme so it adopts the rendering brand's branding_logo_url
+// at resolve time. landing_html (CT4) and preview_image_url (CT2/CT3) are created
+// here but only consumed downstream. The resolver in src/lib/theme.ts is the sole
+// read point; CT1 ships with these columns dormant (no brand/campaign points at a
+// theme yet), so every campaign falls through to today's look.
+
+export const themes = pgTable(
+  "themes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    org_id: uuid("org_id").references(() => organizations.id, {
+      onDelete: "cascade",
+    }), // null = gallery
+    client_id: uuid("client_id").references((): AnyPgColumn => clients.id, {
+      onDelete: "cascade",
+    }), // null for gallery (annotation breaks the circular-FK type cycle)
+    name: text("name").notNull(),
+    scope: text("scope").notNull().default("gallery"), // "gallery" | "custom"
+    is_active: boolean("is_active").notNull().default(true),
+    palette: jsonb("palette").notNull(), // EmailTheme.palette keys (see resolver)
+    font_display: text("font_display").notNull(),
+    font_sans: text("font_sans").notNull(),
+    logo_url: text("logo_url"), // null → adopt rendering brand's branding_logo_url
+    logo_background: text("logo_background").notNull().default("light"),
+    logo_position: text("logo_position").notNull().default("top-left"),
+    show_powered_by: boolean("show_powered_by").notNull().default(true),
+    landing_html: text("landing_html"), // CT4 consumes
+    preview_image_url: text("preview_image_url"), // CT2/CT3 consume
+    created_by: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("themes_org_id_idx").on(table.org_id),
+    index("themes_client_id_idx").on(table.client_id),
+  ]
+);
+
+export const themesRelations = relations(themes, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [themes.org_id],
+    references: [organizations.id],
+  }),
+  // The brand a CUSTOM theme belongs to (themes.client_id). Distinct relation
+  // from clients.defaultTheme (clients.default_theme_id → themes) — there are two
+  // FK links between clients and themes, so each logical relation declares both
+  // ends with a matching relationName to disambiguate.
+  client: one(clients, {
+    fields: [themes.client_id],
+    references: [clients.id],
+    relationName: "brandCustomThemes",
+  }),
+  // Reverse of clients.defaultTheme — a theme may be the default for many brands.
+  defaultForBrands: many(clients, { relationName: "brandDefaultTheme" }),
+  creator: one(users, {
+    fields: [themes.created_by],
+    references: [users.id],
+  }),
+}));
 
 // ── Memberships (per-brand role for a user) ─────────────────────────
 
@@ -137,6 +216,14 @@ export const campaigns = pgTable(
     salary_range_max: integer("salary_range_max"),
     chat_lifecycle: text("chat_lifecycle").notNull().default("dormant"),
     ghost_ttl_days: integer("ghost_ttl_days").notNull().default(10),
+    // Campaign Themes CT1. theme_id is a campaign-level override of the brand
+    // default (set in CT3); onDelete "set null" degrades to inheritance.
+    // theme_snapshot freezes the resolved look at activation (RD-1) so editing a
+    // theme never changes a live campaign — null while draft.
+    theme_id: uuid("theme_id").references(() => themes.id, {
+      onDelete: "set null",
+    }),
+    theme_snapshot: jsonb("theme_snapshot").$type<ThemeSnapshot>(),
     created_at: timestamp("created_at").defaultNow().notNull(),
     updated_at: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -529,6 +616,16 @@ export const clientsRelations = relations(clients, ({ one, many }) => ({
   }),
   campaigns: many(campaigns),
   memberships: many(memberships),
+  // The brand's default theme (CT1; clients.default_theme_id → themes). Distinct
+  // relationName from the themes.client edge (themes.client_id → clients), which
+  // is the reverse-direction "custom theme owned by brand" link.
+  defaultTheme: one(themes, {
+    fields: [clients.default_theme_id],
+    references: [themes.id],
+    relationName: "brandDefaultTheme",
+  }),
+  // Reverse of themes.client — a brand owns many custom themes.
+  customThemes: many(themes, { relationName: "brandCustomThemes" }),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -557,6 +654,11 @@ export const campaignsRelations = relations(campaigns, ({ one, many }) => ({
   }),
   candidates: many(candidates),
   events: many(events),
+  // Campaign-level theme override (CT1; set in CT3).
+  theme: one(themes, {
+    fields: [campaigns.theme_id],
+    references: [themes.id],
+  }),
 }));
 
 export const candidatesRelations = relations(candidates, ({ one, many }) => ({

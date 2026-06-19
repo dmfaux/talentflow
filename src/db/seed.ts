@@ -636,6 +636,9 @@ export async function seed(db: Db): Promise<SeedSummary> {
   await db.delete(schema.invitations);
   await db.delete(schema.memberships);
   await db.delete(schema.passwordResetTokens);
+  // Themes (CT1) — gallery rows have null org_id/client_id so they do NOT cascade
+  // when clients/orgs are dropped; clear them explicitly for a clean rebuild.
+  await db.delete(schema.themes);
   // Keep operators; drop all tenant users (operator_audit only references
   // operators, so this never trips its not-null set-null FK).
   await db.delete(schema.users).where(eq(schema.users.is_operator, false));
@@ -722,6 +725,7 @@ export async function seed(db: Db): Promise<SeedSummary> {
     where: eq(schema.users.email, operatorDef.email),
     columns: { id: true },
   });
+  let operatorId: string;
   if (!existingOperator) {
     const [inserted] = await db
       .insert(schema.users)
@@ -741,12 +745,14 @@ export async function seed(db: Db): Promise<SeedSummary> {
         `Operator ${operatorDef.email} was created with a non-NULL org_id; expected an explicit NULL org binding.`
       );
     }
+    operatorId = inserted.id;
   } else {
     // Keep the credential current on a re-run.
     await db
       .update(schema.users)
       .set({ password_hash: passwordHash, is_active: true })
       .where(eq(schema.users.id, existingOperator.id));
+    operatorId = existingOperator.id;
   }
 
   // Tenant users — the shared email appears twice (different org_id), one active
@@ -784,6 +790,38 @@ export async function seed(db: Db): Promise<SeedSummary> {
   console.log(
     `Users: ${tenantDefs.length} tenant + 1 operator; Memberships: ${membershipRows.length}\n`
   );
+
+  // ── Gallery theme (Campaign Themes CT1) ──
+  // One pickable gallery default reproducing today's TalentStream look (palette =
+  // the in-code DEFAULT_EMAIL_THEME). CT1 does NOT point any brand's
+  // default_theme_id at it — that is CT3; it exists so tenants have a pickable
+  // default from day one. Literals are duplicated here (not imported from
+  // lib/theme) because the seed runs under tsx, which does not resolve the `@/`
+  // alias that lib/theme depends on. created_by references the operator.
+  await db.insert(schema.themes).values({
+    org_id: null,
+    client_id: null,
+    name: "TalentStream Classic",
+    scope: "gallery",
+    is_active: true,
+    palette: {
+      bg: "#f0f3f7", card: "#ffffff", primary: "#2c5bff", primaryDeep: "#1a45d4",
+      primaryTint: "#e8eeff", accent: "#05dbd6", ink: "#11123c", inkSoft: "#2f3941",
+      inkMuted: "#5a6b7a", inkFaint: "#9fb5c4", border: "#d1dce6",
+    },
+    font_display:
+      "'Instrument Serif', Georgia, 'Times New Roman', 'DejaVu Serif', serif",
+    font_sans:
+      "'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+    logo_url: null,
+    logo_background: "light",
+    logo_position: "top-left",
+    show_powered_by: true,
+    landing_html: null,
+    preview_image_url: null,
+    created_by: operatorId,
+  });
+  console.log("Gallery themes: 1 (TalentStream Classic)\n");
 
   // Accumulator for metered usage events (awaited + batched at the end).
   const usageEventsToInsert: (typeof schema.usageEvents.$inferInsert)[] = [];

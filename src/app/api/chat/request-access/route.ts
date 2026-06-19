@@ -2,8 +2,13 @@ import { db } from "@/db";
 import { campaigns, candidates, chatTokens, clients } from "@/db/schema";
 import { generateMagicLinkToken } from "@/lib/chat-auth";
 import { getActiveConversation } from "@/lib/chat";
-import { chatAccessEmail, sendCandidateEmail } from "@/lib/email";
+import {
+  brandEmailIdentity,
+  chatAccessEmail,
+  sendCandidateEmail,
+} from "@/lib/email";
 import { getOrgStatus } from "@/lib/org-status";
+import { resolveCampaignTheme } from "@/lib/theme";
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -27,6 +32,15 @@ export async function POST(request: NextRequest) {
         org_id: candidates.org_id,
         name: candidates.name,
         role_title: campaigns.role_title,
+        // Theme resolution + brand identity inputs (CT1).
+        theme_id: campaigns.theme_id,
+        theme_snapshot: campaigns.theme_snapshot,
+        default_theme_id: clients.default_theme_id,
+        branding_logo_url: clients.branding_logo_url,
+        logo_background: clients.logo_background,
+        logo_position: clients.logo_position,
+        brand_from_name: clients.from_name,
+        brand_reply_to: clients.reply_to_email,
       })
       .from(candidates)
       .innerJoin(campaigns, eq(candidates.campaign_id, campaigns.id))
@@ -78,12 +92,34 @@ export async function POST(request: NextRequest) {
       : `/c/${clientSlug}/${campaignSlug}/chat`;
     const magicLinkUrl = `${origin}/api/chat/verify?token=${token.raw}&redirect=${encodeURIComponent(redirect)}`;
 
-    // Send email
+    // Resolve the email theme (CT1): prefer the active campaign's snapshot,
+    // else resolve live (gallery/default → today's look).
+    const emailTheme =
+      candidate.theme_snapshot?.email ??
+      (
+        await resolveCampaignTheme({
+          theme_id: candidate.theme_id,
+          client: {
+            default_theme_id: candidate.default_theme_id,
+            branding_logo_url: candidate.branding_logo_url,
+            logo_background: candidate.logo_background,
+            logo_position: candidate.logo_position,
+          },
+        })
+      ).email;
+
+    // Send email — now themed and carrying the per-brand identity (the only
+    // candidate email that previously omitted it). Deliverability-safe: only the
+    // From display name changes; the verified envelope-from is retained.
     await sendCandidateEmail(
       trimmedEmail,
       `Verify your identity — ${candidate.role_title}`,
-      chatAccessEmail(candidate.name, candidate.role_title, magicLinkUrl),
-      candidate.id
+      chatAccessEmail(emailTheme, candidate.name, candidate.role_title, magicLinkUrl),
+      candidate.id,
+      brandEmailIdentity({
+        from_name: candidate.brand_from_name,
+        reply_to_email: candidate.brand_reply_to,
+      })
     );
 
     return successResponse;

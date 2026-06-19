@@ -1,5 +1,6 @@
 import { db } from "@/db";
 import { candidates, messages } from "@/db/schema";
+import { DEFAULT_EMAIL_THEME, type EmailTheme } from "@/lib/theme";
 import { recordUsageEvent } from "@/lib/usage";
 import { eq } from "drizzle-orm";
 
@@ -190,79 +191,9 @@ export async function sendCandidateEmail(
 
 // ── Email templates ──────────────────────────────────────────────────
 
-/* Brand palette — cobalt primary, vermillion accent, cream surface, charcoal ink.
- * Kept in lockstep with src/app/globals.css --color-* tokens so email visuals
- * stay aligned with the in-app brand. */
-const C = {
-  bg: "#f0f3f7", // cream — canvas
-  card: "#ffffff", // paper
-  cobalt: "#2c5bff", // primary, CTAs, links
-  cobaltDeep: "#1a45d4", // button hover / second-layer
-  cobaltTint: "#e8eeff", // info card fill
-  vermillion: "#05dbd6", // editorial accent for eyebrow labels
-  ink: "#11123c", // primary text
-  inkSoft: "#2f3941", // secondary text / body
-  inkMuted: "#5a6b7a", // notes / helper text
-  inkFaint: "#9fb5c4", // footer
-  border: "#d1dce6", // rules
-} as const;
-
-/* Font stacks — Google fonts aren't reliably loaded across email clients, so
- * these stacks fall back to widely-available system equivalents that match the
- * in-app feel (editorial serif headlines, clean sans body). */
-const FONT_DISPLAY =
-  "'Instrument Serif', Georgia, 'Times New Roman', 'DejaVu Serif', serif";
-const FONT_SANS =
-  "'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif";
-
-function emailHeading(label: string, title: string): string {
-  return `
-    <p style="margin:0 0 10px;font-family:${FONT_SANS};font-size:11px;text-transform:uppercase;letter-spacing:0.16em;color:${C.cobalt};font-weight:600;">
-      <span style="display:inline-block;width:18px;height:1px;background-color:${C.vermillion};vertical-align:middle;margin-right:10px;"></span>${label}
-    </p>
-    <h1 class="ts-headline" style="margin:0 0 24px;font-family:${FONT_DISPLAY};font-size:30px;color:${C.ink};font-weight:400;line-height:1.12;letter-spacing:-0.015em;">${title}</h1>`;
-}
-
-function emailP(html: string, last = false): string {
-  return `<p style="margin:0${last ? "" : " 0 16px"};font-family:${FONT_SANS};font-size:15px;color:${C.inkSoft};line-height:1.7;">${html}</p>`;
-}
-
-function emailNote(html: string): string {
-  return `<p style="margin:20px 0 0;padding-top:18px;border-top:1px solid ${C.border};font-family:${FONT_SANS};font-size:13px;color:${C.inkMuted};line-height:1.65;">${html}</p>`;
-}
-
-function emailBtn(text: string, url: string): string {
-  return `
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 4px;">
-      <tr><td style="background-color:${C.cobalt};border-radius:8px;">
-        <a href="${url}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-family:${FONT_SANS};font-size:14px;font-weight:600;letter-spacing:0.01em;">${text}&ensp;&#8594;</a>
-      </td></tr>
-    </table>`;
-}
-
-function emailInfoCard(items: [string, string][]): string {
-  const rows = items
-    .map(
-      ([label, value], i) => `
-    <p style="margin:0 0 3px;font-family:${FONT_SANS};font-size:10px;text-transform:uppercase;letter-spacing:0.14em;color:${C.inkMuted};font-weight:600;">${label}</p>
-    <p style="margin:0${i < items.length - 1 ? " 0 14px" : ""};font-family:${FONT_DISPLAY};font-size:18px;color:${C.ink};line-height:1.3;">${value}</p>`
-    )
-    .join("");
-
-  return `
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:22px 0 6px;">
-      <tr>
-        <td width="3" style="background-color:${C.cobalt};border-radius:2px 0 0 2px;font-size:0;line-height:0;">&nbsp;</td>
-        <td style="padding:18px 22px;background-color:${C.cobaltTint};border-radius:0 4px 4px 0;">
-          ${rows}
-        </td>
-      </tr>
-    </table>`;
-}
-
 /** Minimal HTML escape for admin-supplied free text that is embedded in email
  *  bodies. Covers the five characters that matter inside HTML attribute and
- *  element content contexts. */
+ *  element content contexts. Pure (theme-independent) → stays module-level. */
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -272,23 +203,106 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function emailFallbackLink(url: string): string {
-  return `<p style="margin:14px 0 0;font-family:${FONT_SANS};font-size:12px;color:${C.inkMuted};line-height:1.55;">
-    If the button doesn&rsquo;t work, copy this link into your browser:<br>
-    <a href="${url}" style="color:${C.cobalt};word-break:break-all;text-decoration:underline;">${url}</a>
-  </p>`;
-}
+/**
+ * Build a theme-bound email kit. Every helper closes over `theme`, reading
+ * `P.x` (= `theme.palette.x`) and the font stacks where the old module-level
+ * `C`/`FONT_*` constants were read. The palette keys rename the old `C` keys —
+ * cobalt→primary, cobaltDeep→primaryDeep, cobaltTint→primaryTint,
+ * vermillion→accent — with identical hex values, so under DEFAULT_EMAIL_THEME
+ * every template is byte-identical to its pre-CT1 output (locked by the email
+ * snapshot test). FONT_DISPLAY/FONT_SANS are local aliases of the theme fonts so
+ * those interpolations stay untouched.
+ */
+function makeEmailKit(theme: EmailTheme) {
+  const P = theme.palette;
+  const FONT_DISPLAY = theme.fontDisplay;
+  const FONT_SANS = theme.fontSans;
 
-/* Email-safe wordmark + mark built from HTML tables, since SVG is inconsistent
- * across clients (Gmail in particular strips inline SVG). The mark is a 4-bar
- * descending funnel (cobalt) tied to the in-app Logo component, followed by the
- * lowercase "talentstream" wordmark with "stream" in cobalt. */
-function brandHeader(): string {
-  const bar = (width: number, opacity: string) =>
-    `<tr><td height="3" width="${width}" style="background-color:${C.cobalt};opacity:${opacity};border-radius:2px;font-size:0;line-height:3px;mso-line-height-rule:exactly;">&nbsp;</td><td style="font-size:0;line-height:0;">&nbsp;</td></tr>
+  function emailHeading(label: string, title: string): string {
+    return `
+    <p style="margin:0 0 10px;font-family:${FONT_SANS};font-size:11px;text-transform:uppercase;letter-spacing:0.16em;color:${P.primary};font-weight:600;">
+      <span style="display:inline-block;width:18px;height:1px;background-color:${P.accent};vertical-align:middle;margin-right:10px;"></span>${label}
+    </p>
+    <h1 class="ts-headline" style="margin:0 0 24px;font-family:${FONT_DISPLAY};font-size:30px;color:${P.ink};font-weight:400;line-height:1.12;letter-spacing:-0.015em;">${title}</h1>`;
+  }
+
+  function emailP(html: string, last = false): string {
+    return `<p style="margin:0${last ? "" : " 0 16px"};font-family:${FONT_SANS};font-size:15px;color:${P.inkSoft};line-height:1.7;">${html}</p>`;
+  }
+
+  function emailNote(html: string): string {
+    return `<p style="margin:20px 0 0;padding-top:18px;border-top:1px solid ${P.border};font-family:${FONT_SANS};font-size:13px;color:${P.inkMuted};line-height:1.65;">${html}</p>`;
+  }
+
+  function emailBtn(text: string, url: string): string {
+    return `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 4px;">
+      <tr><td style="background-color:${P.primary};border-radius:8px;">
+        <a href="${url}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-family:${FONT_SANS};font-size:14px;font-weight:600;letter-spacing:0.01em;">${text}&ensp;&#8594;</a>
+      </td></tr>
+    </table>`;
+  }
+
+  function emailInfoCard(items: [string, string][]): string {
+    const rows = items
+      .map(
+        ([label, value], i) => `
+    <p style="margin:0 0 3px;font-family:${FONT_SANS};font-size:10px;text-transform:uppercase;letter-spacing:0.14em;color:${P.inkMuted};font-weight:600;">${label}</p>
+    <p style="margin:0${i < items.length - 1 ? " 0 14px" : ""};font-family:${FONT_DISPLAY};font-size:18px;color:${P.ink};line-height:1.3;">${value}</p>`
+      )
+      .join("");
+
+    return `
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:22px 0 6px;">
+      <tr>
+        <td width="3" style="background-color:${P.primary};border-radius:2px 0 0 2px;font-size:0;line-height:0;">&nbsp;</td>
+        <td style="padding:18px 22px;background-color:${P.primaryTint};border-radius:0 4px 4px 0;">
+          ${rows}
+        </td>
+      </tr>
+    </table>`;
+  }
+
+  function emailFallbackLink(url: string): string {
+    return `<p style="margin:14px 0 0;font-family:${FONT_SANS};font-size:12px;color:${P.inkMuted};line-height:1.55;">
+    If the button doesn&rsquo;t work, copy this link into your browser:<br>
+    <a href="${url}" style="color:${P.primary};word-break:break-all;text-decoration:underline;">${url}</a>
+  </p>`;
+  }
+
+  /* Brand header. When the theme carries a logo (a bespoke theme, or a gallery/
+   * default theme that adopted the rendering brand's logo), render it as an
+   * <img> — sized (~44px), aligned by logo.position, with a dark surface only
+   * when logo.background is "dark", and no border/shadow (mirrors
+   * prompt-builder.ts:132-141). When logo is null (the DEFAULT_EMAIL_THEME path),
+   * render the email-safe TalentStream funnel wordmark unchanged — SVG is
+   * inconsistent across clients (Gmail strips inline SVG), so the mark is a 4-bar
+   * descending funnel built from tables, followed by the lowercase wordmark. */
+  function brandHeader(): string {
+    if (theme.logo) {
+      const pos = theme.logo.position.toLowerCase();
+      const align = pos.includes("right")
+        ? "right"
+        : pos.includes("cent")
+          ? "center"
+          : "left";
+      const cellStyle =
+        theme.logo.background === "dark"
+          ? ` style="padding:10px 14px;background-color:${P.ink};border-radius:6px;"`
+          : "";
+      return `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="${align}" style="border-collapse:separate;">
+      <tr><td${cellStyle}>
+        <img src="${theme.logo.url}" alt="Logo" style="display:block;max-height:44px;width:auto;border:0;outline:none;text-decoration:none;">
+      </td></tr>
+    </table>`;
+    }
+
+    const bar = (width: number, opacity: string) =>
+      `<tr><td height="3" width="${width}" style="background-color:${P.primary};opacity:${opacity};border-radius:2px;font-size:0;line-height:3px;mso-line-height-rule:exactly;">&nbsp;</td><td style="font-size:0;line-height:0;">&nbsp;</td></tr>
     <tr><td height="3" colspan="2" style="font-size:0;line-height:3px;mso-line-height-rule:exactly;">&nbsp;</td></tr>`;
 
-  return `
+    return `
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;">
       <tr>
         <!-- Mark: 4 descending cobalt bars = candidate funnel -->
@@ -298,25 +312,31 @@ function brandHeader(): string {
             ${bar(20, "0.78")}
             ${bar(13, "0.58")}
             <tr>
-              <td height="3" width="7" style="background-color:${C.cobalt};opacity:0.4;border-radius:2px;font-size:0;line-height:3px;mso-line-height-rule:exactly;">&nbsp;</td>
+              <td height="3" width="7" style="background-color:${P.primary};opacity:0.4;border-radius:2px;font-size:0;line-height:3px;mso-line-height-rule:exactly;">&nbsp;</td>
               <td valign="middle" style="padding-left:3px;font-size:0;line-height:0;">
-                <span style="display:inline-block;width:5px;height:5px;border-radius:50%;background-color:${C.vermillion};"></span>
+                <span style="display:inline-block;width:5px;height:5px;border-radius:50%;background-color:${P.accent};"></span>
               </td>
             </tr>
           </table>
         </td>
         <!-- Wordmark -->
         <td valign="middle">
-          <span style="font-family:${FONT_SANS};font-size:19px;font-weight:700;letter-spacing:-0.03em;color:${C.ink};line-height:1;">
-            talent<span style="color:${C.cobalt};">stream</span>
+          <span style="font-family:${FONT_SANS};font-size:19px;font-weight:700;letter-spacing:-0.03em;color:${P.ink};line-height:1;">
+            talent<span style="color:${P.primary};">stream</span>
           </span>
         </td>
       </tr>
     </table>`;
-}
+  }
 
-function wrapTemplate(body: string): string {
-  return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+  function wrapTemplate(body: string): string {
+    // Footer: the powered-by attribution only when the theme allows it; a
+    // white-label theme (show_powered_by false) drops it for a neutral line.
+    const footerText = theme.showPoweredBy
+      ? `Sent by TalentStream&ensp;&middot;&ensp;AI-powered recruitment campaigns<br>
+            Automated message &mdash; please do not reply`
+      : `Automated message &mdash; please do not reply`;
+    return `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
   <meta charset="utf-8">
@@ -335,7 +355,7 @@ function wrapTemplate(body: string): string {
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
     img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }
-    a { color:${C.cobalt}; }
+    a { color:${P.primary}; }
     @media (max-width: 620px) {
       .ts-card { width:100% !important; max-width:100% !important; }
       .ts-pad { padding-left:28px !important; padding-right:28px !important; }
@@ -343,21 +363,21 @@ function wrapTemplate(body: string): string {
     }
   </style>
 </head>
-<body style="margin:0;padding:0;background-color:${C.bg};-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${C.bg};">
+<body style="margin:0;padding:0;background-color:${P.bg};-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${P.bg};">
     <tr><td align="center" style="padding:56px 16px;">
 
       <table role="presentation" class="ts-card" width="580" cellpadding="0" cellspacing="0" border="0" style="max-width:580px;width:100%;">
 
         <!-- Top accent bar — cobalt -->
-        <tr><td style="height:3px;background-color:${C.cobalt};border-radius:6px 6px 0 0;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</td></tr>
+        <tr><td style="height:3px;background-color:${P.primary};border-radius:6px 6px 0 0;font-size:0;line-height:0;mso-line-height-rule:exactly;">&nbsp;</td></tr>
 
         <!-- Card -->
-        <tr><td style="background:${C.card};border-left:1px solid ${C.border};border-right:1px solid ${C.border};border-bottom:1px solid ${C.border};border-radius:0 0 6px 6px;">
+        <tr><td style="background:${P.card};border-left:1px solid ${P.border};border-right:1px solid ${P.border};border-bottom:1px solid ${P.border};border-radius:0 0 6px 6px;">
 
           <!-- Brand header -->
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-            <tr><td class="ts-pad" style="padding:26px 44px 24px;border-bottom:1px solid ${C.border};">
+            <tr><td class="ts-pad" style="padding:26px 44px 24px;border-bottom:1px solid ${P.border};">
               ${brandHeader()}
             </td></tr>
           </table>
@@ -375,9 +395,8 @@ function wrapTemplate(body: string): string {
       <!-- Footer -->
       <table role="presentation" width="580" cellpadding="0" cellspacing="0" border="0" style="max-width:580px;width:100%;">
         <tr><td style="padding:22px 44px;text-align:center;">
-          <p style="margin:0;font-family:${FONT_SANS};font-size:11px;color:${C.inkFaint};line-height:1.55;letter-spacing:0.02em;">
-            Sent by TalentStream&ensp;&middot;&ensp;AI-powered recruitment campaigns<br>
-            Automated message &mdash; please do not reply
+          <p style="margin:0;font-family:${FONT_SANS};font-size:11px;color:${P.inkFaint};line-height:1.55;letter-spacing:0.02em;">
+            ${footerText}
           </p>
         </td></tr>
       </table>
@@ -386,13 +405,28 @@ function wrapTemplate(body: string): string {
   </table>
 </body>
 </html>`;
+  }
+
+  return {
+    wrapTemplate,
+    emailHeading,
+    emailP,
+    emailNote,
+    emailBtn,
+    emailInfoCard,
+    emailFallbackLink,
+    brandHeader,
+  };
 }
 
 export function applicationReceivedEmail(
+  theme: EmailTheme,
   candidateName: string,
   roleTitle: string,
   clientName: string
 ): string {
+  const { wrapTemplate, emailHeading, emailP, emailInfoCard, emailNote } =
+    makeEmailKit(theme);
   return wrapTemplate(`
     ${emailHeading("Confirmation", "We&rsquo;ve got your application")}
     ${emailP(`Hi ${candidateName},`)}
@@ -403,10 +437,12 @@ export function applicationReceivedEmail(
 }
 
 export function gatingPassedEmail(
+  theme: EmailTheme,
   candidateName: string,
   roleTitle: string,
   clientName: string
 ): string {
+  const { wrapTemplate, emailHeading, emailP, emailNote } = makeEmailKit(theme);
   return wrapTemplate(`
     ${emailHeading("Good news", "You&rsquo;re moving forward")}
     ${emailP(`Hi ${candidateName},`)}
@@ -419,6 +455,9 @@ export function passwordResetEmail(
   firstName: string,
   resetUrl: string
 ): string {
+  // Non-campaign template: always the default theme, never parameterised.
+  const { wrapTemplate, emailHeading, emailP, emailBtn, emailNote } =
+    makeEmailKit(DEFAULT_EMAIL_THEME);
   return wrapTemplate(`
     ${emailHeading("Account security", "Reset your password")}
     ${emailP(`Hi ${firstName},`)}
@@ -440,6 +479,9 @@ export function invitationEmail(
   const intro = inviter
     ? `<strong>${inviter}</strong> has invited you to join <strong>${org}</strong> on TalentStream.`
     : `You&rsquo;ve been invited to join <strong>${org}</strong> on TalentStream.`;
+  // Non-campaign template: always the default theme, never parameterised.
+  const { wrapTemplate, emailHeading, emailP, emailBtn, emailFallbackLink, emailNote } =
+    makeEmailKit(DEFAULT_EMAIL_THEME);
   return wrapTemplate(`
     ${emailHeading("Invitation", "You&rsquo;ve been invited")}
     ${emailP(intro)}
@@ -451,10 +493,12 @@ export function invitationEmail(
 }
 
 export function gatingFailedEmail(
+  theme: EmailTheme,
   candidateName: string,
   roleTitle: string,
   clientName: string
 ): string {
+  const { wrapTemplate, emailHeading, emailP, emailNote } = makeEmailKit(theme);
   return wrapTemplate(`
     ${emailHeading("Application update", "Thank you for applying")}
     ${emailP(`Hi ${candidateName},`)}
@@ -464,10 +508,12 @@ export function gatingFailedEmail(
 }
 
 export function rejectionEmail(
+  theme: EmailTheme,
   candidateName: string,
   roleTitle: string,
   clientName: string
 ): string {
+  const { wrapTemplate, emailHeading, emailP, emailNote } = makeEmailKit(theme);
   return wrapTemplate(`
     ${emailHeading("Application update", "Thank you for your interest")}
     ${emailP(`Hi ${candidateName},`)}
@@ -477,11 +523,14 @@ export function rejectionEmail(
 }
 
 export function chatInvitationEmail(
+  theme: EmailTheme,
   candidateName: string,
   roleTitle: string,
   clientName: string,
   chatUrl: string
 ): string {
+  const { wrapTemplate, emailHeading, emailP, emailInfoCard, emailBtn, emailFallbackLink } =
+    makeEmailKit(theme);
   return wrapTemplate(`
     ${emailHeading("Next step", "We&rsquo;d like to chat")}
     ${emailP(`Hi ${candidateName},`)}
@@ -493,10 +542,13 @@ export function chatInvitationEmail(
 }
 
 export function chatAccessEmail(
+  theme: EmailTheme,
   candidateName: string,
   roleTitle: string,
   magicLinkUrl: string
 ): string {
+  const { wrapTemplate, emailHeading, emailP, emailBtn, emailNote } =
+    makeEmailKit(theme);
   return wrapTemplate(`
     ${emailHeading("Verification", "Confirm your identity")}
     ${emailP(`Hi ${candidateName},`)}
@@ -512,12 +564,15 @@ export function chatAccessEmail(
  *  Honest, not an ultimatum — frames the close as "we'll assume you're no
  *  longer interested", matching the blameless no_response terminal state. */
 export function chatNudgeEmail(
+  theme: EmailTheme,
   candidateName: string,
   roleTitle: string,
   clientName: string,
   chatUrl: string,
   closeByDate: string
 ): string {
+  const { wrapTemplate, emailHeading, emailP, emailBtn, emailFallbackLink } =
+    makeEmailKit(theme);
   return wrapTemplate(`
     ${emailHeading("Reminder", "We&rsquo;d still love to hear from you")}
     ${emailP(`Hi ${candidateName},`)}
@@ -533,10 +588,12 @@ export function chatNudgeEmail(
  *  the application is being closed. Kept distinct from rejectionEmail so the
  *  candidate understands no evaluation decision was made. */
 export function noResponseEmail(
+  theme: EmailTheme,
   candidateName: string,
   roleTitle: string,
   clientName: string
 ): string {
+  const { wrapTemplate, emailHeading, emailP, emailNote } = makeEmailKit(theme);
   return wrapTemplate(`
     ${emailHeading("Application update", "We&rsquo;ve closed your application")}
     ${emailP(`Hi ${candidateName},`)}
@@ -551,11 +608,13 @@ export function noResponseEmail(
  *  conversation. Admin's optional reason is rendered verbatim after HTML
  *  escaping. */
 export function rejectionConfirmationEmail(
+  theme: EmailTheme,
   candidateName: string,
   roleTitle: string,
   clientName: string,
   adminReason?: string
 ): string {
+  const { wrapTemplate, emailHeading, emailP, emailNote } = makeEmailKit(theme);
   const cleaned = adminReason?.trim();
   const reasonBlock = cleaned
     ? emailP(`They asked us to share the following note: &ldquo;${escapeHtml(cleaned)}&rdquo;`)
