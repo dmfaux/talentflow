@@ -9,7 +9,7 @@ import {
 import { orgScope, resolveOwnedResource } from "@/lib/tenant";
 import { validateSlug } from "@/lib/slug";
 import { validateHtmlTemplate } from "@/lib/slots";
-import { freezeCampaignTheme } from "@/lib/theme";
+import { assertThemeAvailableForBrand, freezeCampaignTheme } from "@/lib/theme";
 import { and, eq, sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
@@ -135,6 +135,26 @@ export async function PATCH(
       }
     }
 
+    // Campaign-level theme override (CT3). `null` inherits the brand default at
+    // render; a non-null id must be in THIS campaign's brand availability set.
+    // Validated here (not via allowedFields) and resolved before the freeze below
+    // so a publish-with-theme PATCH freezes the new override.
+    if (body.theme_id !== undefined) {
+      if (body.theme_id === null) {
+        updates.theme_id = null;
+      } else if (typeof body.theme_id !== "string" || !body.theme_id.trim()) {
+        return error("theme_id must be a theme id or null");
+      } else {
+        const themeId = body.theme_id.trim();
+        const verdict = await assertThemeAvailableForBrand(themeId, {
+          id: existing.client_id,
+          org_id: existing.org_id,
+        });
+        if (verdict) return error(verdict.message, verdict.status);
+        updates.theme_id = themeId;
+      }
+    }
+
     // Auto-set timestamps on status transitions
     if (body.status && body.status !== existing.status) {
       if (body.status === "active") {
@@ -156,7 +176,12 @@ export async function PATCH(
           },
         });
         updates.theme_snapshot = await freezeCampaignTheme({
-          theme_id: existing.theme_id,
+          // A publish PATCH may set theme_id in the same request — prefer the
+          // in-request value (incl. an explicit null) over the stored one.
+          theme_id:
+            "theme_id" in updates
+              ? (updates.theme_id as string | null)
+              : existing.theme_id,
           html_template:
             (updates.html_template as string | null | undefined) ??
             existing.html_template,

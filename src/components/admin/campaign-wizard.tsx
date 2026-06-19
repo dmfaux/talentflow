@@ -7,6 +7,7 @@ import { buildTemplatePrompt, type BrandColors } from "@/lib/prompt-builder";
 import { validateHtmlTemplate, replaceSlots, type SlotData } from "@/lib/slots";
 import { renderMarkdown } from "@/lib/markdown";
 import { useTenant } from "./tenant-provider";
+import { ThemeCard, type Theme } from "./theme-card";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -32,6 +33,8 @@ interface Client {
   id: string;
   slug: string;
   name: string;
+  tier: string | null;
+  default_theme_id: string | null;
   branding_logo_url: string | null;
   brand_primary_color: string | null;
   brand_secondary_color: string | null;
@@ -40,6 +43,7 @@ interface Client {
   logo_background: string | null;
   logo_position: string | null;
 }
+
 
 interface GatingOption {
   value: string;
@@ -73,6 +77,8 @@ export interface FormData {
   ghost_ttl_days: number;
   html_template: string;
   design_brief: string;
+  /** Campaign-level theme override; null inherits the brand default (CT3). */
+  theme_id: string | null;
 }
 
 const STEPS = ["Basics", "Gating Questions", "Scoring Rubric", "Landing Page", "Review"] as const;
@@ -102,6 +108,7 @@ const INITIAL: FormData = {
   ghost_ttl_days: 10,
   html_template: "",
   design_brief: "",
+  theme_id: null,
 };
 
 function slugify(s: string) {
@@ -163,12 +170,32 @@ export function CampaignWizard({
   const [promptCopied, setPromptCopied] = useState(false);
   const [htmlValidation, setHtmlValidation] = useState<{ ok: boolean; errors?: string[] } | null>(null);
   const [previewDevice, setPreviewDevice] = useState<"desktop" | "mobile">("desktop");
+  // Theme step state (CT3): availability feed for the campaign's brand.
+  const [themes, setThemes] = useState<Theme[]>([]);
 
   useEffect(() => {
     fetch("/api/admin/clients")
       .then((r) => r.json())
       .then((res) => setClients(res.data ?? []));
   }, []);
+
+  // Theme availability for the campaign's brand (gallery ∪ this brand's bespoke).
+  // Scoped by brand_id so edit mode (whose campaign brand may differ from the
+  // active brand) lists the right set.
+  useEffect(() => {
+    if (!form.client_id) {
+      setThemes([]);
+      return;
+    }
+    const controller = new AbortController();
+    fetch(`/api/admin/themes?brand_id=${form.client_id}`, { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((res) => setThemes(res.data ?? []))
+      .catch((err) => {
+        if (err.name !== "AbortError") setThemes([]);
+      });
+    return () => controller.abort();
+  }, [form.client_id]);
 
   // Create mode: bind the form's brand to the active-brand context (and follow
   // header brand switches). "All brands"/none → empty, which blocks step 0.
@@ -479,6 +506,8 @@ export function CampaignWizard({
       ghost_ttl_days: form.ghost_ttl_days,
       html_template: form.html_template || null,
       design_brief: form.design_brief || null,
+      // null = inherit the brand default at render (CT3, RD-2).
+      theme_id: form.theme_id,
       status,
     };
 
@@ -1047,7 +1076,22 @@ export function CampaignWizard({
 
         {/* ── Step 3: Landing Page (AI prompt + HTML paste) ────── */}
         {step === 3 && (
-          <div className="space-y-5">
+          <div className="space-y-8">
+            {/* Email theme picker (CT3) */}
+            <ThemeSection
+              themes={themes}
+              value={form.theme_id}
+              onChange={(id) => updateForm({ theme_id: id })}
+              brandId={form.client_id}
+              brandDefaultId={
+                clients.find((c) => c.id === form.client_id)?.default_theme_id ?? null
+              }
+              brandTier={clients.find((c) => c.id === form.client_id)?.tier ?? null}
+            />
+
+            <div className="h-px bg-border" />
+
+            <div className="space-y-5">
             <div>
               <h2 className="text-base font-semibold text-charcoal">Landing Page</h2>
               <p className="mt-1 text-xs text-txt-muted">
@@ -1144,6 +1188,7 @@ export function CampaignWizard({
                 setPreviewDevice={setPreviewDevice}
               />
             )}
+            </div>
           </div>
         )}
 
@@ -1442,6 +1487,178 @@ function ClientBrandingSummary({ client }: { client: Client | undefined }) {
 }
 
 // ── Template Preview ────────────────────────────────────────────────
+
+// ── Campaign theme picker (CT3) ──────────────────────────────────────
+// Cards from GET /api/admin/themes (gallery ∪ this brand's bespoke). The first
+// card is "Brand default" (inherit → theme_id null), so a later brand-default
+// change still flows through; the brand's own default theme is also badged among
+// the cards. Custom themes are disabled on a Standard brand (the server enforces
+// the tier gate regardless). A live email preview + a self-only test-send back
+// the choice via the server-rendered applicationReceivedEmail kit.
+
+function ThemeSection({
+  themes,
+  value,
+  onChange,
+  brandId,
+  brandDefaultId,
+  brandTier,
+}: {
+  themes: Theme[];
+  value: string | null;
+  onChange: (id: string | null) => void;
+  brandId: string;
+  brandDefaultId: string | null;
+  brandTier: string | null;
+}) {
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [sendState, setSendState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [sendMessage, setSendMessage] = useState("");
+
+  const isPremium = brandTier === "premium" || brandTier === "enterprise";
+  const brandDefaultName = themes.find((t) => t.id === brandDefaultId)?.name ?? null;
+
+  // Live email preview — debounced; re-renders the sample applicationReceivedEmail
+  // through the server kit whenever the chosen theme (or brand) changes.
+  useEffect(() => {
+    if (!brandId) return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      setPreviewLoading(true);
+      fetch("/api/admin/themes/test-send?preview=1", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme_id: value, brand_id: brandId }),
+        signal: controller.signal,
+      })
+        .then((r) => (r.ok ? r.json() : { data: {} }))
+        .then((res) => setPreviewHtml(res.data?.html ?? ""))
+        .catch((err) => {
+          if (err.name !== "AbortError") setPreviewHtml("");
+        })
+        .finally(() => setPreviewLoading(false));
+    }, 300);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [value, brandId]);
+
+  async function sendTest() {
+    setSendState("sending");
+    setSendMessage("");
+    try {
+      const res = await fetch("/api/admin/themes/test-send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme_id: value, brand_id: brandId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSendState("error");
+        setSendMessage(data.error || "Couldn't send the test email");
+        return;
+      }
+      setSendState("sent");
+      setSendMessage(`Sent to ${data.data?.to ?? "your inbox"}`);
+    } catch {
+      setSendState("error");
+      setSendMessage("Something went wrong");
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-base font-semibold text-charcoal">Email Theme</h2>
+        <p className="mt-1 text-xs text-txt-muted">
+          The look applied to this campaign&apos;s emails. Inherit your brand default or pick a ready-made theme.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {/* Inherit / brand-default tile */}
+        <ThemeCard
+          inherit
+          selected={value === null}
+          onClick={() => onChange(null)}
+          title="Brand default"
+          subtitle="Inherit"
+          hint={brandDefaultName ? `Currently ${brandDefaultName}` : "TalentStream Classic"}
+        />
+
+        {themes.map((theme) => {
+          const locked = theme.scope === "custom" && !isPremium;
+          return (
+            <ThemeCard
+              key={theme.id}
+              selected={value === theme.id}
+              disabled={locked && value !== theme.id}
+              onClick={() => onChange(theme.id)}
+              title={theme.name}
+              subtitle={theme.scope === "custom" ? "Bespoke" : "Gallery"}
+              badge={theme.id === brandDefaultId ? "Brand default" : undefined}
+              previewImageUrl={theme.preview_image_url}
+              hint={locked ? "Premium plan only" : undefined}
+            />
+          );
+        })}
+      </div>
+
+      {/* Live email preview + test-send */}
+      <div>
+        <div className="mb-2 flex items-center justify-between">
+          <label className={labelClass}>Email preview</label>
+          <div className="flex items-center gap-3">
+            {sendState !== "idle" && (
+              <span
+                className={`text-[0.7rem] ${
+                  sendState === "error"
+                    ? "text-red"
+                    : sendState === "sent"
+                      ? "text-green"
+                      : "text-txt-muted"
+                }`}
+              >
+                {sendState === "sending" ? "Sending…" : sendMessage}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={sendTest}
+              disabled={sendState === "sending" || !brandId}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-cream/40 px-3 text-[0.72rem] font-medium text-charcoal transition-colors hover:bg-cream hover:border-txt-muted disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="1.5" y="3" width="13" height="10" rx="1.5" />
+                <path d="M2 4l6 4 6-4" />
+              </svg>
+              Email a test to me
+            </button>
+          </div>
+        </div>
+        <div className="flex justify-center rounded-lg border border-border bg-cream/40 p-4">
+          {previewHtml ? (
+            <iframe
+              srcDoc={previewHtml}
+              sandbox="allow-same-origin"
+              title="Email theme preview"
+              className={`rounded-lg border border-border bg-white transition-opacity ${
+                previewLoading ? "opacity-60" : "opacity-100"
+              }`}
+              style={{ width: "100%", maxWidth: 540, height: 520 }}
+            />
+          ) : (
+            <div className="flex h-[520px] w-full max-w-[540px] items-center justify-center rounded-lg border border-dashed border-border bg-white text-xs text-txt-muted">
+              {previewLoading ? "Rendering preview…" : "Select a brand to preview the themed email"}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function TemplatePreview({
   html,

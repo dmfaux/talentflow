@@ -9,6 +9,7 @@ import {
 } from "@/lib/api";
 import { orgScope, resolveOwnedResource } from "@/lib/tenant";
 import { validateSlug } from "@/lib/slug";
+import { assertThemeAvailableForBrand } from "@/lib/theme";
 import { isLogoBackground, isLogoPosition, normaliseHexColor } from "@/lib/utils";
 import { and, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
@@ -125,6 +126,29 @@ export async function PATCH(
         return error("logo_position must be 'top-left' or 'top-centre'");
       }
       updates.logo_position = body.logo_position;
+    }
+
+    // Brand default campaign theme (CT3). Gated by the same brand_admin branding
+    // gate above (RD-1) — consistent with logo/colours. `null` clears it (the
+    // brand degrades to gallery/default inheritance); a non-null id must be in
+    // this brand's availability set + tier (assertThemeAvailableForBrand → 400).
+    if (body.default_theme_id !== undefined) {
+      if (body.default_theme_id === null) {
+        updates.default_theme_id = null;
+      } else if (
+        typeof body.default_theme_id !== "string" ||
+        !body.default_theme_id.trim()
+      ) {
+        return error("default_theme_id must be a theme id or null");
+      } else {
+        const themeId = body.default_theme_id.trim();
+        const verdict = await assertThemeAvailableForBrand(themeId, {
+          id: existing.id,
+          org_id: existing.org_id,
+        });
+        if (verdict) return error(verdict.message, verdict.status);
+        updates.default_theme_id = themeId;
+      }
     }
 
     if (updates.name !== undefined && (!updates.name || typeof updates.name !== "string" || !(updates.name as string).trim())) {

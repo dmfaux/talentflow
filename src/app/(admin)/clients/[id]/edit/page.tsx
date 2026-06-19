@@ -2,6 +2,7 @@
 
 import { BrandingSection, type BrandingValues } from "@/components/admin/branding-section";
 import { LiveCampaignPreview } from "@/components/admin/live-campaign-preview";
+import { ThemeCard, type Theme } from "@/components/admin/theme-card";
 import { TierBadge } from "@/components/admin/tier-badge";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -26,6 +27,7 @@ interface Client {
   brand_text_color: string | null;
   logo_background: string | null;
   logo_position: string | null;
+  default_theme_id: string | null;
 }
 
 function normaliseTier(value: string | null | undefined): Tier {
@@ -56,6 +58,8 @@ export default function EditClientPage() {
   const [name, setName] = useState("");
   const [branding, setBranding] = useState<BrandingValues>(DEFAULT_BRANDING);
   const [tier, setTier] = useState<Tier>("standard");
+  const [themes, setThemes] = useState<Theme[]>([]);
+  const [defaultThemeId, setDefaultThemeId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/admin/clients/${id}`)
@@ -67,6 +71,7 @@ export default function EditClientPage() {
         setClient(data);
         setName(data.name);
         setTier(normaliseTier(data.tier));
+        setDefaultThemeId(data.default_theme_id);
         setBranding({
           logo_url: data.branding_logo_url,
           logo_background: (data.logo_background as BrandingValues["logo_background"]) || "light",
@@ -79,6 +84,20 @@ export default function EditClientPage() {
       })
       .catch(() => setLoadError("Brand not found"))
       .finally(() => setLoading(false));
+  }, [id]);
+
+  // Themes available to THIS brand (gallery ∪ its own bespoke) for the default
+  // selector. Scoped by brand_id so an org_admin editing a non-active brand still
+  // sees the right bespoke set.
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/admin/themes?brand_id=${id}`, { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((res) => setThemes(res.data ?? []))
+      .catch((err) => {
+        if (err.name !== "AbortError") setThemes([]);
+      });
+    return () => controller.abort();
   }, [id]);
 
   function patchBranding(patch: Partial<BrandingValues>) {
@@ -117,6 +136,8 @@ export default function EditClientPage() {
           brand_secondary_color: branding.brand_secondary_color || null,
           brand_accent_color: branding.brand_accent_color || null,
           brand_text_color: branding.brand_text_color || null,
+          // null = inherit the gallery/default look for new campaigns (CT3).
+          default_theme_id: defaultThemeId,
         }),
       });
 
@@ -238,6 +259,42 @@ export default function EditClientPage() {
             <span className="text-[0.75rem] text-txt-muted">
               Contact TalentStream to change your plan.
             </span>
+          </div>
+        </div>
+
+        {/* ── Default campaign theme (CT3) ──────────────────────── */}
+        <div className="rounded-xl border border-border bg-surface p-8">
+          <h2 className="font-display mb-2 text-base font-medium text-charcoal">
+            Default Campaign Theme
+          </h2>
+          <p className="mb-5 text-[0.75rem] text-txt-muted">
+            The look new campaigns inherit unless a campaign picks its own. Active
+            campaigns keep the theme they were published with.
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <ThemeCard
+              inherit
+              selected={defaultThemeId === null}
+              onClick={() => setDefaultThemeId(null)}
+              title="No default"
+              subtitle="Inherit"
+              hint="TalentStream Classic"
+            />
+            {themes.map((theme) => {
+              const locked = theme.scope === "custom" && tier === "standard";
+              return (
+                <ThemeCard
+                  key={theme.id}
+                  selected={defaultThemeId === theme.id}
+                  disabled={locked && defaultThemeId !== theme.id}
+                  onClick={() => setDefaultThemeId(theme.id)}
+                  title={theme.name}
+                  subtitle={theme.scope === "custom" ? "Bespoke" : "Gallery"}
+                  previewImageUrl={theme.preview_image_url}
+                  hint={locked ? "Premium plan only" : undefined}
+                />
+              );
+            })}
           </div>
         </div>
 

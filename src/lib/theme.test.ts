@@ -7,22 +7,32 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // recovered from the eq(themes.id, id) `where` clause's bound Param value.
 const store = vi.hoisted(() => ({
   rows: new Map<string, Record<string, unknown>>(),
+  orgs: new Map<string, Record<string, unknown>>(),
   calls: [] as string[],
 }));
+
+// Recover the id bound into an `eq(col, id)` where-clause Param so a findFirst can
+// be answered from an in-memory map without a database.
+function paramId(arg: { where: unknown }): string {
+  const chunks =
+    (arg.where as { queryChunks?: { constructor?: { name?: string }; value?: unknown }[] })
+      .queryChunks ?? [];
+  const param = chunks.find((c) => c?.constructor?.name === "Param");
+  return param?.value as string;
+}
 
 vi.mock("@/db", () => ({
   db: {
     query: {
       themes: {
         findFirst: async (arg: { where: unknown }) => {
-          const chunks =
-            (arg.where as { queryChunks?: { constructor?: { name?: string }; value?: unknown }[] })
-              .queryChunks ?? [];
-          const param = chunks.find((c) => c?.constructor?.name === "Param");
-          const id = param?.value as string;
+          const id = paramId(arg);
           store.calls.push(id);
           return store.rows.get(id);
         },
+      },
+      organizations: {
+        findFirst: async (arg: { where: unknown }) => store.orgs.get(paramId(arg)),
       },
     },
   },
@@ -30,6 +40,7 @@ vi.mock("@/db", () => ({
 
 import {
   assertThemeAssignable,
+  assertThemeAvailableForBrand,
   DEFAULT_EMAIL_THEME,
   FONT_DISPLAY,
   FONT_SANS,
@@ -77,6 +88,7 @@ const brandWithLogo = {
 
 beforeEach(() => {
   store.rows.clear();
+  store.orgs.clear();
   store.calls = [];
 });
 
@@ -121,6 +133,46 @@ describe("assertThemeAssignable", () => {
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.status).toBe(404);
+  });
+});
+
+// ── Tenant write-side availability gate (CT3) ────────────────────────
+
+describe("assertThemeAvailableForBrand", () => {
+  const brand = { id: "B", org_id: "ORG" };
+
+  it("allows a gallery theme on any brand/tier", async () => {
+    store.rows.set("G", { id: "G", scope: "gallery", client_id: null, is_active: true });
+    store.orgs.set("ORG", { tier: "standard" });
+    expect(await assertThemeAvailableForBrand("G", brand)).toBeNull();
+  });
+
+  it("allows the brand's own bespoke when Premium+", async () => {
+    store.rows.set("C", { id: "C", scope: "custom", client_id: "B", is_active: true });
+    store.orgs.set("ORG", { tier: "premium" });
+    expect(await assertThemeAvailableForBrand("C", brand)).toBeNull();
+  });
+
+  it("rejects the brand's own bespoke on a Standard org (400)", async () => {
+    store.rows.set("C", { id: "C", scope: "custom", client_id: "B", is_active: true });
+    store.orgs.set("ORG", { tier: "standard" });
+    expect((await assertThemeAvailableForBrand("C", brand))?.status).toBe(400);
+  });
+
+  it("collapses a sibling brand's bespoke (operator 404) to a tenant 400", async () => {
+    store.rows.set("C", { id: "C", scope: "custom", client_id: "OTHER", is_active: true });
+    store.orgs.set("ORG", { tier: "enterprise" });
+    expect((await assertThemeAvailableForBrand("C", brand))?.status).toBe(400);
+  });
+
+  it("rejects an inactive theme (400)", async () => {
+    store.rows.set("G", { id: "G", scope: "gallery", client_id: null, is_active: false });
+    store.orgs.set("ORG", { tier: "premium" });
+    expect((await assertThemeAvailableForBrand("G", brand))?.status).toBe(400);
+  });
+
+  it("rejects a missing theme (400)", async () => {
+    expect((await assertThemeAvailableForBrand("GONE", brand))?.status).toBe(400);
   });
 });
 

@@ -230,6 +230,47 @@ export async function guardCustomThemeBrand(
 }
 
 /**
+ * CT3 tenant write-side availability gate. Loads `themeId` + the brand's org
+ * tier and decides whether it may be assigned to `brand` (as a campaign override
+ * or the brand default). Unlike the operator-facing `assertThemeAssignable`
+ * (which 404s a sibling brand's bespoke to hide its existence), the tenant
+ * writers collapse EVERY unavailability — a missing or inactive theme, a sibling
+ * brand's bespoke, or a custom theme on a Standard brand — to a single `400`: a
+ * tenant assigning a theme to its OWN resource is making a bad request, not
+ * probing for a theme it can't see (the slice acceptance: "outside availability
+ * → 400"). Returns null when the theme is assignable.
+ */
+export async function assertThemeAvailableForBrand(
+  themeId: string,
+  brand: { id: string; org_id: string }
+): Promise<{ message: string; status: 400 } | null> {
+  const unavailable = {
+    message: "Theme is not available for this brand",
+    status: 400 as const,
+  };
+  const theme = await db.query.themes.findFirst({
+    where: eq(themes.id, themeId),
+    columns: { id: true, scope: true, client_id: true, is_active: true },
+  });
+  // A deactivated theme is no longer pickable, even if it is a gallery theme or
+  // the brand's own bespoke — treat it like a theme that does not exist.
+  if (!theme || !theme.is_active) return unavailable;
+  const org = await db.query.organizations.findFirst({
+    where: eq(organizations.id, brand.org_id),
+    columns: { tier: true },
+  });
+  const verdict = assertThemeAssignable({
+    theme: { scope: theme.scope, client_id: theme.client_id },
+    brandId: brand.id,
+    tier: org?.tier ?? null,
+  });
+  // Collapse the operator 404 (cross-brand hide) to a tenant 400; the tier
+  // message is kept verbatim because it is genuinely actionable (upgrade to
+  // Premium), unlike the deliberately-opaque cross-brand case.
+  return verdict.ok ? null : { message: verdict.message, status: 400 };
+}
+
+/**
  * Freeze the resolved look at activation (RD-1). Captures the live resolver's
  * email theme plus the EFFECTIVE landing — a tenant's html_template override
  * wins over the theme's landing_html and stays authoritative for the active

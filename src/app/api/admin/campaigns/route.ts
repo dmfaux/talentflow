@@ -4,7 +4,7 @@ import { authorizeApiBrand, error, getApiTenant, success } from "@/lib/api";
 import { brandScope, orgScope, resolveOwnedResource } from "@/lib/tenant";
 import { validateSlug } from "@/lib/slug";
 import { validateHtmlTemplate } from "@/lib/slots";
-import { freezeCampaignTheme } from "@/lib/theme";
+import { assertThemeAvailableForBrand, freezeCampaignTheme } from "@/lib/theme";
 import { recordUsageEvent } from "@/lib/usage";
 import { and, desc, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
@@ -119,12 +119,31 @@ export async function POST(request: NextRequest) {
     });
     if (existing) return error("slug is already taken for this client");
 
+    // Campaign-level theme override (CT3). `null` (the default) stays null so the
+    // resolver inherits the brand default at render — we never snapshot the brand
+    // default into the row, so a later brand-default change still flows to drafts
+    // (RD-2). A non-null id must be in the creating brand's availability set.
+    let themeId: string | null = null;
+    if (body.theme_id != null) {
+      if (typeof body.theme_id !== "string" || !body.theme_id.trim()) {
+        return error("theme_id must be a theme id or null");
+      }
+      const trimmed: string = body.theme_id.trim();
+      const verdict = await assertThemeAvailableForBrand(trimmed, {
+        id: brand.id,
+        org_id: brand.org_id,
+      });
+      if (verdict) return error(verdict.message, verdict.status);
+      themeId = trimmed;
+    }
+
     const [row] = await db
       .insert(campaigns)
       .values({
         org_id: ctx.effectiveOrgId!,
         client_id: brand.id,
         slug: body.slug,
+        theme_id: themeId,
         role_title: body.role_title,
         role_description: body.role_description ?? null,
         department: body.department ?? null,

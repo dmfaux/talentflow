@@ -78,6 +78,7 @@ export default async function EditCampaignPage({ params, searchParams }: Props) 
     ghost_ttl_days: campaign.ghost_ttl_days ?? 10,
     html_template: campaign.html_template ?? "",
     design_brief: campaign.design_brief ?? "",
+    theme_id: campaign.theme_id ?? null,
   };
 
   return (
