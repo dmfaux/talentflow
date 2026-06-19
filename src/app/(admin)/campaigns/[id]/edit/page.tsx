@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { campaigns } from "@/db/schema";
+import { campaigns, organizations } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { orgScope, requireTenant } from "@/lib/tenant";
+import { isPremiumTier } from "@/lib/theme-fields";
 import {
   CampaignWizard,
   type FormData as WizardFormData,
@@ -44,6 +45,14 @@ export default async function EditCampaignPage({ params, searchParams }: Props) 
   // closed, archived) 404s — once a campaign has been published we treat
   // its configuration as locked so candidates all see the same thing.
   if (!campaign || campaign.status !== "draft") notFound();
+
+  // Authoritative org tier (organizations.tier) gates the Premium-only landing
+  // override (CT5). Scoped to the actor's org via ctx.effectiveOrgId.
+  const org = await db.query.organizations.findFirst({
+    where: eq(organizations.id, ctx.effectiveOrgId!),
+    columns: { tier: true },
+  });
+  const canOverrideLanding = isPremiumTier(org?.tier ?? null);
 
   const rubric = (campaign.scoring_rubric ?? {}) as ScoringRubric;
   const weights = rubric.dimension_weights ?? {};
@@ -91,6 +100,7 @@ export default async function EditCampaignPage({ params, searchParams }: Props) 
         lockClient
         cancelHref={`/campaigns/${campaign.id}`}
         breadcrumbLabel={`Edit ${campaign.role_title}`}
+        canOverrideLanding={canOverrideLanding}
       />
     </>
   );

@@ -28,6 +28,9 @@ async function getCampaign(clientSlug: string, campaignSlug: string) {
       // Org lifecycle status (S11) — the public seam doesn't run here, so we
       // refuse a suspended/deleted org's careers page in the handler.
       org_status: organizations.status,
+      // Org tier (authoritative) — gates whether a campaign's html_template
+      // paste override is honoured (Premium+ only) on the live/draft path.
+      tier: organizations.tier,
       html_template: campaigns.html_template,
       client_slug: clients.slug,
       client_name: clients.name,
@@ -35,7 +38,7 @@ async function getCampaign(clientSlug: string, campaignSlug: string) {
       brand_secondary_color: clients.brand_secondary_color,
       brand_accent_color: clients.brand_accent_color,
       brand_text_color: clients.brand_text_color,
-      // Theme/landing resolution inputs (CT4). theme_snapshot wins for active
+      // Theme/landing resolution inputs (CT5). theme_snapshot wins for active
       // campaigns; drafts resolve the brand's theme default live.
       theme_id: campaigns.theme_id,
       theme_snapshot: campaigns.theme_snapshot,
@@ -106,11 +109,15 @@ export default async function CampaignPage({ params }: Props) {
     );
   }
 
-  // Effective landing (CT4): frozen snapshot → tenant override → theme default.
+  // Effective landing (CT5): active → frozen snapshot (Premium override or the
+  // themed landing regenerated from the frozen palette); draft → live theme,
+  // with the html_template override honoured only for Premium+ brands. Always a
+  // string — a campaign is never landing-less.
   const landingHtml = await resolveEffectiveLanding({
     theme_id: campaign.theme_id,
     html_template: campaign.html_template,
     theme_snapshot: campaign.theme_snapshot,
+    tier: campaign.tier,
     client: {
       default_theme_id: campaign.default_theme_id,
       branding_logo_url: campaign.branding_logo_url,
@@ -118,18 +125,6 @@ export default async function CampaignPage({ params }: Props) {
       logo_position: campaign.logo_position,
     },
   });
-
-  if (!landingHtml) {
-    console.error(
-      `[candidate-landing] Campaign has no landing template (client="${clientSlug}", campaign="${campaignSlug}").`
-    );
-    return (
-      <CampaignError
-        title="Coming soon"
-        message="This campaign page is being set up. Please check back shortly."
-      />
-    );
-  }
 
   // Replace slot markers with campaign data.
   const slotData: SlotData = {

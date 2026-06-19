@@ -1,11 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-// ── CT4 · landing-page theme integration (DB-backed) ─────────────────
+// ── CT5 · landing-page theme integration (DB-backed) ─────────────────
 //
 // Exercises the public-render landing resolution (resolveEffectiveLanding) and
-// the activation freeze (freezeCampaignTheme) against a real themes row, so the
-// resolver's landing_html return value and the snapshot>override>theme-default
-// precedence are proven end-to-end, not just in the pure unit tests.
+// the activation freeze (freezeCampaignTheme) against real themes rows. Under
+// CT5 the landing is GENERATED from the resolved palette (makeLandingTemplate) —
+// a campaign is never landing-less — and the per-campaign html_template paste is
+// a Premium-only override. These tests prove, end-to-end:
+//   • the generated landing reflects the resolved theme's palette;
+//   • a Premium override wins; a Standard override is ignored (the gate);
+//   • an active campaign is stable against later theme edits (snapshot freeze);
+//   • the freeze stores override-or-null, never the themed landing.
 //
 // ⚠️ *.itest.ts truncate ALL tables — run only against the throwaway
 // interview_insider_test DB (npm run test:integration), never the dev DB.
@@ -25,6 +30,7 @@ import {
 import { eq } from "drizzle-orm";
 
 import { validateHtmlTemplate } from "@/lib/slots";
+import { makeLandingTemplate } from "@/lib/landing";
 import {
   DEFAULT_EMAIL_THEME,
   freezeCampaignTheme,
@@ -34,17 +40,15 @@ import {
 const RUN = !!process.env.DATABASE_URL;
 const MOUNT = '<div id="application-form"></div>';
 
-// Two valid landings (mount point present, no <script>) — one baked into a
-// theme, one a tenant override.
-const THEME_LANDING = `<!DOCTYPE html><html><head><style>body{margin:0}</style></head><body><h1>{{campaign.role_title}}</h1>${MOUNT}</body></html>`;
+// The Premium tenant override — a valid landing (mount present, no <script>).
 const OVERRIDE_LANDING = `<!DOCTYPE html><html><head><style>body{margin:0}</style></head><body><h2>Bespoke</h2>${MOUNT}</body></html>`;
-const EDITED_THEME_LANDING = `<!DOCTYPE html><html><head><style>body{margin:0}</style></head><body><h1>Edited {{campaign.role_title}}</h1>${MOUNT}</body></html>`;
-
-// Both landings must satisfy the slot/mount contract CT2 enforces at authoring.
-expect(validateHtmlTemplate(THEME_LANDING).ok).toBe(true);
 expect(validateHtmlTemplate(OVERRIDE_LANDING).ok).toBe(true);
 
-const fx = { org: "", brand: "", owner: "", withLanding: "", noLanding: "" };
+// A distinctive palette colour we can look for in the generated landing to prove
+// it was coloured from a specific theme.
+const BRANDED_PRIMARY = "#006341";
+
+const fx = { org: "", brand: "", owner: "", brandedTheme: "", plainTheme: "" };
 
 /** A campaign-shaped input for the resolver, carrying the test brand's shape. */
 type ResolverClient = {
@@ -57,17 +61,19 @@ function campaign(opts: {
   theme_id?: string | null;
   html_template?: string | null;
   theme_snapshot?: Awaited<ReturnType<typeof freezeCampaignTheme>> | null;
+  tier?: string | null;
   client: ResolverClient;
 }) {
   return {
     theme_id: opts.theme_id ?? null,
     html_template: opts.html_template ?? null,
     theme_snapshot: opts.theme_snapshot ?? null,
+    tier: opts.tier ?? "standard",
     client: opts.client,
   };
 }
 
-describe.skipIf(!RUN)("CT4 landing theme integration (DB-backed)", () => {
+describe.skipIf(!RUN)("CT5 landing theme integration (DB-backed)", () => {
   let brand: ResolverClient;
 
   beforeAll(async () => {
@@ -84,15 +90,15 @@ describe.skipIf(!RUN)("CT4 landing theme integration (DB-backed)", () => {
     [fx.org] = (
       await db
         .insert(organizations)
-        .values({ slug: "ct4-org", name: "CT4 Org" })
+        .values({ slug: "ct5-org", name: "CT5 Org" })
         .returning({ id: organizations.id })
     ).map((o) => o.id);
 
-    // A logo-less brand: the landing resolution is theme-driven, not logo-driven.
+    // A logo-less brand: the landing is theme-driven, not logo-driven.
     [fx.brand] = (
       await db
         .insert(clients)
-        .values({ org_id: fx.org, slug: "ct4-brand", name: "CT4 Brand" })
+        .values({ org_id: fx.org, slug: "ct5-brand", name: "CT5 Brand" })
         .returning({ id: clients.id })
     ).map((c) => c.id);
 
@@ -103,8 +109,8 @@ describe.skipIf(!RUN)("CT4 landing theme integration (DB-backed)", () => {
           org_id: fx.org,
           org_role: "owner",
           first_name: "Owner",
-          last_name: "CT4",
-          email: "owner@ct4.test",
+          last_name: "CT5",
+          email: "owner@ct5.test",
           password_hash: "x",
         })
         .returning({ id: users.id })
@@ -113,17 +119,20 @@ describe.skipIf(!RUN)("CT4 landing theme integration (DB-backed)", () => {
     const themeBase = {
       scope: "gallery" as const,
       is_active: true,
-      palette: DEFAULT_EMAIL_THEME.palette,
       font_display: DEFAULT_EMAIL_THEME.fontDisplay,
       font_sans: DEFAULT_EMAIL_THEME.fontSans,
       created_by: fx.owner,
     };
-    [fx.withLanding, fx.noLanding] = (
+    [fx.brandedTheme, fx.plainTheme] = (
       await db
         .insert(themes)
         .values([
-          { ...themeBase, name: "Gallery With Landing", landing_html: THEME_LANDING },
-          { ...themeBase, name: "Gallery No Landing", landing_html: null },
+          {
+            ...themeBase,
+            name: "Branded Gallery",
+            palette: { ...DEFAULT_EMAIL_THEME.palette, primary: BRANDED_PRIMARY },
+          },
+          { ...themeBase, name: "Plain Gallery", palette: DEFAULT_EMAIL_THEME.palette },
         ])
         .returning({ id: themes.id })
     ).map((t) => t.id);
@@ -145,83 +154,125 @@ describe.skipIf(!RUN)("CT4 landing theme integration (DB-backed)", () => {
     await db.delete(organizations);
   });
 
-  it("renders a theme's landing_html when there is no override (draft, campaign theme_id)", async () => {
+  it("draft + campaign theme_id: generates a valid landing coloured from that theme", async () => {
     const html = await resolveEffectiveLanding(
-      campaign({ theme_id: fx.withLanding, client: brand })
+      campaign({ theme_id: fx.brandedTheme, client: brand })
     );
-    expect(html).toBe(THEME_LANDING);
+    expect(validateHtmlTemplate(html).ok).toBe(true);
     expect(html).toContain(MOUNT); // mount contract — the form can render
+    expect(html).toContain(BRANDED_PRIMARY); // coloured from the chosen theme
   });
 
-  it("inherits the landing from the brand-default theme when the campaign has no theme_id", async () => {
+  it("draft + no theme_id: generates from the brand-default theme's palette", async () => {
     const html = await resolveEffectiveLanding(
-      campaign({ theme_id: null, client: { ...brand, default_theme_id: fx.withLanding } })
+      campaign({ theme_id: null, client: { ...brand, default_theme_id: fx.brandedTheme } })
     );
-    expect(html).toBe(THEME_LANDING);
+    expect(html).toContain(BRANDED_PRIMARY);
   });
 
-  it("a tenant override wins over the theme's landing default", async () => {
+  it("draft + Premium override: the pasted HTML wins over the generated landing", async () => {
     const html = await resolveEffectiveLanding(
-      campaign({ theme_id: fx.withLanding, html_template: OVERRIDE_LANDING, client: brand })
+      campaign({
+        theme_id: fx.brandedTheme,
+        html_template: OVERRIDE_LANDING,
+        tier: "premium",
+        client: brand,
+      })
     );
     expect(html).toBe(OVERRIDE_LANDING);
   });
 
-  it("an active campaign renders its frozen snapshot landing even after the theme's landing_html is edited", async () => {
-    // Freeze the effective landing at activation (theme default, no override).
+  it("draft + Standard override: the paste is ignored (Premium-only gate) — generated landing renders", async () => {
+    const html = await resolveEffectiveLanding(
+      campaign({
+        theme_id: fx.brandedTheme,
+        html_template: OVERRIDE_LANDING,
+        tier: "standard",
+        client: brand,
+      })
+    );
+    expect(html).not.toBe(OVERRIDE_LANDING);
+    expect(html).toContain(MOUNT);
+    expect(html).toContain(BRANDED_PRIMARY);
+  });
+
+  it("active campaign (no override): regenerates from the FROZEN palette, stable across theme edits", async () => {
+    // Freeze at activation — no override, so landingHtml is null and the look is
+    // carried by the frozen email palette.
     const snapshot = await freezeCampaignTheme({
-      theme_id: fx.withLanding,
+      theme_id: fx.brandedTheme,
       html_template: null,
+      tier: "premium",
       client: brand,
     });
-    expect(snapshot.landingHtml).toBe(THEME_LANDING);
+    expect(snapshot.landingHtml).toBeNull();
+    expect(snapshot.email.palette.primary).toBe(BRANDED_PRIMARY);
 
-    // Edit the underlying theme's landing out from under the active campaign.
+    // Edit the underlying theme's palette out from under the active campaign.
     await db
       .update(themes)
-      .set({ landing_html: EDITED_THEME_LANDING })
-      .where(eq(themes.id, fx.withLanding));
+      .set({ palette: { ...DEFAULT_EMAIL_THEME.palette, primary: "#ff00ff" } })
+      .where(eq(themes.id, fx.brandedTheme));
 
-    // The active campaign is stable — it reads the snapshot, not the edited theme.
-    const html = await resolveEffectiveLanding(
-      campaign({ theme_id: fx.withLanding, theme_snapshot: snapshot, client: brand })
+    // The active campaign reads its snapshot palette — regenerated, but stable.
+    const activeHtml = await resolveEffectiveLanding(
+      campaign({ theme_id: fx.brandedTheme, theme_snapshot: snapshot, client: brand })
     );
-    expect(html).toBe(THEME_LANDING);
-    expect(html).not.toBe(EDITED_THEME_LANDING);
+    expect(activeHtml).toBe(makeLandingTemplate(snapshot.email));
+    expect(activeHtml).toContain(BRANDED_PRIMARY);
+    expect(activeHtml).not.toContain("#ff00ff");
 
     // A draft (no snapshot) re-resolves live and now sees the edit.
     const draftHtml = await resolveEffectiveLanding(
-      campaign({ theme_id: fx.withLanding, client: brand })
+      campaign({ theme_id: fx.brandedTheme, client: brand })
     );
-    expect(draftHtml).toBe(EDITED_THEME_LANDING);
+    expect(draftHtml).toContain("#ff00ff");
 
     // Restore for any later scenarios.
     await db
       .update(themes)
-      .set({ landing_html: THEME_LANDING })
-      .where(eq(themes.id, fx.withLanding));
+      .set({ palette: { ...DEFAULT_EMAIL_THEME.palette, primary: BRANDED_PRIMARY } })
+      .where(eq(themes.id, fx.brandedTheme));
   });
 
-  it("freezeCampaignTheme captures the effective landing — override over theme default", async () => {
-    const overridden = await freezeCampaignTheme({
-      theme_id: fx.withLanding,
+  it("active campaign (Premium override): the frozen override renders verbatim", async () => {
+    const snapshot = await freezeCampaignTheme({
+      theme_id: fx.brandedTheme,
       html_template: OVERRIDE_LANDING,
+      tier: "premium",
       client: brand,
     });
-    expect(overridden.landingHtml).toBe(OVERRIDE_LANDING);
+    expect(snapshot.landingHtml).toBe(OVERRIDE_LANDING);
 
-    const inherited = await freezeCampaignTheme({
-      theme_id: fx.withLanding,
-      html_template: null,
-      client: brand,
-    });
-    expect(inherited.landingHtml).toBe(THEME_LANDING);
+    const html = await resolveEffectiveLanding(
+      campaign({ theme_id: fx.brandedTheme, theme_snapshot: snapshot, client: brand })
+    );
+    expect(html).toBe(OVERRIDE_LANDING);
   });
 
-  it("resolves to null when neither an override nor the theme supplies a landing", async () => {
-    const html = await resolveEffectiveLanding(
-      campaign({ theme_id: fx.noLanding, client: { ...brand, default_theme_id: fx.noLanding } })
-    );
-    expect(html).toBeNull();
+  it("freezeCampaignTheme stores override-or-null, gated by tier (never the themed landing)", async () => {
+    const premium = await freezeCampaignTheme({
+      theme_id: fx.brandedTheme,
+      html_template: OVERRIDE_LANDING,
+      tier: "premium",
+      client: brand,
+    });
+    expect(premium.landingHtml).toBe(OVERRIDE_LANDING);
+
+    const standard = await freezeCampaignTheme({
+      theme_id: fx.brandedTheme,
+      html_template: OVERRIDE_LANDING,
+      tier: "standard",
+      client: brand,
+    });
+    expect(standard.landingHtml).toBeNull();
+
+    const noOverride = await freezeCampaignTheme({
+      theme_id: fx.brandedTheme,
+      html_template: null,
+      tier: "premium",
+      client: brand,
+    });
+    expect(noOverride.landingHtml).toBeNull();
   });
 });

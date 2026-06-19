@@ -1,10 +1,11 @@
 import { db } from "@/db";
-import { campaigns, clients } from "@/db/schema";
+import { campaigns, clients, organizations } from "@/db/schema";
 import { authorizeApiBrand, error, getApiTenant, success } from "@/lib/api";
 import { brandScope, orgScope, resolveOwnedResource } from "@/lib/tenant";
 import { validateSlug } from "@/lib/slug";
 import { validateHtmlTemplate } from "@/lib/slots";
 import { assertThemeAvailableForBrand, freezeCampaignTheme } from "@/lib/theme";
+import { isPremiumTier } from "@/lib/theme-fields";
 import { recordUsageEvent } from "@/lib/usage";
 import { and, desc, eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
@@ -112,6 +113,23 @@ export async function POST(request: NextRequest) {
     const denied = await authorizeApiBrand(ctx, brand.id, "recruiter");
     if (denied) return denied;
 
+    // Tier (authoritative, on organizations — clients.tier is a dead mirror).
+    // The landing-page paste override (html_template) is a Premium-tier lever
+    // (CT5): a Standard brand never gets a custom landing. Reject rather than
+    // silently drop so a non-UI caller gets a clear signal; the wizard already
+    // hides the field for Standard. Loaded once here, reused by the freeze below.
+    const org = await db.query.organizations.findFirst({
+      where: eq(organizations.id, brand.org_id),
+      columns: { tier: true },
+    });
+    const tier = org?.tier ?? null;
+    if (body.html_template && !isPremiumTier(tier)) {
+      return error(
+        "A custom landing page requires a Premium or Enterprise plan",
+        400
+      );
+    }
+
     // Check slug uniqueness per client
     const existing = await db.query.campaigns.findFirst({
       where: and(eq(campaigns.client_id, brand.id), eq(campaigns.slug, body.slug)),
@@ -150,7 +168,9 @@ export async function POST(request: NextRequest) {
         location: body.location ?? null,
         employment_type: body.employment_type ?? null,
         status: body.status ?? "draft",
-        html_template: body.html_template ?? null,
+        // Override is structurally Premium-only (gate above); null for Standard,
+        // and a blank "" coerced to null so a blank never persists.
+        html_template: isPremiumTier(tier) ? (body.html_template || null) : null,
         design_brief: body.design_brief ?? null,
         gating_config: body.gating_config,
         scoring_rubric: body.scoring_rubric,
@@ -178,6 +198,7 @@ export async function POST(request: NextRequest) {
         theme_id: row.theme_id,
         html_template: row.html_template,
         client: brand,
+        tier,
       });
       await db
         .update(campaigns)

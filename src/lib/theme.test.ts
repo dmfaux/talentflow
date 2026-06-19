@@ -45,8 +45,8 @@ import {
   FONT_DISPLAY,
   FONT_SANS,
   freezeCampaignTheme,
-  pickLandingHtml,
   resolveCampaignTheme,
+  resolveEffectiveLanding,
 } from "@/lib/theme";
 
 // ── Fixtures ─────────────────────────────────────────────────────────
@@ -207,26 +207,24 @@ describe("resolveCampaignTheme — precedence", () => {
   });
 
   it("falls through to DEFAULT_EMAIL_THEME with no DB hit when neither is set", async () => {
-    const { email, landingHtml } = await resolveCampaignTheme({
+    const { email } = await resolveCampaignTheme({
       theme_id: null,
       client: logolessBrand,
     });
 
     expect(email).toEqual(DEFAULT_EMAIL_THEME);
-    expect(landingHtml).toBeNull();
     expect(store.calls).toEqual([]); // hot path never touches the DB
   });
 
   it("degrades to the default rung when the theme id no longer resolves", async () => {
     // theme_id set but the row was deleted (set-null race) → no throw, default look.
-    const { email, landingHtml } = await resolveCampaignTheme({
+    const { email } = await resolveCampaignTheme({
       theme_id: "GONE",
       client: logolessBrand,
     });
 
     expect(email.palette).toEqual(DEFAULT_EMAIL_THEME.palette);
     expect(email.logo).toBeNull();
-    expect(landingHtml).toBeNull();
     expect(store.calls).toEqual(["GONE"]);
   });
 });
@@ -302,7 +300,7 @@ describe("resolveCampaignTheme — logo resolution", () => {
 // ── Row → EmailTheme mapping ─────────────────────────────────────────
 
 describe("resolveCampaignTheme — row mapping", () => {
-  it("maps palette/fonts/show_powered_by/landing_html off the row", async () => {
+  it("maps palette/fonts/show_powered_by off the row", async () => {
     store.rows.set(
       "T",
       galleryRow({
@@ -311,11 +309,10 @@ describe("resolveCampaignTheme — row mapping", () => {
         font_display: "Custom Serif",
         font_sans: "Custom Sans",
         show_powered_by: false,
-        landing_html: "<html>landing</html>",
       })
     );
 
-    const { email, landingHtml } = await resolveCampaignTheme({
+    const { email } = await resolveCampaignTheme({
       theme_id: "T",
       client: logolessBrand,
     });
@@ -324,7 +321,6 @@ describe("resolveCampaignTheme — row mapping", () => {
     expect(email.fontDisplay).toBe("Custom Serif");
     expect(email.fontSans).toBe("Custom Sans");
     expect(email.showPoweredBy).toBe(false);
-    expect(landingHtml).toBe("<html>landing</html>");
   });
 });
 
@@ -337,6 +333,7 @@ describe("freezeCampaignTheme", () => {
       theme_id: "T",
       html_template: null,
       client: brandWithLogo,
+      tier: "premium" as string | null,
     };
 
     const snapshot = await freezeCampaignTheme(campaign);
@@ -345,35 +342,51 @@ describe("freezeCampaignTheme", () => {
     expect(snapshot.email).toEqual(live.email);
   });
 
-  it("landingHtml prefers html_template over the resolved landing (override present)", async () => {
-    store.rows.set("T", galleryRow({ id: "T", landing_html: "<theme-landing>" }));
+  it("freezes a Premium brand's html_template override into landingHtml", async () => {
+    store.rows.set("T", galleryRow({ id: "T" }));
 
     const snapshot = await freezeCampaignTheme({
       theme_id: "T",
       html_template: "<tenant-override>",
       client: logolessBrand,
+      tier: "premium",
     });
 
     expect(snapshot.landingHtml).toBe("<tenant-override>");
   });
 
-  it("landingHtml uses the resolved landing when there is no override", async () => {
-    store.rows.set("T", galleryRow({ id: "T", landing_html: "<theme-landing>" }));
+  it("ignores a Standard brand's override — landingHtml is null (Premium-only gate)", async () => {
+    store.rows.set("T", galleryRow({ id: "T" }));
+
+    const snapshot = await freezeCampaignTheme({
+      theme_id: "T",
+      html_template: "<tenant-override>",
+      client: logolessBrand,
+      tier: "standard",
+    });
+
+    expect(snapshot.landingHtml).toBeNull();
+  });
+
+  it("landingHtml is null when there is no override (themed landing regenerates at render)", async () => {
+    store.rows.set("T", galleryRow({ id: "T" }));
 
     const snapshot = await freezeCampaignTheme({
       theme_id: "T",
       html_template: null,
       client: logolessBrand,
+      tier: "premium",
     });
 
-    expect(snapshot.landingHtml).toBe("<theme-landing>");
+    expect(snapshot.landingHtml).toBeNull();
   });
 
-  it("landingHtml is null at the default rung with no override", async () => {
+  it("treats a blank override as no override (null, not empty)", async () => {
     const snapshot = await freezeCampaignTheme({
       theme_id: null,
-      html_template: null,
+      html_template: "   ",
       client: logolessBrand,
+      tier: "premium",
     });
 
     expect(snapshot.landingHtml).toBeNull();
@@ -386,6 +399,7 @@ describe("freezeCampaignTheme", () => {
       theme_id: "T",
       html_template: null,
       client: logolessBrand,
+      tier: "standard",
     });
 
     expect(snapshot.theme_id).toBe("T");
@@ -397,30 +411,86 @@ describe("freezeCampaignTheme", () => {
       theme_id: null,
       html_template: null,
       client: logolessBrand,
+      tier: "standard",
     });
 
     expect(snapshot.theme_id).toBeNull();
   });
 });
 
-// ── CT4 · landing-page precedence (pickLandingHtml) ──────────────────
+// ── CT5 · landing-page resolution (resolveEffectiveLanding) ──────────
 
-describe("pickLandingHtml", () => {
-  it("prefers the frozen snapshot landing over an override and the theme default", () => {
-    expect(pickLandingHtml("<snap/>", "<override/>", "<theme/>")).toBe("<snap/>");
+describe("resolveEffectiveLanding", () => {
+  const MOUNT = '<div id="application-form"></div>';
+
+  it("active campaign: returns the frozen Premium override verbatim", async () => {
+    const html = await resolveEffectiveLanding({
+      theme_id: null,
+      client: logolessBrand,
+      html_template: null,
+      tier: "premium",
+      theme_snapshot: {
+        email: DEFAULT_EMAIL_THEME,
+        landingHtml: "<frozen-override>",
+        theme_id: null,
+        frozen_at: new Date(0).toISOString(),
+      },
+    });
+    expect(html).toBe("<frozen-override>");
+    expect(store.calls).toEqual([]); // snapshot path: no DB hit
   });
 
-  it("uses the tenant override when there is no snapshot (draft)", () => {
-    expect(pickLandingHtml(null, "<override/>", "<theme/>")).toBe("<override/>");
-    expect(pickLandingHtml(undefined, "<override/>", "<theme/>")).toBe("<override/>");
+  it("active campaign: regenerates the themed landing from the frozen palette when no override", async () => {
+    const html = await resolveEffectiveLanding({
+      theme_id: null,
+      client: logolessBrand,
+      html_template: null,
+      tier: "standard",
+      theme_snapshot: {
+        email: { ...DEFAULT_EMAIL_THEME, palette: BRANDED_PALETTE },
+        landingHtml: null,
+        theme_id: null,
+        frozen_at: new Date(0).toISOString(),
+      },
+    });
+    expect(html).toContain(MOUNT);
+    expect(html).toContain("#006341"); // frozen brand palette colour
+    expect(store.calls).toEqual([]);
   });
 
-  it("falls back to the theme default when there is no snapshot and no override", () => {
-    expect(pickLandingHtml(null, null, "<theme/>")).toBe("<theme/>");
+  it("draft + Premium override: returns the override", async () => {
+    const html = await resolveEffectiveLanding({
+      theme_id: null,
+      client: logolessBrand,
+      html_template: "<my-override>",
+      tier: "premium",
+      theme_snapshot: null,
+    });
+    expect(html).toBe("<my-override>");
   });
 
-  it("returns null when nothing supplies a landing (today's no-template surface)", () => {
-    expect(pickLandingHtml(null, null, null)).toBeNull();
-    expect(pickLandingHtml(undefined, undefined, undefined)).toBeNull();
+  it("draft + Standard override: ignores it and returns the generated landing", async () => {
+    const html = await resolveEffectiveLanding({
+      theme_id: null,
+      client: logolessBrand,
+      html_template: "<my-override>",
+      tier: "standard",
+      theme_snapshot: null,
+    });
+    expect(html).not.toContain("<my-override>");
+    expect(html).toContain(MOUNT);
+  });
+
+  it("draft + no override: returns the generated themed landing from the resolved palette", async () => {
+    store.rows.set("T", galleryRow({ id: "T", palette: BRANDED_PALETTE }));
+    const html = await resolveEffectiveLanding({
+      theme_id: "T",
+      client: logolessBrand,
+      html_template: null,
+      tier: "premium",
+      theme_snapshot: null,
+    });
+    expect(html).toContain(MOUNT);
+    expect(html).toContain("#006341");
   });
 });

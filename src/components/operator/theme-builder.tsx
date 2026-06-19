@@ -1,14 +1,13 @@
 "use client";
 
 import { useToast } from "@/components/ui/toast-provider";
-import { validateHtmlTemplate } from "@/lib/slots";
 import {
   STARTER_THEME_DRAFT,
   THEME_PALETTE_KEYS,
   type ThemePaletteKey,
   type ThemeScope,
 } from "@/lib/theme-fields";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   ThemeEmailPreview,
   type ThemePreviewPayload,
@@ -28,6 +27,8 @@ export interface OperatorThemeRow {
   logo_background: string;
   logo_position: string;
   show_powered_by: boolean;
+  // Vestigial (CT5): landings are GENERATED from the palette, not authored per
+  // theme. The column + API field remain but are no longer read or written here.
   landing_html: string | null;
   preview_image_url: string | null;
   client?: { id: string; name: string; slug: string } | null;
@@ -134,16 +135,10 @@ export function ThemeBuilder({
   const [showPoweredBy, setShowPoweredBy] = useState(
     isGallery ? true : initial?.show_powered_by ?? true
   );
-  const [landingHtml, setLandingHtml] = useState(initial?.landing_html ?? "");
   const [previewImageUrl, setPreviewImageUrl] = useState(
     initial?.preview_image_url ?? ""
   );
   const [saving, setSaving] = useState(false);
-
-  const landingValidation = useMemo(() => {
-    if (!landingHtml.trim()) return null;
-    return validateHtmlTemplate(landingHtml);
-  }, [landingHtml]);
 
   const previewPayload: ThemePreviewPayload = {
     palette,
@@ -172,10 +167,6 @@ export function ThemeBuilder({
       toast("Give the theme a name", "error");
       return;
     }
-    if (landingHtml.trim() && landingValidation && !landingValidation.ok) {
-      toast("Fix the landing HTML before saving", "error");
-      return;
-    }
     setSaving(true);
     try {
       const body = {
@@ -189,7 +180,6 @@ export function ThemeBuilder({
         logo_background: logoBackground,
         logo_position: logoPosition,
         show_powered_by: isGallery ? true : showPoweredBy,
-        landing_html: landingHtml.trim() ? landingHtml : null,
         preview_image_url: previewImageUrl.trim() || null,
       };
       const res = await fetch(
@@ -441,54 +431,6 @@ export function ThemeBuilder({
                 />
               </button>
             </div>
-          </section>
-
-          {/* Landing HTML (CT4) */}
-          <section className="rounded-xl border border-border bg-surface p-5">
-            <h3 className="font-serif text-base text-ink">
-              Landing template{" "}
-              <span className="font-sans text-xs font-normal text-ink-muted">
-                optional
-              </span>
-            </h3>
-            <p className="mt-0.5 text-xs text-ink-muted">
-              Must contain{" "}
-              <code className="rounded bg-canvas-2 px-1 font-mono text-[0.7rem] text-ink-soft">
-                &lt;div id=&quot;application-form&quot;&gt;&lt;/div&gt;
-              </code>{" "}
-              and no scripts.
-            </p>
-            <textarea
-              value={landingHtml}
-              onChange={(e) => setLandingHtml(e.target.value)}
-              rows={6}
-              placeholder="Paste a landing-page HTML template…"
-              spellCheck={false}
-              className={`mt-3 w-full resize-none rounded-lg border bg-cream/40 px-3.5 py-2.5 font-mono text-xs text-ink outline-none transition-colors focus:ring-1 focus:ring-cobalt/20 ${
-                landingValidation && !landingValidation.ok
-                  ? "border-red focus:border-red"
-                  : landingValidation?.ok
-                    ? "border-green focus:border-green"
-                    : "border-border focus:border-cobalt"
-              }`}
-            />
-            {landingValidation?.ok && (
-              <p className="mt-1.5 flex items-center gap-1 text-xs text-green">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M2.5 6.5L5 9l4.5-6" />
-                </svg>
-                Valid landing template
-              </p>
-            )}
-            {landingValidation && !landingValidation.ok && (
-              <div className="mt-1.5 space-y-0.5">
-                {landingValidation.errors.map((err, i) => (
-                  <p key={i} className="text-xs text-red">
-                    {err}
-                  </p>
-                ))}
-              </div>
-            )}
           </section>
 
           {/* Save bar */}

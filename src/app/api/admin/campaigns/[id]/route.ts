@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { campaigns, candidates, clients } from "@/db/schema";
+import { campaigns, candidates, clients, organizations } from "@/db/schema";
 import {
   authorizeApiBrand,
   error,
@@ -10,6 +10,7 @@ import { orgScope, resolveOwnedResource } from "@/lib/tenant";
 import { validateSlug } from "@/lib/slug";
 import { validateHtmlTemplate } from "@/lib/slots";
 import { assertThemeAvailableForBrand, freezeCampaignTheme } from "@/lib/theme";
+import { isPremiumTier } from "@/lib/theme-fields";
 import { and, eq, sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
@@ -76,6 +77,22 @@ export async function PATCH(
     const denied = await authorizeApiBrand(ctx, existing.client_id, "recruiter");
     if (denied) return denied;
 
+    // Tier (authoritative, on organizations — not the dead clients.tier mirror).
+    // The html_template landing override is a Premium-tier lever (CT5): reject a
+    // Standard brand's override rather than persist it. Loaded once, reused by
+    // the activation freeze below.
+    const org = await db.query.organizations.findFirst({
+      where: eq(organizations.id, existing.org_id),
+      columns: { tier: true },
+    });
+    const tier = org?.tier ?? null;
+    if (body.html_template && !isPremiumTier(tier)) {
+      return error(
+        "A custom landing page requires a Premium or Enterprise plan",
+        400
+      );
+    }
+
     // Validate HTML template if provided
     if (body.html_template !== undefined && body.html_template) {
       const htmlCheck = validateHtmlTemplate(body.html_template);
@@ -120,7 +137,6 @@ export async function PATCH(
       "location",
       "employment_type",
       "status",
-      "html_template",
       "design_brief",
       "gating_config",
       "scoring_rubric",
@@ -133,6 +149,17 @@ export async function PATCH(
       if (body[field] !== undefined) {
         updates[field] = body[field];
       }
+    }
+
+    // Landing override (html_template) is Premium-only (CT5). Gate the WRITE
+    // structurally — not via the truthy-only check above — mirroring POST: a
+    // non-Premium brand can never persist a value (forced null), and a blank ""
+    // is coerced to null. Kept out of the allowedFields passthrough so it can't
+    // slip through. (A truthy non-Premium override is already 400'd above.)
+    if (body.html_template !== undefined) {
+      updates.html_template = isPremiumTier(tier)
+        ? (body.html_template || null)
+        : null;
     }
 
     // Campaign-level theme override (CT3). `null` inherits the brand default at
@@ -186,6 +213,7 @@ export async function PATCH(
             (updates.html_template as string | null | undefined) ??
             existing.html_template,
           client: client ?? null,
+          tier,
         });
       }
       if (body.status === "closed") updates.campaign_end = new Date();

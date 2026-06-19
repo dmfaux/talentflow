@@ -13,6 +13,9 @@ export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   test: {
     include: ["src/**/*.itest.ts"],
+    // Safety guard: aborts the run unless DATABASE_URL is a throwaway test DB,
+    // BEFORE any beforeAll (which truncates all tables) can fire.
+    setupFiles: ["./vitest.integration.setup.ts"],
     // One shared two-org fixture mutated by the route handlers — run serially.
     fileParallelism: false,
     sequence: { concurrent: false },

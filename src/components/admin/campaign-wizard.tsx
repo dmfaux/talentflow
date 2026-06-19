@@ -27,6 +27,13 @@ export interface CampaignWizardProps {
   cancelHref: string;
   /** Breadcrumb label shown at the top ("New Campaign", "Edit …"). */
   breadcrumbLabel: string;
+  /**
+   * Whether the brand's ORG tier (organizations.tier) is Premium+ — gates the
+   * optional landing-page paste override (CT5). Standard brands always use the
+   * theme-generated landing. Sourced server-side; clients.tier is a dead mirror,
+   * so this can't be derived from the client feed inside the wizard.
+   */
+  canOverrideLanding?: boolean;
 }
 
 interface Client {
@@ -141,6 +148,7 @@ export function CampaignWizard({
   lockClient = false,
   cancelHref,
   breadcrumbLabel,
+  canOverrideLanding = false,
 }: CampaignWizardProps) {
   const router = useRouter();
   const tenant = useTenant();
@@ -177,19 +185,23 @@ export function CampaignWizard({
   const [showLandingOverride, setShowLandingOverride] = useState(
     () => Boolean(initialForm?.html_template?.trim())
   );
+  // CT5: the theme-generated landing preview (server-rendered — the palette lives
+  // server-side, so makeLandingTemplate can't run in the browser). Shown read-only
+  // for Standard and as the revert target for a Premium override. Re-fetched when
+  // the resolved theme or brand changes.
+  const [landingPreviewHtml, setLandingPreviewHtml] = useState("");
+  const [landingPreviewLoading, setLandingPreviewLoading] = useState(false);
 
-  // CT4 landing resolution, mirrored client-side: the campaign's effective theme
-  // is its own override (form.theme_id) or the brand default; that theme may
-  // carry a landing_html the campaign inherits unless the tenant pastes custom
-  // HTML (which wins, matching the server's precedence).
+  // CT5 landing resolution, mirrored client-side: every theme GENERATES a landing
+  // (makeLandingTemplate), so a campaign is never landing-less. The per-campaign
+  // paste (html_template) is an optional Premium-only override — the override flow
+  // is reachable only when canOverrideLanding AND the tenant pastes/opts in.
   const selectedClient = clients.find((c) => c.id === form.client_id);
   const resolvedThemeId = form.theme_id ?? selectedClient?.default_theme_id ?? null;
   const resolvedTheme = themes.find((t) => t.id === resolvedThemeId) ?? null;
-  const themeLandingHtml = resolvedTheme?.landing_html ?? null;
-  // Show the custom-HTML flow when the theme has no landing to inherit, when an
-  // override is already present, or when the user explicitly opts to override.
   const landingOverrideMode =
-    !themeLandingHtml || form.html_template.trim().length > 0 || showLandingOverride;
+    canOverrideLanding &&
+    (form.html_template.trim().length > 0 || showLandingOverride);
 
   useEffect(() => {
     fetch("/api/admin/clients")
@@ -214,6 +226,38 @@ export function CampaignWizard({
       });
     return () => controller.abort();
   }, [form.client_id]);
+
+  // CT5: themed-landing preview. Resolves form.theme_id ?? brand default on the
+  // server (makeLandingTemplate over the resolved palette) so the wizard shows the
+  // real generated landing without shipping the palette to the browser. Debounced;
+  // re-fetched on theme/brand change. Always fetched so it's ready if a Premium
+  // override is reverted.
+  useEffect(() => {
+    if (!form.client_id) {
+      setLandingPreviewHtml("");
+      return;
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => {
+      setLandingPreviewLoading(true);
+      fetch("/api/admin/themes/landing-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme_id: form.theme_id, brand_id: form.client_id }),
+        signal: controller.signal,
+      })
+        .then((r) => (r.ok ? r.json() : { data: {} }))
+        .then((res) => setLandingPreviewHtml(res.data?.html ?? ""))
+        .catch((err) => {
+          if (err.name !== "AbortError") setLandingPreviewHtml("");
+        })
+        .finally(() => setLandingPreviewLoading(false));
+    }, 300);
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [form.theme_id, form.client_id]);
 
   // Create mode: bind the form's brand to the active-brand context (and follow
   // header brand switches). "All brands"/none → empty, which blocks step 0.
@@ -340,17 +384,13 @@ export function CampaignWizard({
     }
 
     if (s === 3) {
-      const override = form.html_template.trim();
-      if (override) {
-        // A pasted override always wins and must pass the slot/mount contract.
+      // CT5: a paste is NEVER required — the theme always generates a landing. The
+      // only check is on a Premium override, which must pass the slot/mount
+      // contract if present. (A Standard brand can't paste, so nothing to check.)
+      if (canOverrideLanding && form.html_template.trim()) {
         const check = validateHtmlTemplate(form.html_template);
         if (!check.ok) errs.html_template = check.errors.join("; ");
-      } else if (!themeLandingHtml) {
-        // No override and no theme-provided landing → nothing would render.
-        errs.html_template =
-          "Paste your HTML template, or choose a theme that includes a landing page";
       }
-      // else: the selected theme supplies a landing default — no override needed.
     }
 
     setErrors(errs);
@@ -477,9 +517,11 @@ export function CampaignWizard({
       brief: form.design_brief || `A professional job application landing page for the ${form.role_title || "open"} role at ${client?.name || "the company"}.`,
       brandColors,
       logo,
-      // CT4: tier-flip the copied prompt — Standard gets TalentStream colours +
-      // the powered-by footer, Premium+ gets brand colours and no footer.
-      tier: client?.tier,
+      // CT5: tier-flip the copied prompt from the AUTHORITATIVE org tier. The
+      // override flow is only reachable when canOverrideLanding (Premium+), so
+      // this yields brand colours + no powered-by footer. (client.tier is the
+      // dead legacy mirror — always "standard" — so it must NOT drive this.)
+      tier: canOverrideLanding ? "premium" : "standard",
     });
   }
 
@@ -530,8 +572,10 @@ export function CampaignWizard({
         max_auto_advance_score: form.max_auto_advance_score,
       },
       ghost_ttl_days: form.ghost_ttl_days,
-      html_template: form.html_template || null,
-      design_brief: form.design_brief || null,
+      // Override is Premium-only (CT5); never send it for a Standard brand (the
+      // server rejects it too — this just avoids a needless 400).
+      html_template: canOverrideLanding ? form.html_template || null : null,
+      design_brief: canOverrideLanding ? form.design_brief || null : null,
       // null = inherit the brand default at render (CT3, RD-2).
       theme_id: form.theme_id,
       status,
@@ -1112,7 +1156,7 @@ export function CampaignWizard({
               brandDefaultId={
                 clients.find((c) => c.id === form.client_id)?.default_theme_id ?? null
               }
-              brandTier={clients.find((c) => c.id === form.client_id)?.tier ?? null}
+              brandTier={canOverrideLanding ? "premium" : "standard"}
             />
 
             <div className="h-px bg-border" />
@@ -1124,26 +1168,24 @@ export function CampaignWizard({
                   <div>
                     <h2 className="text-base font-semibold text-charcoal">Landing Page</h2>
                     <p className="mt-1 text-xs text-txt-muted">
-                      {themeLandingHtml
-                        ? `Your custom HTML overrides ${resolvedTheme?.name ?? "the theme"}'s landing page. Copy the AI prompt into Claude or ChatGPT, tweak the live preview, then paste the final HTML here.`
-                        : "Copy the AI prompt below into Claude or ChatGPT. It will generate a live preview as an artifact — tweak the design until you're happy, then paste the final HTML here."}
+                      Your custom HTML replaces {resolvedTheme?.name ?? "the theme"}&apos;s
+                      generated landing page for this campaign. Copy the AI prompt into Claude
+                      or ChatGPT, tweak the live preview, then paste the final HTML here.
                     </p>
                   </div>
-                  {themeLandingHtml && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowLandingOverride(false);
-                        handleHtmlChange("");
-                      }}
-                      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[0.72rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer"
-                    >
-                      <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M8.5 3L4.5 7l4 4" />
-                      </svg>
-                      Use theme default
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowLandingOverride(false);
+                      handleHtmlChange("");
+                    }}
+                    className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-[0.72rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M8.5 3L4.5 7l4 4" />
+                    </svg>
+                    Use theme default
+                  </button>
                 </div>
 
                 {/* Design brief */}
@@ -1193,7 +1235,7 @@ export function CampaignWizard({
                 {/* HTML paste area */}
                 <div>
                   <label htmlFor="html_template" className={labelClass}>
-                    HTML Template {!themeLandingHtml && <span className="text-red">*</span>}
+                    HTML Template
                   </label>
                   <textarea
                     id="html_template"
@@ -1239,7 +1281,9 @@ export function CampaignWizard({
             ) : (
               <ThemeLandingDefault
                 themeName={resolvedTheme?.name ?? null}
-                html={themeLandingHtml!}
+                html={landingPreviewHtml}
+                loading={landingPreviewLoading}
+                canOverride={canOverrideLanding}
                 form={form}
                 clientName={selectedClient?.name}
                 previewDevice={previewDevice}
@@ -1315,22 +1359,20 @@ export function CampaignWizard({
             {/* Landing page summary */}
             <div className="rounded-lg border border-border p-4">
               <h3 className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-txt-muted">Landing Page</h3>
-              {form.html_template ? (
+              {canOverrideLanding && form.html_template ? (
                 <p className="mt-1 flex items-center gap-1.5 text-sm text-charcoal">
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green">
                     <path d="M3 7.5L5.5 10l5.5-6" />
                   </svg>
                   Custom HTML template ({form.html_template.length.toLocaleString()} characters)
                 </p>
-              ) : themeLandingHtml ? (
+              ) : (
                 <p className="mt-1 flex items-center gap-1.5 text-sm text-charcoal">
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green">
                     <path d="M3 7.5L5.5 10l5.5-6" />
                   </svg>
-                  Landing page from {resolvedTheme?.name ?? "the selected theme"}
+                  Themed landing — generated from {resolvedTheme?.name ?? "your theme"}
                 </p>
-              ) : (
-                <p className="mt-1 text-sm text-red">No landing page — go back to the Landing Page step to paste HTML or pick a theme that includes one</p>
               )}
             </div>
           </div>
@@ -1726,15 +1768,18 @@ function ThemeSection({
   );
 }
 
-// ── Theme landing default (CT4) ──────────────────────────────────────
-// When the selected theme ships a landing_html, the campaign inherits it — no
-// custom HTML required. We frame that with a short explainer, the same live
-// preview the override flow uses, and an unobtrusive affordance to override with
-// bespoke HTML. Mirrors the server precedence (a pasted override wins).
+// ── Theme landing default (CT5) ──────────────────────────────────────
+// Every theme GENERATES a landing (makeLandingTemplate over its palette), so a
+// campaign is never landing-less — there is nothing to paste. We show the
+// server-rendered generated landing read-only, framed by a short explainer. The
+// override affordance is Premium-only (canOverride); a Standard brand sees the
+// preview but cannot replace it.
 
 function ThemeLandingDefault({
   themeName,
   html,
+  loading,
+  canOverride,
   form,
   clientName,
   previewDevice,
@@ -1743,6 +1788,8 @@ function ThemeLandingDefault({
 }: {
   themeName: string | null;
   html: string;
+  loading: boolean;
+  canOverride: boolean;
   form: FormData;
   clientName: string | undefined;
   previewDevice: "desktop" | "mobile";
@@ -1754,7 +1801,9 @@ function ThemeLandingDefault({
       <div>
         <h2 className="text-base font-semibold text-charcoal">Landing Page</h2>
         <p className="mt-1 text-xs text-txt-muted">
-          This campaign inherits its landing page from its theme — nothing to paste.
+          {canOverride
+            ? "This campaign's landing page is generated from its theme — nothing to paste. Prefer something bespoke? Override it below."
+            : "This campaign's landing page is generated from its theme — nothing to paste."}
         </p>
       </div>
 
@@ -1771,36 +1820,44 @@ function ThemeLandingDefault({
             Landing page from {themeName ?? "your theme"}
           </p>
           <p className="mt-0.5 text-xs leading-relaxed text-txt-secondary">
-            This theme ships with a ready-made landing page, so this campaign is good to go without any HTML. Prefer something bespoke? Override it below.
+            The colours, logo, and type come from your theme. Edit the theme to restyle every campaign that uses it.
           </p>
         </div>
       </div>
 
-      {/* Live preview of the theme's landing default */}
-      <TemplatePreview
-        html={html}
-        form={form}
-        clientName={clientName}
-        previewDevice={previewDevice}
-        setPreviewDevice={setPreviewDevice}
-      />
+      {/* Live preview of the theme's generated landing */}
+      {html ? (
+        <TemplatePreview
+          html={html}
+          form={form}
+          clientName={clientName}
+          previewDevice={previewDevice}
+          setPreviewDevice={setPreviewDevice}
+        />
+      ) : (
+        <div className="flex h-[200px] items-center justify-center rounded-lg border border-dashed border-border bg-cream/40 text-xs text-txt-muted">
+          {loading ? "Rendering preview…" : "Select a brand to preview the landing page"}
+        </div>
+      )}
 
-      {/* Override affordance */}
-      <div className="flex flex-col items-center gap-1.5 border-t border-border pt-5 text-center">
-        <button
-          type="button"
-          onClick={onOverride}
-          className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-[0.78rem] font-medium text-charcoal transition-colors hover:bg-cream hover:border-txt-muted cursor-pointer"
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 2.5l2.5 2.5L6 12.5 3 13l.5-3z" />
-          </svg>
-          Override with custom HTML
-        </button>
-        <p className="text-[0.7rem] text-txt-muted">
-          Replace the theme&apos;s landing with your own design for this campaign only.
-        </p>
-      </div>
+      {/* Override affordance — Premium only */}
+      {canOverride && (
+        <div className="flex flex-col items-center gap-1.5 border-t border-border pt-5 text-center">
+          <button
+            type="button"
+            onClick={onOverride}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-[0.78rem] font-medium text-charcoal transition-colors hover:bg-cream hover:border-txt-muted cursor-pointer"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 2.5l2.5 2.5L6 12.5 3 13l.5-3z" />
+            </svg>
+            Override with custom HTML
+          </button>
+          <p className="text-[0.7rem] text-txt-muted">
+            Replace the theme&apos;s landing with your own design for this campaign only.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

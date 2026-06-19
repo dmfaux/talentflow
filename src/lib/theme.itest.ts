@@ -209,6 +209,7 @@ describe.skipIf(!RUN)("CT1 theme freeze + render preference (DB-backed)", () => 
       theme_id: null,
       html_template: null,
       client: brand!,
+      tier: null, // email half is tier-independent; this test compares only .email
     });
     expect(data.theme_snapshot.email).toEqual(live.email);
   });
