@@ -77,7 +77,7 @@ export function OrgSettingsCard() {
       setName(data.name);
       setContactName(data.contact_name ?? "");
       setContactEmail(data.contact_email ?? "");
-      toast("Organization updated", "success");
+      toast("Organisation updated", "success");
     } catch {
       toast("Something went wrong", "error");
     } finally {
@@ -97,18 +97,18 @@ export function OrgSettingsCard() {
           <rect x="2" y="3" width="12" height="10" rx="1.5" />
           <path d="M5 6.5h6M5 9.5h4" />
         </svg>
-        <h2 className="text-sm font-semibold text-charcoal">Organization</h2>
+        <h2 className="text-sm font-semibold text-charcoal">Organisation</h2>
       </div>
 
       {loading ? (
         <p className="text-sm text-txt-muted">Loading…</p>
       ) : !org ? (
-        <p className="text-sm text-txt-muted">Could not load organization settings.</p>
+        <p className="text-sm text-txt-muted">Could not load organisation settings.</p>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label htmlFor="org-name" className={labelClass}>
-              Organization Name
+              Organisation Name
             </label>
             <input
               id="org-name"

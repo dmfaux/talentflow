@@ -44,7 +44,7 @@ export class OrgInactiveError extends Error {
   readonly status: Exclude<OrgStatus, "active">;
 
   constructor(status: Exclude<OrgStatus, "active">) {
-    super(`Organization is ${status}`);
+    super(`Organisation is ${status}`);
     this.name = "OrgInactiveError";
     this.status = status;
   }

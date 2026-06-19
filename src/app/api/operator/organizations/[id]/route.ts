@@ -50,7 +50,7 @@ export async function GET(
     const org = await db.query.organizations.findFirst({
       where: eq(organizations.id, id),
     });
-    if (!org) return error("Organization not found", 404);
+    if (!org) return error("Organisation not found", 404);
 
     // Per-org usage aggregate (S10), windowed to the last 30 days, plus
     // all-time token totals for context. Uses usage_events_org_kind_idx /
@@ -187,7 +187,7 @@ export async function PATCH(
     const org = await db.query.organizations.findFirst({
       where: eq(organizations.id, id),
     });
-    if (!org) return error("Organization not found", 404);
+    if (!org) return error("Organisation not found", 404);
 
     const updates: Record<string, unknown> = {};
 

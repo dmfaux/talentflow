@@ -30,7 +30,7 @@ export async function POST(
       where: eq(organizations.id, id),
       columns: { id: true, name: true },
     });
-    if (!org) return error("Organization not found", 404);
+    if (!org) return error("Organisation not found", 404);
 
     // Already onboarded → nothing to resend.
     const existingOwner = await db.query.users.findFirst({

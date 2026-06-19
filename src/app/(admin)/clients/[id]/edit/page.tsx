@@ -251,7 +251,7 @@ export default function EditClientPage() {
             Subscription Tier
           </h2>
           <p className="mb-5 text-[0.75rem] text-txt-muted">
-            The plan is set by TalentStream for the whole organization and
+            The plan is set by TalentStream for the whole organisation and
             can&apos;t be changed here.
           </p>
           <div className="flex items-center gap-3 rounded-lg bg-cream/60 px-4 py-3">

@@ -97,7 +97,7 @@ export default function SettingsPage() {
     <div className="max-w-2xl">
       <h1 className="mb-1 text-lg font-semibold text-charcoal">Settings</h1>
       <p className="mb-8 text-xs text-txt-muted">
-        Organization, brand, data privacy, and compliance controls
+        Organisation, brand, data privacy, and compliance controls
       </p>
 
       {/* ── Organization + Active brand (S9) ─────────────────── */}

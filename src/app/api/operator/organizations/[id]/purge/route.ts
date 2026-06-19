@@ -27,7 +27,7 @@ export async function POST(
       where: eq(organizations.id, id),
     });
     // Already-purged (row gone) or never existed → 404 (idempotent for re-runs).
-    if (!org) return error("Organization not found", 404);
+    if (!org) return error("Organisation not found", 404);
 
     // Interlock: a tenant must be soft-deleted first. An active/suspended org
     // cannot be hard-purged in one step.

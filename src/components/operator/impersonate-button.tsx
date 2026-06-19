@@ -58,14 +58,14 @@ export function ImpersonateButton({ orgId, orgName, status }: Props) {
           <path d="M3 13.5c0-2.5 2.2-4 5-4s5 1.5 5 4" />
           <path d="M12.5 2.5l1.5 1.5-1.5 1.5M14 4h-3" />
         </svg>
-        Act as this organization
+        Act as this organisation
       </button>
       <ConfirmModal
         open={confirming}
         title={`Act as ${orgName}?`}
         description={
           (nonActive
-            ? `This organization is ${status}. `
+            ? `This organisation is ${status}. `
             : "") +
           "You'll enter the tenant with owner-level access. Everything you do is audited, and the session times out after 60 minutes."
         }

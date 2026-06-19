@@ -68,7 +68,7 @@ export async function runOrgTransition(
     const org = await db.query.organizations.findFirst({
       where: eq(organizations.id, id),
     });
-    if (!org) return error("Organization not found", 404);
+    if (!org) return error("Organisation not found", 404);
 
     const spec = SPECS[kind];
 

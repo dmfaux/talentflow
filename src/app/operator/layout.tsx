@@ -48,7 +48,7 @@ export default async function OperatorLayout({
                 href="/operator"
                 className="rounded-md px-2.5 py-1 text-[0.72rem] font-medium text-paper/55 transition-colors hover:bg-white/10 hover:text-paper"
               >
-                Organizations
+                Organisations
               </Link>
               <Link
                 href="/operator/themes"

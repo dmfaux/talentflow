@@ -84,7 +84,7 @@ export default function OperatorOrganizationsPage() {
           <p className="font-mono text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-ink-muted">
             Control plane
           </p>
-          <h1 className="mt-1 font-serif text-2xl text-ink">Organizations</h1>
+          <h1 className="mt-1 font-serif text-2xl text-ink">Organisations</h1>
           <p className="mt-1 text-xs text-ink-muted">
             {loading ? "Loading…" : `${total} ${total === 1 ? "org" : "orgs"}${hasFilters ? " matching filters" : " total"}`}
           </p>
@@ -96,7 +96,7 @@ export default function OperatorOrganizationsPage() {
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M7 2v10M2 7h10" />
           </svg>
-          New organization
+          New organisation
         </Link>
       </div>
 
@@ -151,20 +151,20 @@ export default function OperatorOrganizationsPage() {
       {/* Table */}
       {loading && orgs.length === 0 ? (
         <div className="rounded-xl border border-border bg-surface py-20 text-center text-sm text-ink-muted">
-          Loading organizations…
+          Loading organisations…
         </div>
       ) : orgs.length === 0 ? (
         <EmptyState
           icon="campaigns"
-          title={hasFilters ? "No organizations match" : "No organizations yet"}
-          description={hasFilters ? "Try clearing the filters above." : "Provisioned organizations will appear here."}
+          title={hasFilters ? "No organisations match" : "No organisations yet"}
+          description={hasFilters ? "Try clearing the filters above." : "Provisioned organisations will appear here."}
         />
       ) : (
         <div className="overflow-hidden rounded-xl border border-border bg-surface">
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-border bg-canvas/60">
-                <th className="px-5 py-3 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-ink-muted">Organization</th>
+                <th className="px-5 py-3 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-ink-muted">Organisation</th>
                 <th className="px-5 py-3 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-ink-muted">Slug</th>
                 <th className="px-5 py-3 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-ink-muted">Tier</th>
                 <th className="px-5 py-3 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-ink-muted">Status</th>

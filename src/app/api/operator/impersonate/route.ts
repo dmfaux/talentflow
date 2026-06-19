@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       where: eq(organizations.id, orgId),
       columns: { id: true, slug: true, name: true, status: true },
     });
-    if (!org) return error("Organization not found", 404);
+    if (!org) return error("Organisation not found", 404);
 
     // Switching target: close any open session first so they never overlap.
     await closeOpenActAsSessions(ctx.userId);

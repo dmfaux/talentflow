@@ -72,10 +72,10 @@ export default function NewOrganizationPage() {
       });
       const { data, error } = await res.json();
       if (!res.ok) {
-        setFormError(error || "Could not provision the organization");
+        setFormError(error || "Could not provision the organisation");
         return;
       }
-      toast("Organization provisioned — invite sent", "success");
+      toast("Organisation provisioned — invite sent", "success");
       router.push(`/operator/orgs/${data.organization.id}`);
     } catch {
       setFormError("Something went wrong. Try again.");
@@ -94,7 +94,7 @@ export default function NewOrganizationPage() {
       {/* Breadcrumb */}
       <div className="mb-5 flex items-center gap-2 text-xs text-ink-muted">
         <Link href="/operator" className="transition-colors hover:text-ink">
-          Organizations
+          Organisations
         </Link>
         <span>/</span>
         <span className="text-ink-soft">New</span>
@@ -104,7 +104,7 @@ export default function NewOrganizationPage() {
         <p className="font-mono text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-ink-muted">
           Control plane
         </p>
-        <h1 className="mt-1 font-serif text-2xl text-ink">New organization</h1>
+        <h1 className="mt-1 font-serif text-2xl text-ink">New organisation</h1>
         <p className="mt-1 text-xs text-ink-muted">
           Provisions an empty, isolated org and emails its first Owner an invitation.
         </p>
@@ -122,7 +122,7 @@ export default function NewOrganizationPage() {
             {/* Name */}
             <div>
               <label htmlFor="org-name" className={labelClass}>
-                Organization name
+                Organisation name
               </label>
               <input
                 id="org-name"
@@ -216,7 +216,7 @@ export default function NewOrganizationPage() {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
               )}
-              Provision organization
+              Provision organisation
             </button>
           </div>
         </div>

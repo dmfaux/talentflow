@@ -90,7 +90,7 @@ export default function OperatorOrgDetailPage() {
         setTier(normaliseTier(data.tier));
         setBillingEmail(data.billing_email ?? "");
       })
-      .catch(() => setLoadError("Organization not found"))
+      .catch(() => setLoadError("Organisation not found"))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -150,7 +150,7 @@ export default function OperatorOrgDetailPage() {
     return <div className="py-24 text-center text-sm text-ink-muted">Loading…</div>;
   }
   if (loadError || !org) {
-    return <div className="py-24 text-center text-sm text-red">{loadError || "Organization not found"}</div>;
+    return <div className="py-24 text-center text-sm text-red">{loadError || "Organisation not found"}</div>;
   }
 
   const counts = [
@@ -177,7 +177,7 @@ export default function OperatorOrgDetailPage() {
     <div>
       {/* Breadcrumb */}
       <div className="mb-5 flex items-center gap-2 text-xs text-ink-muted">
-        <Link href="/operator" className="hover:text-ink transition-colors">Organizations</Link>
+        <Link href="/operator" className="hover:text-ink transition-colors">Organisations</Link>
         <span>/</span>
         <span className="font-mono text-ink-soft">{org.slug}</span>
       </div>
@@ -266,7 +266,7 @@ export default function OperatorOrgDetailPage() {
             </div>
           ) : (
             <p className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-ink-muted">
-              No owner has been provisioned for this organization yet.
+              No owner has been provisioned for this organisation yet.
             </p>
           )}
         </div>
@@ -277,7 +277,7 @@ export default function OperatorOrgDetailPage() {
         <div className="rounded-xl border border-border bg-surface p-6">
           <h2 className="font-serif text-lg text-ink">Plan & billing</h2>
           <p className="mt-0.5 text-xs text-ink-muted">
-            Tier is operator-set on the organization (the authoritative copy).
+            Tier is operator-set on the organisation (the authoritative copy).
           </p>
 
           <div className="mt-5">

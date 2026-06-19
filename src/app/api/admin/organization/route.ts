@@ -29,13 +29,13 @@ export async function GET() {
   const denied = authorizeApiOrg(ctx, "manage_org_settings");
   if (denied) return denied;
 
-  if (!ctx.effectiveOrgId) return error("No organization in context", 400);
+  if (!ctx.effectiveOrgId) return error("No organisation in context", 400);
 
   try {
     const org = await db.query.organizations.findFirst({
       where: eq(organizations.id, ctx.effectiveOrgId),
     });
-    if (!org) return error("Organization not found", 404);
+    if (!org) return error("Organisation not found", 404);
     return success(orgView(org));
   } catch (err) {
     console.error("GET /api/admin/organization error:", err);
@@ -50,7 +50,7 @@ export async function PATCH(request: NextRequest) {
   const denied = authorizeApiOrg(ctx, "manage_org_settings");
   if (denied) return denied;
 
-  if (!ctx.effectiveOrgId) return error("No organization in context", 400);
+  if (!ctx.effectiveOrgId) return error("No organisation in context", 400);
 
   try {
     const body = await request.json();

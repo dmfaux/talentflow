@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
         ? body.ownerEmail.trim().toLowerCase()
         : "";
 
-    if (!name) return error("Organization name is required");
+    if (!name) return error("Organisation name is required");
     const slugCheck = validateSlug(slug);
     if (!slugCheck.valid) return error(slugCheck.error!);
     if (!isTier(body.tier)) {

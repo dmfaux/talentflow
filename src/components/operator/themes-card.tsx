@@ -131,7 +131,7 @@ export function ThemesCard({
 
       {!premium && (
         <p className="mt-4 rounded-lg border border-dashed border-border bg-cream/40 px-3.5 py-2.5 text-[0.78rem] text-ink-muted">
-          This organization is on{" "}
+          This organisation is on{" "}
           <span className="font-medium capitalize text-ink-soft">{tier}</span>.
           Brands can pick gallery themes; bespoke white-label themes unlock on
           Premium or Enterprise.
@@ -141,7 +141,7 @@ export function ThemesCard({
       <div className="mt-4 space-y-2.5">
         {brands.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-ink-muted">
-            No brands in this organization yet.
+            No brands in this organisation yet.
           </p>
         ) : (
           brands.map((brand) => {

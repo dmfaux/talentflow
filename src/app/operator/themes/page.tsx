@@ -156,14 +156,14 @@ function ThemesConsole() {
       {brandScoped && (
         <div className="mb-5 flex items-center gap-2 text-xs text-ink-muted">
           <Link href="/operator" className="hover:text-ink transition-colors">
-            Organizations
+            Organisations
           </Link>
           <span>/</span>
           <Link
             href={`/operator/orgs/${orgId}`}
             className="hover:text-ink transition-colors"
           >
-            {brandName ?? "Organization"}
+            {brandName ?? "Organisation"}
           </Link>
           <span>/</span>
           <span className="text-ink-soft">Bespoke themes</span>
@@ -181,7 +181,7 @@ function ThemesConsole() {
           <p className="mt-1 text-xs text-ink-muted">
             {brandScoped
               ? "The shared gallery plus this brand's bespoke, white-label themes."
-              : "Shared themes every tenant can pick. Bespoke themes are built per brand from an organization."}
+              : "Shared themes every tenant can pick. Bespoke themes are built per brand from an organisation."}
           </p>
         </div>
       </div>
