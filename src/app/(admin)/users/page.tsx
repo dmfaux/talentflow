@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { ReactNode, useCallback, useEffect, useState } from "react";
 import { canManageOrg, useTenant } from "@/components/admin/tenant-provider";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast-provider";
@@ -294,7 +294,14 @@ function InviteModal({
 
           {/* Access type toggle */}
           <div>
-            <label className={labelClass}>Access</label>
+            <div className="mb-1.5 flex items-center gap-1.5">
+              <span className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-ink-muted">
+                Access
+              </span>
+              <HelpPopover label="About access types">
+                <AccessHelp />
+              </HelpPopover>
+            </div>
             <div className="flex gap-1 rounded-lg border border-rule bg-canvas p-0.5">
               <SegBtn
                 active={accessType === "brand"}
@@ -331,9 +338,17 @@ function InviteModal({
                 </select>
               </div>
               <div>
-                <label htmlFor="invite-brand-role" className={labelClass}>
-                  Brand role
-                </label>
+                <div className="mb-1.5 flex items-center gap-1.5">
+                  <label
+                    htmlFor="invite-brand-role"
+                    className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-ink-muted"
+                  >
+                    Brand role
+                  </label>
+                  <HelpPopover label="About brand roles" align="right">
+                    <BrandRolesHelp />
+                  </HelpPopover>
+                </div>
                 <select
                   id="invite-brand-role"
                   value={brandRole}
@@ -409,6 +424,102 @@ function SegBtn({
     >
       {label}
     </button>
+  );
+}
+
+// ── Help popovers (invite affordances) ───────────────────────────────
+// A small "?" trigger that opens an on-demand explanation. Rendered INSIDE the
+// invite modal card so its click-away dismisses the popover without bubbling to
+// the modal's overlay-close.
+
+function HelpPopover({
+  label,
+  align = "left",
+  children,
+}: {
+  label: string;
+  align?: "left" | "right";
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-label={label}
+        aria-expanded={open}
+        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-rule text-[0.62rem] font-semibold leading-none text-ink-muted transition-colors hover:border-cobalt hover:text-cobalt cursor-pointer"
+      >
+        ?
+      </button>
+      {open && (
+        <>
+          <span className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div
+            role="dialog"
+            aria-label={label}
+            className={`absolute top-6 z-20 w-72 rounded-lg border border-rule bg-paper p-3.5 text-left shadow-xl ${
+              align === "right" ? "right-0" : "left-0"
+            }`}
+          >
+            {children}
+          </div>
+        </>
+      )}
+    </span>
+  );
+}
+
+function HelpItem({ term, children }: { term: string; children: ReactNode }) {
+  return (
+    <p className="text-[0.72rem] leading-relaxed text-ink-soft">
+      <span className="font-semibold text-ink">{term}</span> — {children}
+    </p>
+  );
+}
+
+function BrandRolesHelp() {
+  return (
+    <div className="space-y-2">
+      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-ink-muted">
+        What each brand role can do
+      </p>
+      <HelpItem term="Brand Admin">
+        Everything a Recruiter can do, plus edit this brand&rsquo;s branding,
+        contact details, and settings.
+      </HelpItem>
+      <HelpItem term="Recruiter">
+        Add and manage candidates, and create, edit, and publish campaigns for
+        this brand.
+      </HelpItem>
+      <HelpItem term="Viewer">
+        Read-only access to this brand&rsquo;s campaigns and candidates.
+      </HelpItem>
+    </div>
+  );
+}
+
+function AccessHelp() {
+  return (
+    <div className="space-y-2">
+      <p className="text-[0.65rem] font-semibold uppercase tracking-[0.1em] text-ink-muted">
+        Brand role vs Org-level
+      </p>
+      <HelpItem term="Brand role">
+        Access to a single brand, at the level you choose. Best for someone who
+        works on just one brand.
+      </HelpItem>
+      <HelpItem term="Org-level">
+        Access to every brand in the organisation, plus organisation admin —
+        inviting members, creating brands, and editing settings. Best for
+        someone who runs the whole account.
+      </HelpItem>
+      <p className="text-[0.7rem] leading-relaxed text-ink-muted">
+        Org-level comes as Org Admin, or Owner (full control, including managing
+        other owners).
+      </p>
+    </div>
   );
 }
 
