@@ -207,19 +207,35 @@ export async function PATCH(
       updates.is_active = nextActive;
     }
 
-    const [row] = await db
-      .update(users)
-      .set(updates)
-      .where(eq(users.id, id))
-      .returning({
-        id: users.id,
-        first_name: users.first_name,
-        last_name: users.last_name,
-        email: users.email,
-        org_role: users.org_role,
-        is_active: users.is_active,
-        updated_at: users.updated_at,
-      });
+    const returnCols = {
+      id: users.id,
+      first_name: users.first_name,
+      last_name: users.last_name,
+      email: users.email,
+      org_role: users.org_role,
+      is_active: users.is_active,
+      updated_at: users.updated_at,
+    };
+
+    // Promoting a brand-scoped Member to an org-level role (owner/org_admin)
+    // makes their per-brand memberships dead data — decideBrandAccess spans all
+    // brands for org-level roles and never consults memberships. Clear them in
+    // the same unit so the membership view reflects the role (a later demote
+    // back to Member starts from a clean slate, not stale brands).
+    const promotingToOrgLevel =
+      existing.org_role === null && updates.org_role != null;
+
+    const row = promotingToOrgLevel
+      ? await db.transaction(async (tx) => {
+          const [r] = await tx
+            .update(users)
+            .set(updates)
+            .where(eq(users.id, id))
+            .returning(returnCols);
+          await tx.delete(memberships).where(eq(memberships.user_id, id));
+          return r;
+        })
+      : (await db.update(users).set(updates).where(eq(users.id, id)).returning(returnCols))[0];
 
     return success(row);
   } catch (err) {
