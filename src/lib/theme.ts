@@ -1,5 +1,6 @@
 import { db } from "@/db";
-import { themes } from "@/db/schema";
+import { clients, organizations, themes } from "@/db/schema";
+import { isPremiumTier } from "@/lib/theme-fields";
 import { eq } from "drizzle-orm";
 
 // ── Campaign Themes — the single resolution point (CT1) ──────────────
@@ -156,6 +157,76 @@ export async function resolveCampaignTheme(
     email: { ...DEFAULT_EMAIL_THEME, logo: brandLogo(campaign.client) },
     landingHtml: null,
   };
+}
+
+// ── Theme-assignment guards (CT2; reused by CT3) ─────────────────────
+//
+// The availability + tier rules that the operator (CT2) and tenant (CT3) writers
+// BOTH enforce when a theme is built for, or assigned to, a brand. Factored here
+// so there is a single source of truth — never two copies of "can this theme go
+// on this brand?" that can drift apart.
+
+/**
+ * Is `theme` assignable to brand `brandId`? A GALLERY theme is available to every
+ * brand; a CUSTOM (white-label) theme is available only to its OWN brand — never
+ * another brand's or org's bespoke — and only when that brand is Premium+ (D-1).
+ * `tier` is the brand's effective ORG tier (organizations.tier, the authoritative
+ * copy; clients.tier is a never-written legacy mirror). Returns a tagged result
+ * the caller maps to an HTTP status (404 = cross-brand bespoke hidden as
+ * "not found"; 400 = the tier gate).
+ */
+export function assertThemeAssignable(args: {
+  theme: { scope: string; client_id: string | null };
+  brandId: string;
+  tier: string | null | undefined;
+}): { ok: true } | { ok: false; status: 400 | 404; message: string } {
+  if (args.theme.scope === "custom") {
+    if (args.theme.client_id !== args.brandId) {
+      return {
+        ok: false,
+        status: 404,
+        message: "Theme is not available for this brand",
+      };
+    }
+    if (!isPremiumTier(args.tier)) {
+      return {
+        ok: false,
+        status: 400,
+        message: "A custom theme requires a Premium or Enterprise brand",
+      };
+    }
+  }
+  return { ok: true };
+}
+
+/**
+ * Authoring-time integrity for a CUSTOM theme: the brand must exist, belong to
+ * the supplied org (no cross-org bespoke), and its org must be Premium+. Loads
+ * the brand + org tier and runs assertThemeAssignable. Returns null when OK, or a
+ * `{ message, status }` the route turns into an error response.
+ */
+export async function guardCustomThemeBrand(
+  orgId: string,
+  clientId: string
+): Promise<{ message: string; status: 400 | 404 } | null> {
+  const brand = await db.query.clients.findFirst({
+    where: eq(clients.id, clientId),
+    columns: { id: true, org_id: true },
+  });
+  if (!brand) return { message: "Unknown client_id", status: 400 };
+  if (brand.org_id !== orgId) {
+    return { message: "client_id does not belong to org_id", status: 400 };
+  }
+  const org = await db.query.organizations.findFirst({
+    where: eq(organizations.id, brand.org_id),
+    columns: { tier: true },
+  });
+  const verdict = assertThemeAssignable({
+    theme: { scope: "custom", client_id: clientId },
+    brandId: clientId,
+    tier: org?.tier ?? null,
+  });
+  return verdict.ok ? null : { message: verdict.message, status: verdict.status };
 }
 
 /**

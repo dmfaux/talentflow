@@ -3,6 +3,7 @@
 import { TierBadge, type Tier } from "@/components/admin/tier-badge";
 import { ImpersonateButton } from "@/components/operator/impersonate-button";
 import { LifecycleActions } from "@/components/operator/lifecycle-actions";
+import { ThemesCard, type ThemeBrand } from "@/components/operator/themes-card";
 import { useToast } from "@/components/ui/toast-provider";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -44,6 +45,7 @@ interface OrgDetail {
   deleted_at: string | null;
   created_at: string;
   counts: { brands: number; campaigns: number; candidates: number };
+  brands: ThemeBrand[];
   owner: OrgOwner | null;
   pendingInvite: PendingInvite | null;
   usage: OrgUsage;
@@ -383,6 +385,11 @@ export default function OperatorOrgDetailPage() {
             </p>
           )}
         </div>
+      </div>
+
+      {/* Themes — per-brand default campaign theme + bespoke builds (CT2) */}
+      <div className="mt-6">
+        <ThemesCard orgId={org.id} tier={org.tier} brands={org.brands} />
       </div>
 
       {/* Lifecycle — suspend / soft-delete / restore / purge (S11) */}

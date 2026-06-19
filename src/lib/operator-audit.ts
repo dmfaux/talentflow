@@ -20,6 +20,12 @@ export const OPERATOR_AUDIT_ACTIONS = [
   "restore",
   "soft_delete",
   "purge_org",
+  // Campaign Themes CT2 — operator theme authoring. theme_create/theme_update
+  // carry point-in-time {name, scope}; set_brand_default_theme carries {from, to}
+  // (the brand's previous/next default_theme_id), matching the set_tier precedent.
+  "theme_create",
+  "theme_update",
+  "set_brand_default_theme",
 ] as const;
 
 export type OperatorAuditAction = (typeof OPERATOR_AUDIT_ACTIONS)[number];

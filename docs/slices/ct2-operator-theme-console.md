@@ -1,5 +1,7 @@
 # CT2 · Operator theme authoring console
 
+> **✅ DONE** — implemented 2026-06-19. Operator routes (`POST`/`GET /api/operator/themes`, `PATCH /api/operator/themes/[id]`, `POST /api/operator/themes/preview`, `POST /api/operator/clients/[id]/default-theme`); three new in-code audit actions (`theme_create`/`theme_update`/`set_brand_default_theme`, no migration); the shared `assertThemeAssignable` + db-backed `guardCustomThemeBrand` guards (`src/lib/theme.ts`) over a pure, client-safe `normaliseThemeFields`/palette module (`src/lib/theme-fields.ts`); the operator console (`/operator/themes` gallery grid + bespoke listing + theme-builder with a live email preview) and a **Themes** card on the org-detail page are all in. **Tier-gate correction:** the Premium+ gate reads the authoritative `organizations.tier` (the spec's literal `clients.tier` is a never-written legacy mirror that is always `standard`, so gating on it would block every brand). Verified: 22 unit tests (field validation + assignment guard) + 17 integration tests (gallery/bespoke create, default assignment + audit rows, Standard-brand reject, cross-org reject, preview render); `npm run build` clean. All acceptance criteria met.
+
 > **Campaign Themes — Phase 2 (managed authoring).** Extracted from the [Campaign Themes spec](../campaign-themes-spec.md) (§8). Slice IDs CT1–CT4 are stable references for tracking.
 
 - **Goal:** operators (TalentStream staff) hand-build the shared **gallery** and per-brand **bespoke** themes, and assign a brand's default theme — the managed/services model (decision 3).

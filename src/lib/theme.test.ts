@@ -29,6 +29,7 @@ vi.mock("@/db", () => ({
 }));
 
 import {
+  assertThemeAssignable,
   DEFAULT_EMAIL_THEME,
   FONT_DISPLAY,
   FONT_SANS,
@@ -77,6 +78,50 @@ const brandWithLogo = {
 beforeEach(() => {
   store.rows.clear();
   store.calls = [];
+});
+
+// ── Assignment guard (CT2) ───────────────────────────────────────────
+
+describe("assertThemeAssignable", () => {
+  it("allows a gallery theme on any brand regardless of tier", () => {
+    expect(
+      assertThemeAssignable({
+        theme: { scope: "gallery", client_id: null },
+        brandId: "brand-1",
+        tier: "standard",
+      })
+    ).toEqual({ ok: true });
+  });
+
+  it("allows the brand's own bespoke theme when Premium+", () => {
+    expect(
+      assertThemeAssignable({
+        theme: { scope: "custom", client_id: "brand-1" },
+        brandId: "brand-1",
+        tier: "premium",
+      })
+    ).toEqual({ ok: true });
+  });
+
+  it("rejects a custom theme on a Standard brand (400)", () => {
+    const result = assertThemeAssignable({
+      theme: { scope: "custom", client_id: "brand-1" },
+      brandId: "brand-1",
+      tier: "standard",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(400);
+  });
+
+  it("hides another brand's bespoke theme as not-found (404)", () => {
+    const result = assertThemeAssignable({
+      theme: { scope: "custom", client_id: "brand-2" },
+      brandId: "brand-1",
+      tier: "enterprise",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(404);
+  });
 });
 
 // ── Precedence ───────────────────────────────────────────────────────

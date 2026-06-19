@@ -5,12 +5,13 @@ import {
   clients,
   invitations,
   organizations,
+  themes,
   usageEvents,
   users,
 } from "@/db/schema";
 import { clientIp, error, requireApiOperator, success } from "@/lib/api";
 import { recordOperatorAudit } from "@/lib/operator-audit";
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
 const USAGE_KINDS = [
@@ -127,6 +128,23 @@ export async function GET(
       periodOutput += row.outputTokens;
     }
 
+    // The org's brands + each brand's current default theme (CT2) — the Themes
+    // card on the org-detail page assigns defaults and links to bespoke builds.
+    // Premium-gating is decided from org.tier (returned above), server-enforced.
+    const brandRows = await db
+      .select({
+        id: clients.id,
+        name: clients.name,
+        slug: clients.slug,
+        default_theme_id: clients.default_theme_id,
+        default_theme_name: themes.name,
+        default_theme_scope: themes.scope,
+      })
+      .from(clients)
+      .leftJoin(themes, eq(clients.default_theme_id, themes.id))
+      .where(eq(clients.org_id, id))
+      .orderBy(asc(clients.name));
+
     return success({
       ...org,
       counts: {
@@ -134,6 +152,7 @@ export async function GET(
         campaigns: camps.total,
         candidates: cands.total,
       },
+      brands: brandRows,
       owner: owner ?? null,
       pendingInvite: pendingInvite ?? null,
       usage: {
