@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { clients, organizations, themes } from "@/db/schema";
 import { isPremiumTier } from "@/lib/theme-fields";
 import { makeLandingTemplate } from "@/lib/landing";
+import type { EmailTemplateMap } from "@/lib/email-slots";
 import { eq } from "drizzle-orm";
 
 // ── Campaign Themes — the single resolution point (CT1) ──────────────
@@ -37,6 +38,11 @@ export interface EmailTheme {
    *  TalentStream funnel wordmark is rendered (default-theme fallback). */
   logo: { url: string; background: string; position: string } | null;
   showPoweredBy: boolean;
+  /** CT6: per-template bespoke email HTML carried on the theme. Present only for
+   *  custom (Premium) themes; gallery/default themes leave it null and fall back
+   *  to the generated email kit. Riding on EmailTheme means it flows into
+   *  theme_snapshot.email at freeze (RD-1 stability) with no call-site changes. */
+  emailTemplates?: EmailTemplateMap | null;
 }
 
 /** The snapshot frozen onto a campaign at activation (RD-1). Stored on
@@ -125,7 +131,7 @@ function brandLogo(client: ResolverClient | null): EmailTheme["logo"] {
  */
 export async function resolveCampaignTheme(
   campaign: ResolverCampaign
-): Promise<{ email: EmailTheme }> {
+): Promise<{ email: EmailTheme; landingHtml: string | null }> {
   const themeId = campaign.theme_id ?? campaign.client?.default_theme_id ?? null;
 
   if (themeId) {
@@ -147,16 +153,24 @@ export async function resolveCampaignTheme(
             }
           : brandLogo(campaign.client),
         showPoweredBy: row.show_powered_by,
+        // CT6: bespoke per-template email HTML (custom themes only; gallery rows
+        // carry null by write-side invariant).
+        emailTemplates: row.email_templates ?? null,
       };
-      return { email };
+      // CT6: the theme's bespoke landing body (custom themes only). Distinct from
+      // a campaign's per-campaign html_template paste — precedence handled in
+      // resolveEffectiveLanding / freezeCampaignTheme.
+      const landingHtml = row.landing_html?.trim() ? row.landing_html : null;
+      return { email, landingHtml };
     }
     // Row missing (deleted / set-null race) → fall through to the default rung.
   }
 
   // Default rung: today's look, with the brand's own logo adopted (so even a
-  // Standard brand keeps its logo per the tier matrix).
+  // Standard brand keeps its logo per the tier matrix). No bespoke landing.
   return {
     email: { ...DEFAULT_EMAIL_THEME, logo: brandLogo(campaign.client) },
+    landingHtml: null,
   };
 }
 
@@ -287,16 +301,16 @@ function landingOverride(
 
 /**
  * Resolve the landing HTML the public careers page should render for a campaign
- * (CT5). A campaign is NEVER landing-less: the themed landing is generated from
- * the resolved palette via makeLandingTemplate, and the per-campaign paste
- * (html_template) is only an optional Premium-tier override.
+ * (CT5/CT6). A campaign is NEVER landing-less. Precedence (highest first):
+ *   1. the per-campaign html_template paste (Premium-only override),
+ *   2. the theme's own bespoke landing body (CT6 — custom/Premium themes),
+ *   3. the palette-generated landing via makeLandingTemplate.
  *
- * - Active campaigns read the frozen snapshot: a Premium override frozen at
- *   activation wins; otherwise the themed landing is regenerated from the FROZEN
- *   palette (snapshot.email), so editing a theme never disturbs an in-flight
- *   campaign (RD-1) yet active campaigns still pick up the shared layout.
- * - Drafts (no snapshot) resolve live: the html_template override is honoured
- *   only for Premium+ brands; everyone else gets the theme-generated landing.
+ * - Active campaigns read the frozen snapshot: freezeCampaignTheme bakes rung 1
+ *   OR rung 2 into snapshot.landingHtml at activation, so editing a theme never
+ *   disturbs an in-flight campaign (RD-1); when neither was frozen the themed
+ *   landing is regenerated from the FROZEN palette (snapshot.email).
+ * - Drafts (no snapshot) resolve live through the full precedence chain.
  */
 export async function resolveEffectiveLanding(
   campaign: ResolverCampaign & {
@@ -311,20 +325,23 @@ export async function resolveEffectiveLanding(
       ? frozen
       : makeLandingTemplate(campaign.theme_snapshot.email);
   }
-  const { email } = await resolveCampaignTheme(campaign);
+  const { email, landingHtml } = await resolveCampaignTheme(campaign);
   return (
     landingOverride(campaign.tier, campaign.html_template) ??
+    landingHtml ??
     makeLandingTemplate(email)
   );
 }
 
 /**
  * Freeze the resolved look at activation (RD-1). Captures the live resolver's
- * email theme; the landing is NOT baked (it regenerates from `email` at render),
- * so the snapshot's landingHtml stores ONLY a Premium-tier paste override (or
- * null). A Standard brand can never freeze an override — the gate is structural.
- * Re-frozen on every into-active transition; never re-frozen by an edit to an
- * already-active campaign.
+ * email theme (which now carries the bespoke per-template email HTML, so active
+ * campaigns send the frozen bespoke emails — CT6). For the landing it bakes the
+ * effective body: a Premium-tier paste override wins, else the theme's own
+ * bespoke landing (CT6), else null (the landing regenerates from `email` at
+ * render). A Standard brand can never freeze a paste override and never carries a
+ * custom theme, so its snapshot stays null → generated. Re-frozen on every
+ * into-active transition; never re-frozen by an edit to an already-active campaign.
  */
 export async function freezeCampaignTheme(
   campaign: ResolverCampaign & {
@@ -335,7 +352,9 @@ export async function freezeCampaignTheme(
   const resolved = await resolveCampaignTheme(campaign);
   return {
     email: resolved.email,
-    landingHtml: landingOverride(campaign.tier, campaign.html_template),
+    landingHtml:
+      landingOverride(campaign.tier, campaign.html_template) ??
+      resolved.landingHtml,
     theme_id: campaign.theme_id ?? null,
     frozen_at: new Date().toISOString(),
   };

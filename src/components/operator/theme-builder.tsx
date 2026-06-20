@@ -1,6 +1,13 @@
 "use client";
 
 import { useToast } from "@/components/ui/toast-provider";
+import type { EmailTemplateMap } from "@/lib/email-slots";
+import {
+  buildTemplatePrompt,
+  type BrandColors,
+  type LogoInput,
+} from "@/lib/prompt-builder";
+import { validateHtmlTemplate } from "@/lib/slots";
 import {
   STARTER_THEME_DRAFT,
   THEME_PALETTE_KEYS,
@@ -8,6 +15,8 @@ import {
   type ThemeScope,
 } from "@/lib/theme-fields";
 import { useState } from "react";
+import { ThemeBespokeEmails } from "./theme-bespoke-emails";
+import { ThemeBespokePreview } from "./theme-bespoke-preview";
 import {
   ThemeEmailPreview,
   type ThemePreviewPayload,
@@ -27,9 +36,13 @@ export interface OperatorThemeRow {
   logo_background: string;
   logo_position: string;
   show_powered_by: boolean;
-  // Vestigial (CT5): landings are GENERATED from the palette, not authored per
-  // theme. The column + API field remain but are no longer read or written here.
+  // Bespoke landing override (CT6): a custom theme may carry a hand-authored
+  // landing page that supersedes the palette-generated one (resolveEffectiveLanding
+  // precedence). Null = fall back to the generated landing. Custom-scope only.
   landing_html: string | null;
+  // Bespoke per-template email overrides (CT6): a sparse map keyed by email
+  // template type. Custom-scope only; gallery themes stay recolour-only.
+  email_templates: EmailTemplateMap | null;
   preview_image_url: string | null;
   client?: { id: string; name: string; slug: string } | null;
   organization?: { id: string; name: string; slug: string } | null;
@@ -92,11 +105,31 @@ function to6(hex: string): string {
   return /^[0-9a-fA-F]{6}$/.test(v) ? `#${v}` : "#000000";
 }
 
+/**
+ * Map the theme's own 11-token palette onto the prompt builders' BrandColors
+ * shape. The bespoke prompt embeds these as "use these exact colours", so the
+ * generated landing/email matches the theme the operator is authoring. Used when
+ * the page can't supply the brand's configured colours (no operator brand-kit
+ * feed); the threaded brandColors prop takes precedence over this.
+ */
+function paletteToBrandColors(
+  palette: Record<ThemePaletteKey, string>
+): BrandColors {
+  return {
+    primary: palette.primary,
+    secondary: palette.bg,
+    accent: palette.accent,
+    text: palette.ink,
+  };
+}
+
 export function ThemeBuilder({
   scope,
   orgId,
   clientId,
   brandName,
+  brandColors,
+  logo,
   initial,
   onDone,
 }: {
@@ -104,6 +137,11 @@ export function ThemeBuilder({
   orgId?: string;
   clientId?: string;
   brandName?: string;
+  /** The brand's configured colours (custom themes only); threaded from the page.
+   *  Absent for gallery themes — the bespoke sections are then hidden anyway. */
+  brandColors?: BrandColors | null;
+  /** The brand's configured logo (custom themes only); threaded from the page. */
+  logo?: LogoInput | null;
   initial?: OperatorThemeRow;
   onDone: (saved: boolean) => void;
 }) {
@@ -138,6 +176,15 @@ export function ThemeBuilder({
   const [previewImageUrl, setPreviewImageUrl] = useState(
     initial?.preview_image_url ?? ""
   );
+  // Bespoke landing override (CT6, custom-only). Re-enabled — the builder now
+  // authors landing_html again (CT5 had treated it as vestigial).
+  const [landingHtml, setLandingHtml] = useState(initial?.landing_html ?? "");
+  const [landingBrief, setLandingBrief] = useState("");
+  const [landingCopied, setLandingCopied] = useState(false);
+  // Bespoke per-template email overrides (CT6, custom-only) — a sparse map.
+  const [emailTemplates, setEmailTemplates] = useState<EmailTemplateMap>(
+    () => initial?.email_templates ?? {}
+  );
   const [saving, setSaving] = useState(false);
 
   const previewPayload: ThemePreviewPayload = {
@@ -150,8 +197,42 @@ export function ThemeBuilder({
     show_powered_by: isGallery ? true : showPoweredBy,
   };
 
+  // Live validation of the pasted bespoke landing (mirrors campaign-wizard) —
+  // only surfaced when something has been pasted.
+  const landingValidation = landingHtml.trim()
+    ? validateHtmlTemplate(landingHtml)
+    : null;
+
+  // The brand colours/logo fed to the AI prompts. Prefer what the page threaded
+  // (the brand's configured kit); fall back to the theme's own palette + logo so
+  // the prompt always reflects the bespoke colours being authored.
+  const promptBrandColors: BrandColors =
+    brandColors ?? paletteToBrandColors(palette);
+  const promptLogo: LogoInput | null =
+    logo ??
+    (logoUrl.trim()
+      ? { url: logoUrl.trim(), background: logoBackground, position: logoPosition }
+      : null);
+
   function setColor(key: ThemePaletteKey, value: string) {
     setPalette((p) => ({ ...p, [key]: value }));
+  }
+
+  function copyLandingPrompt() {
+    const prompt = buildTemplatePrompt({
+      name: name.trim() || `${brandName ?? "Brand"} landing page`,
+      brief:
+        landingBrief.trim() ||
+        `A bespoke, white-label job-application landing page for ${brandName ?? "the brand"}.`,
+      brandColors: promptBrandColors,
+      logo: promptLogo,
+      // Bespoke landings are custom/Premium+ only: brand colours, no powered-by.
+      tier: "premium",
+    });
+    navigator.clipboard?.writeText(prompt).then(() => {
+      setLandingCopied(true);
+      setTimeout(() => setLandingCopied(false), 2000);
+    });
   }
 
   // Ensure preset selects always include the current (possibly custom) value.
@@ -167,6 +248,12 @@ export function ThemeBuilder({
       toast("Give the theme a name", "error");
       return;
     }
+    // Bespoke landing must satisfy the slot/mount contract before we save it (the
+    // server re-validates, but fail fast with a precise message).
+    if (!isGallery && landingValidation && !landingValidation.ok) {
+      toast(`Fix the bespoke landing: ${landingValidation.errors[0]}`, "error");
+      return;
+    }
     setSaving(true);
     try {
       const body = {
@@ -180,6 +267,15 @@ export function ThemeBuilder({
         logo_background: logoBackground,
         logo_position: logoPosition,
         show_powered_by: isGallery ? true : showPoweredBy,
+        // Bespoke landing + emails (CT6) — custom-scope only. Gallery sends null
+        // so a scope-flip can't smuggle bespoke structure (the server forces null
+        // for gallery regardless). Empty map → null, so we don't persist {}.
+        landing_html: isGallery ? null : landingHtml.trim() || null,
+        email_templates: isGallery
+          ? null
+          : Object.keys(emailTemplates).length
+            ? emailTemplates
+            : null,
         preview_image_url: previewImageUrl.trim() || null,
       };
       const res = await fetch(
@@ -432,6 +528,143 @@ export function ThemeBuilder({
               </button>
             </div>
           </section>
+
+          {/* ── Bespoke authoring (custom themes only) ──────────────
+              Gallery themes stay palette-only; the bespoke landing + emails
+              are Premium-only, brand-scoped structure (CT6). */}
+          {!isGallery && (
+            <>
+              {/* Bespoke section divider */}
+              <div className="flex items-center gap-3 pt-1">
+                <div className="h-px flex-1 bg-border" />
+                <p className="font-mono text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-ink-muted">
+                  Bespoke · white-label
+                </p>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+
+              {/* A · Bespoke landing page */}
+              <section className="rounded-xl border border-border bg-surface p-5">
+                <h3 className="font-serif text-base text-ink">Bespoke landing page</h3>
+                <p className="mt-0.5 text-xs text-ink-muted">
+                  A hand-authored landing page that supersedes the palette-generated
+                  one for campaigns on this theme. Copy the prompt into Claude or
+                  ChatGPT, refine the live preview, then paste the final HTML.
+                  Leave blank to use the generated landing.
+                </p>
+
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <label htmlFor="landing_brief" className={labelClass}>
+                      Design brief{" "}
+                      <span className="font-sans normal-case tracking-normal text-ink-faint">
+                        optional
+                      </span>
+                    </label>
+                    <textarea
+                      id="landing_brief"
+                      value={landingBrief}
+                      onChange={(e) => setLandingBrief(e.target.value)}
+                      placeholder="Layout style, tone, sections to include… folded into the copied prompt."
+                      rows={2}
+                      className="w-full resize-none rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={copyLandingPrompt}
+                    className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-border bg-cream/40 px-4 text-[0.8rem] font-medium text-ink transition-colors hover:bg-cream hover:border-border-strong cursor-pointer"
+                  >
+                    {landingCopied ? (
+                      <>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 8.5L6.5 12L13 4" />
+                        </svg>
+                        Copied to clipboard
+                      </>
+                    ) : (
+                      <>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="5" y="5" width="8" height="8" rx="1.5" />
+                          <path d="M3 11V3.5A1.5 1.5 0 014.5 2H11" />
+                        </svg>
+                        Copy AI prompt for the landing page
+                      </>
+                    )}
+                  </button>
+
+                  <div className="relative">
+                    <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
+                    <p className="relative mx-auto w-fit bg-surface px-3 text-[0.62rem] font-medium uppercase tracking-[0.15em] text-ink-muted">
+                      Then paste the generated HTML
+                    </p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="landing_html" className={labelClass}>
+                      Landing HTML
+                    </label>
+                    <textarea
+                      id="landing_html"
+                      value={landingHtml}
+                      onChange={(e) => setLandingHtml(e.target.value)}
+                      placeholder="Paste the complete HTML page here…"
+                      spellCheck={false}
+                      rows={10}
+                      className={`w-full resize-none rounded-lg border bg-cream/40 px-3.5 py-2.5 font-mono text-xs text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-muted focus:ring-1 focus:ring-cobalt/20 ${
+                        landingValidation && !landingValidation.ok
+                          ? "border-red focus:border-red"
+                          : landingValidation?.ok
+                            ? "border-green focus:border-cobalt"
+                            : "border-border focus:border-cobalt"
+                      }`}
+                    />
+                    {landingValidation?.ok && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-green">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2.5 6.5L5 9l4.5-6" />
+                        </svg>
+                        Valid landing template ({landingHtml.length.toLocaleString()}{" "}
+                        characters)
+                      </p>
+                    )}
+                    {landingValidation && !landingValidation.ok && (
+                      <div className="mt-1 space-y-0.5">
+                        {landingValidation.errors.map((err, i) => (
+                          <p key={i} className="text-xs text-red">
+                            {err}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {landingValidation?.ok && (
+                    <ThemeBespokePreview
+                      request={{
+                        endpoint: "/api/operator/themes/landing-preview",
+                        // The route reads landing_html (paste branch) and the
+                        // palette/fonts/logo draft (generated branch) — send both.
+                        body: { landing_html: landingHtml, ...previewPayload },
+                      }}
+                      height={560}
+                      label="Preview landing page"
+                    />
+                  )}
+                </div>
+              </section>
+
+              {/* B · Bespoke emails */}
+              <ThemeBespokeEmails
+                value={emailTemplates}
+                onChange={setEmailTemplates}
+                brandColors={promptBrandColors}
+                logo={promptLogo}
+                previewTheme={previewPayload}
+              />
+            </>
+          )}
 
           {/* Save bar */}
           <div className="flex items-center justify-end gap-2">

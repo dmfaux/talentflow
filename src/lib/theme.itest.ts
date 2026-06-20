@@ -49,12 +49,15 @@ import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
 import { applicationReceivedEmail } from "@/lib/email";
+import { makeLandingTemplate } from "@/lib/landing";
 import {
   DEFAULT_EMAIL_THEME,
   freezeCampaignTheme,
   resolveCampaignTheme,
+  resolveEffectiveLanding,
   type EmailTheme,
 } from "@/lib/theme";
+import type { EmailTemplateMap } from "@/lib/email-slots";
 import { POST as campaignsPost } from "@/app/api/admin/campaigns/route";
 import { PATCH as campaignPatch } from "@/app/api/admin/campaigns/[id]/route";
 
@@ -340,5 +343,234 @@ describe.skipIf(!RUN)("CT1 theme freeze + render preference (DB-backed)", () => 
     // Snapshot is byte-stable — same frozen_at, same (branded) palette.
     expect(edited.theme_snapshot.frozen_at).toBe(frozenAt);
     expect(edited.theme_snapshot.email.palette.primary).toBe("#006341");
+  });
+});
+
+// ── CT6 · bespoke landing + per-template emails (DB-backed) ──────────
+//
+// CT5 themed the landing from the palette and the per-campaign paste was the
+// only bespoke surface. CT6 lets a CUSTOM (Premium) theme carry its OWN bespoke
+// landing body (themes.landing_html) AND per-template email HTML
+// (themes.email_templates). These cases prove, against real rows:
+//   (a) draft precedence — campaign html_template paste > theme landing_html
+//       > the palette-generated landing;
+//   (b) freezeCampaignTheme bakes the theme's bespoke landing_html into
+//       snapshot.landingHtml when there is no per-campaign paste override;
+//   (c) the theme's email_templates ride onto snapshot.email.emailTemplates so
+//       an active campaign sends the frozen bespoke emails (RD-1).
+//
+// ⚠️ *.itest.ts truncate ALL tables — run only against the throwaway
+// interview_insider_test DB, never the dev DB.
+
+const MOUNT = '<div id="application-form"></div>';
+
+// The theme's own bespoke landing (a valid mount-bearing document) and a
+// per-campaign paste override that must win over it.
+const THEME_LANDING = `<!DOCTYPE html><html><head><style>body{margin:0}</style></head><body><h2>Theme Bespoke</h2>${MOUNT}</body></html>`;
+const CAMPAIGN_PASTE = `<!DOCTYPE html><html><head><style>body{margin:0}</style></head><body><h2>Campaign Paste</h2>${MOUNT}</body></html>`;
+
+// A valid per-type email map (CT6): applicationReceived needs no action.url;
+// chatInvitation requires {{action.url}} or it would fail the per-type contract.
+const THEME_EMAILS: EmailTemplateMap = {
+  applicationReceived:
+    "<p>Hi {{candidate.name}}, your application for {{campaign.role_title}} at {{client.name}} is received.</p>",
+  chatInvitation:
+    '<p>Hi {{candidate.name}}</p><a href="{{action.url}}">Start the chat</a>',
+};
+
+const ct6 = { org: "", brand: "", owner: "", customTheme: "" };
+
+// A logo-less brand carrying the bespoke custom theme as its default. The shape
+// matches ResolverClient (default_theme_id + the brand's own logo fields).
+type ResolverBrand = {
+  default_theme_id: string | null;
+  branding_logo_url: string | null;
+  logo_background: string | null;
+  logo_position: string | null;
+};
+
+describe.skipIf(!RUN)("CT6 bespoke landing + email templates (DB-backed)", () => {
+  let brand: ResolverBrand;
+
+  beforeAll(async () => {
+    await db.delete(usageEvents);
+    await db.delete(operatorAudit);
+    await db.delete(candidates);
+    await db.delete(campaigns);
+    await db.delete(memberships);
+    await db.delete(themes);
+    await db.delete(users);
+    await db.delete(clients);
+    await db.delete(organizations);
+
+    [ct6.org] = (
+      await db
+        .insert(organizations)
+        // Premium org — custom themes + paste overrides are Premium-only.
+        .values({ slug: "ct6-org", name: "CT6 Org", tier: "premium" })
+        .returning({ id: organizations.id })
+    ).map((o) => o.id);
+
+    [ct6.brand] = (
+      await db
+        .insert(clients)
+        .values({ org_id: ct6.org, slug: "ct6-brand", name: "CT6 Brand" })
+        .returning({ id: clients.id })
+    ).map((c) => c.id);
+
+    ct6.owner = (
+      await db
+        .insert(users)
+        .values({
+          org_id: ct6.org,
+          org_role: "owner",
+          first_name: "Owner",
+          last_name: "CT6",
+          email: "owner@ct6.test",
+          password_hash: PW,
+        })
+        .returning({ id: users.id })
+    )[0].id;
+
+    // A custom theme carrying BOTH a bespoke landing body and per-template emails.
+    ct6.customTheme = (
+      await db
+        .insert(themes)
+        .values({
+          org_id: ct6.org,
+          client_id: ct6.brand,
+          name: "CT6 Bespoke",
+          scope: "custom",
+          is_active: true,
+          palette: BRANDED_PALETTE,
+          font_display: DEFAULT_EMAIL_THEME.fontDisplay,
+          font_sans: DEFAULT_EMAIL_THEME.fontSans,
+          show_powered_by: false,
+          landing_html: THEME_LANDING,
+          email_templates: THEME_EMAILS,
+          created_by: ct6.owner,
+        })
+        .returning({ id: themes.id })
+    )[0].id;
+
+    brand = {
+      default_theme_id: ct6.customTheme,
+      branding_logo_url: null,
+      logo_background: "light",
+      logo_position: "top-left",
+    };
+  });
+
+  afterAll(async () => {
+    // Leave the throwaway DB clean for the next suite.
+    await db.delete(campaigns);
+    await db.delete(themes);
+    await db.delete(users);
+    await db.delete(clients);
+    await db.delete(organizations);
+  });
+
+  it("(a) draft precedence: campaign paste > theme landing_html > generated", async () => {
+    // 1. Campaign paste override (Premium) wins over the theme's own landing.
+    const withPaste = await resolveEffectiveLanding({
+      theme_id: ct6.customTheme,
+      html_template: CAMPAIGN_PASTE,
+      theme_snapshot: null,
+      tier: "premium",
+      client: brand,
+    });
+    expect(withPaste).toBe(CAMPAIGN_PASTE);
+
+    // 2. No paste → the theme's bespoke landing_html is served verbatim.
+    const themeLanding = await resolveEffectiveLanding({
+      theme_id: ct6.customTheme,
+      html_template: null,
+      theme_snapshot: null,
+      tier: "premium",
+      client: brand,
+    });
+    expect(themeLanding).toBe(THEME_LANDING);
+
+    // 3. A theme WITHOUT a bespoke landing falls through to the generated page.
+    const [plainTheme] = (
+      await db
+        .insert(themes)
+        .values({
+          org_id: ct6.org,
+          client_id: ct6.brand,
+          name: "CT6 Plain Custom",
+          scope: "custom",
+          is_active: true,
+          palette: BRANDED_PALETTE,
+          font_display: DEFAULT_EMAIL_THEME.fontDisplay,
+          font_sans: DEFAULT_EMAIL_THEME.fontSans,
+          show_powered_by: false,
+          landing_html: null,
+          email_templates: null,
+          created_by: ct6.owner,
+        })
+        .returning({ id: themes.id })
+    ).map((t) => t.id);
+
+    const generated = await resolveEffectiveLanding({
+      theme_id: plainTheme,
+      html_template: null,
+      theme_snapshot: null,
+      tier: "premium",
+      client: { ...brand, default_theme_id: null },
+    });
+    expect(generated).not.toBe(THEME_LANDING);
+    expect(generated).toContain(MOUNT); // generated landing still mounts the form
+    expect(generated).toContain("#006341"); // coloured from the resolved palette
+  });
+
+  it("(b) freeze bakes the theme's bespoke landing_html when there is no paste", async () => {
+    const snapshot = await freezeCampaignTheme({
+      theme_id: ct6.customTheme,
+      html_template: null, // no per-campaign override
+      tier: "premium",
+      client: brand,
+    });
+    expect(snapshot.landingHtml).toBe(THEME_LANDING);
+
+    // A per-campaign paste still wins at freeze time (override beats theme body).
+    const overridden = await freezeCampaignTheme({
+      theme_id: ct6.customTheme,
+      html_template: CAMPAIGN_PASTE,
+      tier: "premium",
+      client: brand,
+    });
+    expect(overridden.landingHtml).toBe(CAMPAIGN_PASTE);
+  });
+
+  it("(c) the custom theme's email_templates flow into snapshot.email.emailTemplates", async () => {
+    const snapshot = await freezeCampaignTheme({
+      theme_id: ct6.customTheme,
+      html_template: null,
+      tier: "premium",
+      client: brand,
+    });
+    expect(snapshot.email.emailTemplates).toEqual(THEME_EMAILS);
+
+    // The frozen snapshot regenerates the landing from the frozen body, stable
+    // against later theme edits (RD-1) — the active campaign reads its snapshot.
+    const activeHtml = await resolveEffectiveLanding({
+      theme_id: ct6.customTheme,
+      html_template: null,
+      theme_snapshot: snapshot,
+      tier: "premium",
+      client: brand,
+    });
+    expect(activeHtml).toBe(THEME_LANDING);
+    // Sanity: a snapshot without a frozen body would regenerate via the palette.
+    expect(
+      await resolveEffectiveLanding({
+        theme_id: ct6.customTheme,
+        html_template: null,
+        theme_snapshot: { ...snapshot, landingHtml: null },
+        tier: "premium",
+        client: brand,
+      })
+    ).toBe(makeLandingTemplate(snapshot.email));
   });
 });

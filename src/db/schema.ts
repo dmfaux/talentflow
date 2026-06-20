@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import type { ThemeSnapshot } from "@/lib/theme";
+import type { EmailTemplateMap } from "@/lib/email-slots";
 import {
   type AnyPgColumn,
   boolean,
@@ -126,7 +127,11 @@ export const themes = pgTable(
     logo_background: text("logo_background").notNull().default("light"),
     logo_position: text("logo_position").notNull().default("top-left"),
     show_powered_by: boolean("show_powered_by").notNull().default(true),
-    landing_html: text("landing_html"), // CT4 consumes
+    landing_html: text("landing_html"), // CT4/CT6 consumes (bespoke landing)
+    // CT6: per-template bespoke email HTML, sparse-keyed by EmailTemplateType.
+    // Custom-scope themes only (write-side forces null for gallery), so the
+    // resolver can render it unconditionally without a tier re-check.
+    email_templates: jsonb("email_templates").$type<EmailTemplateMap>(),
     preview_image_url: text("preview_image_url"), // CT2/CT3 consume
     created_by: uuid("created_by").references(() => users.id, {
       onDelete: "set null",

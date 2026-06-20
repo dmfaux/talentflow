@@ -232,6 +232,13 @@
       "when": 1781853390944,
       "tag": "0032_stiff_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1781941787463,
+      "tag": "0033_redundant_sauron",
+      "breakpoints": true
     }
   ]
 }

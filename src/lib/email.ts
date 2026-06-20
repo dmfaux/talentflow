@@ -1,6 +1,11 @@
 import { db } from "@/db";
 import { candidates, messages } from "@/db/schema";
 import { DEFAULT_EMAIL_THEME, type EmailTheme } from "@/lib/theme";
+import {
+  replaceEmailSlots,
+  type EmailSlotData,
+  type EmailTemplateType,
+} from "@/lib/email-slots";
 import { recordUsageEvent } from "@/lib/usage";
 import { eq } from "drizzle-orm";
 
@@ -419,21 +424,55 @@ function makeEmailKit(theme: EmailTheme) {
   };
 }
 
+/**
+ * CT6 dispatch: render the operator-authored bespoke template for `type` when the
+ * theme carries one, else fall back to the generated email kit. A bespoke theme
+ * (Premium, custom-scope) bakes a per-template HTML override onto
+ * `theme.emailTemplates` (which rides through to theme_snapshot.email at freeze),
+ * so this is the single branch every themed template shares. A blank/whitespace
+ * override is treated as absent — the kit fallback wins rather than sending an
+ * empty body. Gallery/default themes carry null here and always fall back, so
+ * their output is byte-identical to pre-CT6.
+ */
+function renderThemedEmail(
+  type: EmailTemplateType,
+  theme: EmailTheme,
+  data: EmailSlotData,
+  fallback: () => string
+): string {
+  const html = theme.emailTemplates?.[type];
+  if (typeof html === "string" && html.trim()) {
+    return replaceEmailSlots(html, data);
+  }
+  return fallback();
+}
+
 export function applicationReceivedEmail(
   theme: EmailTheme,
   candidateName: string,
   roleTitle: string,
   clientName: string
 ): string {
-  const { wrapTemplate, emailHeading, emailP, emailInfoCard, emailNote } =
-    makeEmailKit(theme);
-  return wrapTemplate(`
+  return renderThemedEmail(
+    "applicationReceived",
+    theme,
+    {
+      candidate: { name: candidateName },
+      campaign: { role_title: roleTitle },
+      client: { name: clientName },
+    },
+    () => {
+      const { wrapTemplate, emailHeading, emailP, emailInfoCard, emailNote } =
+        makeEmailKit(theme);
+      return wrapTemplate(`
     ${emailHeading("Confirmation", "We&rsquo;ve got your application")}
     ${emailP(`Hi ${candidateName},`)}
     ${emailP("Thank you for applying. We&rsquo;ve received your application and it&rsquo;s now being reviewed.")}
     ${emailInfoCard([["Role", roleTitle], ["Company", clientName]])}
     ${emailNote("You&rsquo;ll hear from us soon with an update on next steps.")}
   `);
+    }
+  );
 }
 
 export function gatingPassedEmail(
@@ -442,13 +481,25 @@ export function gatingPassedEmail(
   roleTitle: string,
   clientName: string
 ): string {
-  const { wrapTemplate, emailHeading, emailP, emailNote } = makeEmailKit(theme);
-  return wrapTemplate(`
+  return renderThemedEmail(
+    "gatingPassed",
+    theme,
+    {
+      candidate: { name: candidateName },
+      campaign: { role_title: roleTitle },
+      client: { name: clientName },
+    },
+    () => {
+      const { wrapTemplate, emailHeading, emailP, emailNote } =
+        makeEmailKit(theme);
+      return wrapTemplate(`
     ${emailHeading("Good news", "You&rsquo;re moving forward")}
     ${emailP(`Hi ${candidateName},`)}
     ${emailP(`Great news &mdash; you meet the initial requirements for the <strong>${roleTitle}</strong> role at <strong>${clientName}</strong>. Your application is now being reviewed by the team.`)}
     ${emailNote("We&rsquo;ll be in touch with the outcome shortly. Thank you for your patience.")}
   `);
+    }
+  );
 }
 
 export function passwordResetEmail(
@@ -498,13 +549,25 @@ export function gatingFailedEmail(
   roleTitle: string,
   clientName: string
 ): string {
-  const { wrapTemplate, emailHeading, emailP, emailNote } = makeEmailKit(theme);
-  return wrapTemplate(`
+  return renderThemedEmail(
+    "gatingFailed",
+    theme,
+    {
+      candidate: { name: candidateName },
+      campaign: { role_title: roleTitle },
+      client: { name: clientName },
+    },
+    () => {
+      const { wrapTemplate, emailHeading, emailP, emailNote } =
+        makeEmailKit(theme);
+      return wrapTemplate(`
     ${emailHeading("Application update", "Thank you for applying")}
     ${emailP(`Hi ${candidateName},`)}
     ${emailP(`Thank you for your interest in the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>. Unfortunately, your profile does not meet the specific requirements for this role at this time.`)}
     ${emailNote("We encourage you to apply for future opportunities that may be a better fit. We wish you all the best.")}
   `);
+    }
+  );
 }
 
 export function rejectionEmail(
@@ -513,13 +576,25 @@ export function rejectionEmail(
   roleTitle: string,
   clientName: string
 ): string {
-  const { wrapTemplate, emailHeading, emailP, emailNote } = makeEmailKit(theme);
-  return wrapTemplate(`
+  return renderThemedEmail(
+    "rejection",
+    theme,
+    {
+      candidate: { name: candidateName },
+      campaign: { role_title: roleTitle },
+      client: { name: clientName },
+    },
+    () => {
+      const { wrapTemplate, emailHeading, emailP, emailNote } =
+        makeEmailKit(theme);
+      return wrapTemplate(`
     ${emailHeading("Application update", "Thank you for your interest")}
     ${emailP(`Hi ${candidateName},`)}
     ${emailP(`Thank you for your interest in the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>. After careful consideration, we&rsquo;ve decided not to move forward with your application at this time.`)}
     ${emailNote("We appreciate the time you invested and encourage you to keep an eye out for future opportunities. We wish you all the best in your career.")}
   `);
+    }
+  );
 }
 
 export function chatInvitationEmail(
@@ -529,9 +604,25 @@ export function chatInvitationEmail(
   clientName: string,
   chatUrl: string
 ): string {
-  const { wrapTemplate, emailHeading, emailP, emailInfoCard, emailBtn, emailFallbackLink } =
-    makeEmailKit(theme);
-  return wrapTemplate(`
+  return renderThemedEmail(
+    "chatInvitation",
+    theme,
+    {
+      candidate: { name: candidateName },
+      campaign: { role_title: roleTitle },
+      client: { name: clientName },
+      action: { url: chatUrl },
+    },
+    () => {
+      const {
+        wrapTemplate,
+        emailHeading,
+        emailP,
+        emailInfoCard,
+        emailBtn,
+        emailFallbackLink,
+      } = makeEmailKit(theme);
+      return wrapTemplate(`
     ${emailHeading("Next step", "We&rsquo;d like to chat")}
     ${emailP(`Hi ${candidateName},`)}
     ${emailP("We have a few follow-up questions about your application. This should only take a few minutes.")}
@@ -539,6 +630,8 @@ export function chatInvitationEmail(
     ${emailBtn("Start chat", chatUrl)}
     ${emailFallbackLink(chatUrl)}
   `);
+    }
+  );
 }
 
 export function chatAccessEmail(
@@ -547,15 +640,28 @@ export function chatAccessEmail(
   roleTitle: string,
   magicLinkUrl: string
 ): string {
-  const { wrapTemplate, emailHeading, emailP, emailBtn, emailNote } =
-    makeEmailKit(theme);
-  return wrapTemplate(`
+  return renderThemedEmail(
+    "chatAccess",
+    theme,
+    {
+      // No client name on this template (the magic-link verify email has no
+      // company context — mirrors EMAIL_SLOT_SPECS.chatAccess).
+      candidate: { name: candidateName },
+      campaign: { role_title: roleTitle },
+      action: { url: magicLinkUrl },
+    },
+    () => {
+      const { wrapTemplate, emailHeading, emailP, emailBtn, emailNote } =
+        makeEmailKit(theme);
+      return wrapTemplate(`
     ${emailHeading("Verification", "Confirm your identity")}
     ${emailP(`Hi ${candidateName},`)}
     ${emailP(`We received a request to access your chat for the <strong>${roleTitle}</strong> application. Click below to verify your identity and continue. This link expires in 1&nbsp;hour.`)}
     ${emailBtn("Verify &amp; continue", magicLinkUrl)}
     ${emailNote("If you didn&rsquo;t request this, you can safely ignore this email.")}
   `);
+    }
+  );
 }
 
 // ── Nudge / no-response / rejection-confirmation templates ─────────
@@ -571,9 +677,20 @@ export function chatNudgeEmail(
   chatUrl: string,
   closeByDate: string
 ): string {
-  const { wrapTemplate, emailHeading, emailP, emailBtn, emailFallbackLink } =
-    makeEmailKit(theme);
-  return wrapTemplate(`
+  return renderThemedEmail(
+    "chatNudge",
+    theme,
+    {
+      candidate: { name: candidateName },
+      campaign: { role_title: roleTitle },
+      client: { name: clientName },
+      action: { url: chatUrl },
+      chat: { close_by_date: closeByDate },
+    },
+    () => {
+      const { wrapTemplate, emailHeading, emailP, emailBtn, emailFallbackLink } =
+        makeEmailKit(theme);
+      return wrapTemplate(`
     ${emailHeading("Reminder", "We&rsquo;d still love to hear from you")}
     ${emailP(`Hi ${candidateName},`)}
     ${emailP(`We&rsquo;re still interested in your application for the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>, but we haven&rsquo;t heard back from our earlier chat invitation.`)}
@@ -581,6 +698,8 @@ export function chatNudgeEmail(
     ${emailBtn("Continue chat", chatUrl)}
     ${emailFallbackLink(chatUrl)}
   `);
+    }
+  );
 }
 
 /** Terminal email for candidates who never engaged with the follow-up chat.
@@ -593,13 +712,25 @@ export function noResponseEmail(
   roleTitle: string,
   clientName: string
 ): string {
-  const { wrapTemplate, emailHeading, emailP, emailNote } = makeEmailKit(theme);
-  return wrapTemplate(`
+  return renderThemedEmail(
+    "noResponse",
+    theme,
+    {
+      candidate: { name: candidateName },
+      campaign: { role_title: roleTitle },
+      client: { name: clientName },
+    },
+    () => {
+      const { wrapTemplate, emailHeading, emailP, emailNote } =
+        makeEmailKit(theme);
+      return wrapTemplate(`
     ${emailHeading("Application update", "We&rsquo;ve closed your application")}
     ${emailP(`Hi ${candidateName},`)}
     ${emailP(`We reached out with a few follow-up questions about your application for the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>, but we haven&rsquo;t heard back &mdash; so we&rsquo;ve closed your application for this role.`)}
     ${emailNote("Thank you for your interest. We wish you the very best in your search and hope to see you apply for a future opportunity.")}
   `);
+    }
+  );
 }
 
 /** Backstop confirmation email after an in-chat rejection has been delivered.
@@ -614,16 +745,31 @@ export function rejectionConfirmationEmail(
   clientName: string,
   adminReason?: string
 ): string {
-  const { wrapTemplate, emailHeading, emailP, emailNote } = makeEmailKit(theme);
-  const cleaned = adminReason?.trim();
-  const reasonBlock = cleaned
-    ? emailP(`They asked us to share the following note: &ldquo;${escapeHtml(cleaned)}&rdquo;`)
-    : "";
-  return wrapTemplate(`
+  return renderThemedEmail(
+    "rejectionConfirmation",
+    theme,
+    {
+      candidate: { name: candidateName },
+      campaign: { role_title: roleTitle },
+      client: { name: clientName },
+      // Pass through verbatim (slot replacement escapes it); null when absent so
+      // the {{#admin.reason}}…{{/admin.reason}} conditional block collapses.
+      admin: { reason: adminReason ?? null },
+    },
+    () => {
+      const { wrapTemplate, emailHeading, emailP, emailNote } =
+        makeEmailKit(theme);
+      const cleaned = adminReason?.trim();
+      const reasonBlock = cleaned
+        ? emailP(`They asked us to share the following note: &ldquo;${escapeHtml(cleaned)}&rdquo;`)
+        : "";
+      return wrapTemplate(`
     ${emailHeading("Application update", "Confirming our earlier message")}
     ${emailP(`Hi ${candidateName},`)}
     ${emailP(`This is a written confirmation of the message shared with you in your chat: the recruitment team for the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong> has decided not to move forward with your application.`)}
     ${reasonBlock}
     ${emailNote("We appreciate the time you invested and wish you the very best in your career.")}
   `);
+    }
+  );
 }

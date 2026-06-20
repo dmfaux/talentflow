@@ -51,6 +51,7 @@ export async function PATCH(
       logo_position: pick("logo_position"),
       show_powered_by: pick("show_powered_by"),
       landing_html: pick("landing_html"),
+      email_templates: pick("email_templates"),
       preview_image_url: pick("preview_image_url"),
     });
     if (!result.ok) return error(result.message, result.status);
@@ -76,6 +77,9 @@ export async function PATCH(
         logo_position: values.logo_position,
         show_powered_by: values.show_powered_by,
         landing_html: values.landing_html,
+        // CT6: per-template bespoke email HTML (custom themes only; gallery rows
+        // are forced to null by normaliseThemeFields).
+        email_templates: values.email_templates,
         preview_image_url: values.preview_image_url,
         updated_at: new Date(),
       })

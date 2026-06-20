@@ -6,6 +6,7 @@ import {
 } from "@/components/operator/theme-builder";
 import { ThemeEmailPreview } from "@/components/operator/theme-email-preview";
 import { EmptyState } from "@/components/ui/empty-state";
+import type { BrandColors, LogoInput } from "@/lib/prompt-builder";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
@@ -18,8 +19,21 @@ type BuilderState =
       orgId?: string;
       clientId?: string;
       brandName?: string;
+      /** The brand's configured kit (custom themes only), threaded to the builder
+       *  so the bespoke landing/email AI prompts embed the real brand colours. */
+      brandColors?: BrandColors | null;
+      logo?: LogoInput | null;
       initial?: OperatorThemeRow;
     };
+
+// The brand-kit feed for the active brand (colours + logo) backing the bespoke
+// prompts. Loaded once per brand from the brand row; null until resolved. Tagged
+// with the brand it belongs to so a stale kit from a previous brand is ignored.
+interface BrandKit {
+  clientId: string;
+  brandColors: BrandColors | null;
+  logo: LogoInput | null;
+}
 
 function previewPayload(row: OperatorThemeRow) {
   return {
@@ -111,6 +125,10 @@ function ThemesConsole() {
   const [themes, setThemes] = useState<OperatorThemeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [builder, setBuilder] = useState<BuilderState>({ open: false });
+  // The active brand's configured kit (colours + logo) for the bespoke prompts.
+  // Loaded once per brand; null when unavailable, in which case the builder falls
+  // back to the theme's own palette/logo so the prompt still embeds real colours.
+  const [brandKit, setBrandKit] = useState<BrandKit | null>(null);
 
   const load = useCallback(() => {
     const qs = new URLSearchParams();
@@ -127,6 +145,43 @@ function ThemesConsole() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Resolve the brand's configured colours + logo for the bespoke AI prompts.
+  // The brand's own theme rows expose its logo (logo_url/background/position);
+  // the brand's palette colours aren't on the operator theme feed, so the builder
+  // falls back to the theme palette when brandColors stays null (see ThemeBuilder).
+  // No synchronous reset on brand change: the kit is tagged with its clientId and
+  // a non-matching tag is ignored at read time, so the effect only setState()s
+  // asynchronously once the fetch resolves.
+  useEffect(() => {
+    if (!clientId) return;
+    const controller = new AbortController();
+    fetch(`/api/operator/themes?client_id=${clientId}`, {
+      signal: controller.signal,
+    })
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((res) => {
+        const rows: OperatorThemeRow[] = res.data ?? [];
+        const branded = rows.find(
+          (t) => t.scope === "custom" && t.client_id === clientId && t.logo_url
+        );
+        const logo: LogoInput | null = branded?.logo_url
+          ? {
+              url: branded.logo_url,
+              background: branded.logo_background || "light",
+              position: branded.logo_position || "top-left",
+            }
+          : null;
+        setBrandKit({ clientId, brandColors: null, logo });
+      })
+      .catch((err) => {
+        if (err.name !== "AbortError") setBrandKit(null);
+      });
+    return () => controller.abort();
+  }, [clientId]);
+
+  // Only trust the kit when it belongs to the brand currently in scope.
+  const activeKit = brandKit?.clientId === clientId ? brandKit : null;
 
   const gallery = themes.filter((t) => t.scope === "gallery");
   const bespoke = themes.filter(
@@ -145,6 +200,8 @@ function ThemesConsole() {
         orgId={builder.orgId}
         clientId={builder.clientId}
         brandName={builder.brandName}
+        brandColors={builder.brandColors}
+        logo={builder.logo}
         initial={builder.initial}
         onDone={closeBuilder}
       />
@@ -242,6 +299,8 @@ function ThemesConsole() {
                   orgId,
                   clientId,
                   brandName,
+                  brandColors: activeKit?.brandColors ?? null,
+                  logo: activeKit?.logo ?? null,
                 })
               }
               className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-cobalt bg-cobalt-tint px-4 text-[0.8rem] font-medium text-cobalt transition-colors hover:bg-cobalt-tint/70 cursor-pointer"
@@ -270,6 +329,8 @@ function ThemesConsole() {
                       orgId,
                       clientId,
                       brandName,
+                      brandColors: activeKit?.brandColors ?? null,
+                      logo: activeKit?.logo ?? null,
                       initial: row,
                     })
                   }

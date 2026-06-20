@@ -9,6 +9,12 @@
 
 import { validateHtmlTemplate } from "@/lib/slots";
 import {
+  EMAIL_TEMPLATE_TYPES,
+  type EmailTemplateMap,
+  isEmailTemplateType,
+  validateEmailTemplate,
+} from "@/lib/email-slots";
+import {
   isLogoBackground,
   isLogoPosition,
   normaliseHexColor,
@@ -93,6 +99,47 @@ export function normaliseThemePalette(
   return { ok: true, palette };
 }
 
+/**
+ * Validate + normalise the bespoke per-template email map (CT6). Accepts a
+ * sparse object keyed by EmailTemplateType; each non-blank value must pass the
+ * per-type email contract (validateEmailTemplate). Blank/absent entries are
+ * dropped. Returns the normalised map (or null when empty), or the first error.
+ */
+export function normaliseEmailTemplates(
+  input: unknown
+):
+  | { ok: true; templates: EmailTemplateMap | null }
+  | { ok: false; message: string } {
+  if (input == null) return { ok: true, templates: null };
+  if (typeof input !== "object") {
+    return { ok: false, message: "email_templates must be an object or null" };
+  }
+  const source = input as Record<string, unknown>;
+  const out: EmailTemplateMap = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (!isEmailTemplateType(key)) {
+      return {
+        ok: false,
+        message: `Unknown email template "${key}". Allowed: ${EMAIL_TEMPLATE_TYPES.join(", ")}`,
+      };
+    }
+    if (value == null) continue;
+    if (typeof value !== "string") {
+      return { ok: false, message: `email_templates.${key} must be a string` };
+    }
+    if (!value.trim()) continue; // blank → no override for this type
+    const check = validateEmailTemplate(key, value);
+    if (!check.ok) {
+      return { ok: false, message: `${key}: ${check.errors.join("; ")}` };
+    }
+    out[key] = value;
+  }
+  return {
+    ok: true,
+    templates: Object.keys(out).length ? out : null,
+  };
+}
+
 // The full set of theme columns a create/edit produces, already normalised.
 export interface ThemeWriteValues {
   name: string;
@@ -107,6 +154,7 @@ export interface ThemeWriteValues {
   logo_position: string;
   show_powered_by: boolean;
   landing_html: string | null;
+  email_templates: EmailTemplateMap | null;
   preview_image_url: string | null;
 }
 
@@ -144,6 +192,7 @@ export function normaliseThemeFields(input: {
   logo_position?: unknown;
   show_powered_by?: unknown;
   landing_html?: unknown;
+  email_templates?: unknown;
   preview_image_url?: unknown;
 }): ThemeFieldsResult {
   const fail = (message: string): ThemeFieldsResult => ({
@@ -209,6 +258,12 @@ export function normaliseThemeFields(input: {
     }
   }
 
+  // email_templates (CT6) — per-template bespoke email HTML. Validated against
+  // the per-type email contract; gallery themes are forced to null below.
+  const emailResult = normaliseEmailTemplates(input.email_templates);
+  if (!emailResult.ok) return fail(emailResult.message);
+  let email_templates: EmailTemplateMap | null = emailResult.templates;
+
   if (input.show_powered_by != null && typeof input.show_powered_by !== "boolean") {
     return fail("show_powered_by must be a boolean");
   }
@@ -222,6 +277,12 @@ export function normaliseThemeFields(input: {
     org_id = null;
     client_id = null;
     show_powered_by = true;
+    // CT6: bespoke structure is custom/Premium-only. A gallery theme is the
+    // Standard "pick from the set" surface and must stay recolour-only, so the
+    // resolver can render landing_html / email_templates unconditionally knowing
+    // only custom themes ever carry them.
+    landing_html = null;
+    email_templates = null;
   } else {
     org_id = trimmedOrNull(input.org_id);
     client_id = trimmedOrNull(input.client_id);
@@ -245,6 +306,7 @@ export function normaliseThemeFields(input: {
       logo_position,
       show_powered_by,
       landing_html,
+      email_templates,
       preview_image_url,
     },
   };
