@@ -19,6 +19,21 @@ import {
   isLogoPosition,
   normaliseHexColor,
 } from "@/lib/utils";
+import { derivePalette, DEFAULT_THEME_SEEDS } from "@/lib/theme-colors";
+import {
+  resolveDisplayFont,
+  resolveBodyFont,
+  DEFAULT_DISPLAY_FONT_KEY,
+  DEFAULT_BODY_FONT_KEY,
+} from "@/lib/theme-fonts";
+import {
+  normaliseLandingCopy,
+  normaliseEmailCopy,
+  DEFAULT_LANDING_COPY,
+  DEFAULT_EMAIL_COPY,
+  type LandingCopy,
+  type EmailCopy,
+} from "@/lib/theme-copy";
 
 // The 11 palette tokens that make up an EmailTheme.palette (see EmailTheme in
 // theme.ts). Order is the canonical authoring order used by the builder.
@@ -43,23 +58,16 @@ export type ThemePaletteKey = (typeof THEME_PALETTE_KEYS)[number];
 // blank theme without importing theme.ts (which pulls in @/db). Cosmetic only:
 // the resolver's default rung is still the in-code DEFAULT_EMAIL_THEME constant.
 export const STARTER_THEME_DRAFT = {
-  palette: {
-    bg: "#f0f3f7",
-    card: "#ffffff",
-    primary: "#2c5bff",
-    primaryDeep: "#1a45d4",
-    primaryTint: "#e8eeff",
-    accent: "#05dbd6",
-    ink: "#11123c",
-    inkSoft: "#2f3941",
-    inkMuted: "#5a6b7a",
-    inkFaint: "#9fb5c4",
-    border: "#d1dce6",
-  } as Record<ThemePaletteKey, string>,
-  font_display:
-    "'Instrument Serif', Georgia, 'Times New Roman', 'DejaVu Serif', serif",
-  font_sans:
-    "'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+  // Seed-based authoring (CT7): the builder edits 3 seeds + 2 font keys; the
+  // palette below is the derived starting point shown before the operator tweaks.
+  seeds: DEFAULT_THEME_SEEDS,
+  palette: derivePalette(DEFAULT_THEME_SEEDS) as Record<ThemePaletteKey, string>,
+  font_display_key: DEFAULT_DISPLAY_FONT_KEY,
+  font_body_key: DEFAULT_BODY_FONT_KEY,
+  font_display: resolveDisplayFont(DEFAULT_DISPLAY_FONT_KEY).stack,
+  font_sans: resolveBodyFont(DEFAULT_BODY_FONT_KEY).stack,
+  landing_copy: DEFAULT_LANDING_COPY,
+  email_copy: DEFAULT_EMAIL_COPY,
 } as const;
 
 export const THEME_SCOPES = ["gallery", "custom"] as const;
@@ -146,7 +154,17 @@ export interface ThemeWriteValues {
   scope: ThemeScope;
   org_id: string | null;
   client_id: string | null;
+  // CT7: the 3 author-chosen seeds (when seed-based authoring is used; null when
+  // a legacy direct palette was supplied). `palette` is always the full derived
+  // (or directly-supplied) 11-token map the renderers read.
+  seed_primary: string | null;
+  seed_accent: string | null;
+  seed_bg: string | null;
   palette: Record<ThemePaletteKey, string>;
+  // CT7: the chosen font-registry keys (null for legacy direct-stack authoring).
+  // font_display/font_sans are the resolved CSS stacks the renderers read.
+  font_display_key: string | null;
+  font_body_key: string | null;
   font_display: string;
   font_sans: string;
   logo_url: string | null;
@@ -155,6 +173,11 @@ export interface ThemeWriteValues {
   show_powered_by: boolean;
   landing_html: string | null;
   email_templates: EmailTemplateMap | null;
+  // CT7: structured landing copy + shared/per-template email copy (null → renderer
+  // defaults). Unlike landing_html/email_templates these are NOT bespoke free-form
+  // HTML, so they are allowed on gallery themes too (the recolour-friendly layer).
+  landing_copy: LandingCopy | null;
+  email_copy: EmailCopy | null;
   preview_image_url: string | null;
 }
 
@@ -184,7 +207,10 @@ export function normaliseThemeFields(input: {
   scope?: unknown;
   org_id?: unknown;
   client_id?: unknown;
+  seeds?: unknown;
   palette?: unknown;
+  font_display_key?: unknown;
+  font_body_key?: unknown;
   font_display?: unknown;
   font_sans?: unknown;
   logo_url?: unknown;
@@ -193,6 +219,8 @@ export function normaliseThemeFields(input: {
   show_powered_by?: unknown;
   landing_html?: unknown;
   email_templates?: unknown;
+  landing_copy?: unknown;
+  email_copy?: unknown;
   preview_image_url?: unknown;
 }): ThemeFieldsResult {
   const fail = (message: string): ThemeFieldsResult => ({
@@ -209,19 +237,105 @@ export function normaliseThemeFields(input: {
   const name = trimmedOrNull(input.name);
   if (!name) return fail("name is required");
 
-  const paletteResult = normaliseThemePalette(input.palette);
-  if (!paletteResult.ok) {
-    return fail(
-      paletteResult.key
-        ? `palette.${paletteResult.key} must be a valid hex colour`
-        : "palette must include all 11 colour tokens"
-    );
+  // Palette: seed-based authoring (CT7) derives the 11 tokens from 3 seeds; a
+  // legacy payload may still supply a full 11-token palette directly. Seeds win
+  // when present so the derived, contrast-checked map is the source of truth.
+  let seed_primary: string | null = null;
+  let seed_accent: string | null = null;
+  let seed_bg: string | null = null;
+  let palette: Record<ThemePaletteKey, string>;
+  if (input.seeds != null) {
+    if (typeof input.seeds !== "object") {
+      return fail("seeds must be an object with primary, accent and bg");
+    }
+    const s = input.seeds as Record<string, unknown>;
+    const p = normaliseHexColor(s.primary);
+    const a = normaliseHexColor(s.accent);
+    const b = normaliseHexColor(s.bg);
+    if (!p || !a || !b) {
+      return fail(
+        "seeds.primary, seeds.accent and seeds.bg must all be valid hex colours"
+      );
+    }
+    seed_primary = p;
+    seed_accent = a;
+    seed_bg = b;
+    palette = derivePalette({ primary: p, accent: a, bg: b }) as Record<
+      ThemePaletteKey,
+      string
+    >;
+  } else {
+    const paletteResult = normaliseThemePalette(input.palette);
+    if (!paletteResult.ok) {
+      return fail(
+        paletteResult.key
+          ? `palette.${paletteResult.key} must be a valid hex colour`
+          : "provide seeds (primary, accent, bg) or a full 11-token palette"
+      );
+    }
+    palette = paletteResult.palette;
   }
 
-  const font_display = trimmedOrNull(input.font_display);
-  if (!font_display) return fail("font_display is required");
-  const font_sans = trimmedOrNull(input.font_sans);
-  if (!font_sans) return fail("font_sans is required");
+  // Fonts: registry-key authoring (CT7) resolves each key to its CSS stack; a
+  // legacy payload may supply raw font_display/font_sans stacks instead. When
+  // keys are present they win, and we store the RESOLVED key (an unknown key
+  // resolves to the default) so storage and later resolution never disagree.
+  let font_display_key: string | null = null;
+  let font_body_key: string | null = null;
+  let font_display: string;
+  let font_sans: string;
+  if (input.font_display_key != null || input.font_body_key != null) {
+    // Strict at the WRITE boundary (mirrors the seed validation above): a
+    // supplied key must be a known registry key, else 400 — otherwise a typo'd
+    // or stale key would be silently swapped for the default and saved as a
+    // different font than was chosen. The pure resolvers stay lenient for the
+    // RENDER path (a legacy/stale key must never throw on a live send).
+    let d, b;
+    if (input.font_display_key == null) {
+      d = resolveDisplayFont(null);
+    } else if (typeof input.font_display_key === "string") {
+      d = resolveDisplayFont(input.font_display_key);
+      if (d.key !== input.font_display_key) {
+        return fail(
+          `font_display_key "${input.font_display_key}" is not a known display font`
+        );
+      }
+    } else {
+      return fail("font_display_key must be a string");
+    }
+    if (input.font_body_key == null) {
+      b = resolveBodyFont(null);
+    } else if (typeof input.font_body_key === "string") {
+      b = resolveBodyFont(input.font_body_key);
+      if (b.key !== input.font_body_key) {
+        return fail(
+          `font_body_key "${input.font_body_key}" is not a known body font`
+        );
+      }
+    } else {
+      return fail("font_body_key must be a string");
+    }
+    font_display_key = d.key;
+    font_body_key = b.key;
+    font_display = d.stack;
+    font_sans = b.stack;
+  } else {
+    const fd = trimmedOrNull(input.font_display);
+    if (!fd) return fail("font_display is required");
+    const fs = trimmedOrNull(input.font_sans);
+    if (!fs) return fail("font_sans is required");
+    font_display = fd;
+    font_sans = fs;
+  }
+
+  // Structured landing + email copy (CT7). Null → renderer defaults.
+  const landingCopyResult = normaliseLandingCopy(input.landing_copy);
+  if (!landingCopyResult.ok) return fail(landingCopyResult.message);
+  const landing_copy: LandingCopy | null = landingCopyResult.value;
+
+  const emailCopyResult = normaliseEmailCopy(input.email_copy);
+  if (!emailCopyResult.ok) return fail(emailCopyResult.message);
+  const email_copy: EmailCopy | null = emailCopyResult.value;
 
   // Logo surface/position reuse the brand validators; default like the brand route.
   const logo_background = input.logo_background == null ? "light" : input.logo_background;
@@ -298,7 +412,12 @@ export function normaliseThemeFields(input: {
       scope,
       org_id,
       client_id,
-      palette: paletteResult.palette,
+      seed_primary,
+      seed_accent,
+      seed_bg,
+      palette,
+      font_display_key,
+      font_body_key,
       font_display,
       font_sans,
       logo_url,
@@ -307,6 +426,8 @@ export function normaliseThemeFields(input: {
       show_powered_by,
       landing_html,
       email_templates,
+      landing_copy,
+      email_copy,
       preview_image_url,
     },
   };

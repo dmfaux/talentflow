@@ -38,12 +38,41 @@ export async function PATCH(
         ? body[key]
         : (existing as Record<string, unknown>)[key];
 
+    // CT7 seed/palette merge: when the body sends seeds, the seed-based path runs
+    // and re-derives the palette. When it omits seeds, keep an unedited theme
+    // stable by reconstructing seeds from the stored seed columns (a seed-authored
+    // row), or — when this is a legacy row that never had seeds — feeding the
+    // stored palette through the direct-palette path so derivation never silently
+    // changes the saved colours. Passing seeds:null on the legacy path leaves
+    // normaliseThemeFields free to validate the existing palette as before.
+    let seeds: unknown;
+    if (body.seeds !== undefined) {
+      seeds = body.seeds;
+    } else if (existing.seed_primary && existing.seed_accent && existing.seed_bg) {
+      seeds = {
+        primary: existing.seed_primary,
+        accent: existing.seed_accent,
+        bg: existing.seed_bg,
+      };
+    } else {
+      seeds = null;
+    }
+
+    // CT7 font-key merge: send the stored keys (or the body's) through the
+    // key-based path so an unedited row keeps its resolved stacks. Only fall back
+    // to the legacy stack path when neither the body nor the row carries keys.
+    const font_display_key = pick("font_display_key");
+    const font_body_key = pick("font_body_key");
+
     const result = normaliseThemeFields({
       name: pick("name"),
       scope: pick("scope"),
       org_id: pick("org_id"),
       client_id: pick("client_id"),
+      seeds,
       palette: pick("palette"),
+      font_display_key,
+      font_body_key,
       font_display: pick("font_display"),
       font_sans: pick("font_sans"),
       logo_url: pick("logo_url"),
@@ -52,6 +81,8 @@ export async function PATCH(
       show_powered_by: pick("show_powered_by"),
       landing_html: pick("landing_html"),
       email_templates: pick("email_templates"),
+      landing_copy: pick("landing_copy"),
+      email_copy: pick("email_copy"),
       preview_image_url: pick("preview_image_url"),
     });
     if (!result.ok) return error(result.message, result.status);
@@ -70,8 +101,16 @@ export async function PATCH(
         name: values.name,
         scope: values.scope,
         palette: values.palette,
+        // CT7: the 3 author-chosen seeds that derive `palette` (null on the legacy
+        // direct-palette path).
+        seed_primary: values.seed_primary,
+        seed_accent: values.seed_accent,
+        seed_bg: values.seed_bg,
         font_display: values.font_display,
         font_sans: values.font_sans,
+        // CT7: the chosen font-registry keys (null for legacy direct-stack input).
+        font_display_key: values.font_display_key,
+        font_body_key: values.font_body_key,
         logo_url: values.logo_url,
         logo_background: values.logo_background,
         logo_position: values.logo_position,
@@ -80,6 +119,10 @@ export async function PATCH(
         // CT6: per-template bespoke email HTML (custom themes only; gallery rows
         // are forced to null by normaliseThemeFields).
         email_templates: values.email_templates,
+        // CT7: structured landing + email copy (allowed on gallery too; null →
+        // renderer defaults).
+        landing_copy: values.landing_copy,
+        email_copy: values.email_copy,
         preview_image_url: values.preview_image_url,
         updated_at: new Date(),
       })

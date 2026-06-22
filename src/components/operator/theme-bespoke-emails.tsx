@@ -9,6 +9,10 @@ import {
   validateEmailTemplate,
 } from "@/lib/email-slots";
 import type { BrandColors, LogoInput } from "@/lib/prompt-builder";
+import {
+  DEFAULT_EMAIL_COPY,
+  type EmailCopyPerType,
+} from "@/lib/theme-copy";
 import { useState } from "react";
 import { ThemeBespokePreview } from "./theme-bespoke-preview";
 
@@ -29,6 +33,13 @@ const labelClass =
 const PREMIUM_TIER = "premium";
 
 interface PreviewTheme {
+  // New (CT7) authoring inputs.
+  seeds?: { primary: string; accent: string; bg: string };
+  font_display_key?: string;
+  font_body_key?: string;
+  landing_copy?: unknown;
+  email_copy?: unknown;
+  // Compatibility mirror.
   palette: Record<string, string>;
   font_display: string;
   font_sans: string;
@@ -38,16 +49,24 @@ interface PreviewTheme {
   show_powered_by: boolean;
 }
 
+/** The sparse structured per-type copy map authored in this section (CT7). */
+export type PerTypeCopyMap = Partial<Record<EmailTemplateType, EmailCopyPerType>>;
+
 export function ThemeBespokeEmails({
   value,
   onChange,
+  perTypeCopy,
+  onChangePerTypeCopy,
   brandColors,
   logo,
   previewTheme,
 }: {
-  /** The sparse authored map (keyed by email template type). */
+  /** The sparse authored full-HTML override map (keyed by email template type). */
   value: EmailTemplateMap;
   onChange: (next: EmailTemplateMap) => void;
+  /** The sparse structured copy map: per type {subject, body} (CT7). */
+  perTypeCopy: PerTypeCopyMap;
+  onChangePerTypeCopy: (next: PerTypeCopyMap) => void;
   brandColors: BrandColors | null;
   logo: LogoInput | null;
   /** The current theme draft, posted to the preview endpoint alongside the draft. */
@@ -59,6 +78,11 @@ export function ThemeBespokeEmails({
 
   const spec = EMAIL_SLOT_SPECS[active];
   const html = value[active] ?? "";
+  // Structured copy for the active type. Subject seeds from the default; body is
+  // blank by default and means "use the default copy" when left empty.
+  const defaultSubject = DEFAULT_EMAIL_COPY.perType[active]?.subject ?? "";
+  const subject = perTypeCopy[active]?.subject ?? defaultSubject;
+  const body = perTypeCopy[active]?.body ?? "";
   const validation = html.trim() ? validateEmailTemplate(active, html) : null;
   const authoredCount = EMAIL_TEMPLATE_TYPES.filter((t) =>
     (value[t] ?? "").trim()
@@ -70,6 +94,36 @@ export function ThemeBespokeEmails({
     else delete out[active];
     onChange(out);
   }
+
+  // Rebuild the active type's structured-copy entry from the two fields. Keep the
+  // subject (seeded from the default, always meaningful); omit a blank body. Drop
+  // the entry entirely when nothing meaningful is set (subject left at the default
+  // and the body blank), so the persisted map stays sparse.
+  function writeCopy(nextSubject: string, nextBody: string) {
+    const out: PerTypeCopyMap = { ...perTypeCopy };
+    const trimmedSubject = nextSubject.trim();
+    const trimmedBody = nextBody.trim();
+    const entry: EmailCopyPerType = {};
+    if (trimmedSubject) entry.subject = trimmedSubject;
+    if (trimmedBody) entry.body = trimmedBody;
+    const meaningful =
+      (trimmedSubject && trimmedSubject !== defaultSubject) || !!trimmedBody;
+    if (meaningful) out[active] = entry;
+    else delete out[active];
+    onChangePerTypeCopy(out);
+  }
+
+  function setSubject(next: string) {
+    writeCopy(next, body);
+  }
+
+  function setBody(next: string) {
+    writeCopy(subject, next);
+  }
+
+  const copyAuthoredCount = EMAIL_TEMPLATE_TYPES.filter(
+    (t) => perTypeCopy[t]?.subject || perTypeCopy[t]?.body
+  ).length;
 
   function copyPrompt() {
     const prompt = buildEmailTemplatePrompt({
@@ -91,13 +145,15 @@ export function ThemeBespokeEmails({
         <div>
           <h3 className="font-serif text-base text-ink">Bespoke emails</h3>
           <p className="mt-0.5 text-xs text-ink-muted">
-            Hand-author any of the nine candidate emails. Unauthored types fall back
-            to the palette-themed default.
+            Tune the subject and copy for any of the nine candidate emails, or
+            rewrite one entirely. Untouched types fall back to the themed default.
           </p>
         </div>
-        {authoredCount > 0 && (
+        {authoredCount + copyAuthoredCount > 0 && (
           <span className="inline-flex shrink-0 items-center rounded-full bg-cobalt-tint px-2.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.1em] text-cobalt">
-            {authoredCount} authored
+            {authoredCount > 0 && `${authoredCount} rewritten`}
+            {authoredCount > 0 && copyAuthoredCount > 0 && " · "}
+            {copyAuthoredCount > 0 && `${copyAuthoredCount} tuned`}
           </span>
         )}
       </div>
@@ -106,7 +162,10 @@ export function ThemeBespokeEmails({
       <div className="mt-4 flex flex-wrap gap-1.5">
         {EMAIL_TEMPLATE_TYPES.map((type) => {
           const isActive = type === active;
-          const isAuthored = (value[type] ?? "").trim().length > 0;
+          const isAuthored =
+            (value[type] ?? "").trim().length > 0 ||
+            !!perTypeCopy[type]?.subject ||
+            !!perTypeCopy[type]?.body;
           return (
             <button
               key={type}
@@ -147,6 +206,66 @@ export function ThemeBespokeEmails({
               clickable action link, or the candidate dead-ends.
             </p>
           )}
+        </div>
+
+        {/* Structured copy (CT7): subject line + optional body override. Lighter
+            than the full-HTML rewrite below — recolours the default layout with
+            this brand's words. Body blank ⇒ the template's default copy stands. */}
+        <div className="rounded-lg border border-border bg-cream/20 p-4">
+          <p className="text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+            Copy
+          </p>
+          <div className="mt-3 space-y-4">
+            <div>
+              <label htmlFor={`email_subject_${active}`} className={labelClass}>
+                Subject line
+              </label>
+              <input
+                id={`email_subject_${active}`}
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder={defaultSubject}
+                className="h-10 w-full rounded-lg border border-border bg-cream/40 px-3.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20"
+              />
+              <p className="mt-1 text-[0.68rem] text-ink-faint">
+                Slots like{" "}
+                <code className="font-mono text-ink-muted">
+                  {"{{campaign.role_title}}"}
+                </code>{" "}
+                are filled at send time.
+              </p>
+            </div>
+            <div>
+              <label htmlFor={`email_body_${active}`} className={labelClass}>
+                Body copy{" "}
+                <span className="font-sans normal-case tracking-normal text-ink-faint">
+                  optional
+                </span>
+              </label>
+              <textarea
+                id={`email_body_${active}`}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                placeholder="Leave blank to use the default copy"
+                rows={4}
+                className="w-full resize-none rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20"
+              />
+              {spec.allowed.length > 0 && (
+                <p className="mt-1 text-[0.68rem] text-ink-faint">
+                  Allowed slots:{" "}
+                  {spec.allowed.map((s) => `{{${s}}}`).join(", ")}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Full-HTML rewrite — the heavier bespoke path, kept as before. */}
+        <div className="relative">
+          <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
+          <p className="relative mx-auto w-fit bg-surface px-3 text-[0.62rem] font-medium uppercase tracking-[0.15em] text-ink-muted">
+            Or rewrite the whole email
+          </p>
         </div>
 
         <div>

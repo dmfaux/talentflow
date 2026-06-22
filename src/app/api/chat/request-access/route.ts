@@ -5,6 +5,7 @@ import { getActiveConversation } from "@/lib/chat";
 import {
   brandEmailIdentity,
   chatAccessEmail,
+  resolveEmailSubject,
   sendCandidateEmail,
 } from "@/lib/email";
 import { getOrgStatus } from "@/lib/org-status";
@@ -113,7 +114,9 @@ export async function POST(request: NextRequest) {
     // From display name changes; the verified envelope-from is retained.
     await sendCandidateEmail(
       trimmedEmail,
-      `Verify your identity — ${candidate.role_title}`,
+      resolveEmailSubject(emailTheme, "chatAccess", {
+        campaign: { role_title: candidate.role_title },
+      }),
       chatAccessEmail(emailTheme, candidate.name, candidate.role_title, magicLinkUrl),
       candidate.id,
       brandEmailIdentity({

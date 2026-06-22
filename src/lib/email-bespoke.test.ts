@@ -25,16 +25,23 @@ function themeWith(templates: EmailTemplateMap): EmailTheme {
 }
 
 describe("bespoke email dispatch (CT6)", () => {
-  it("renders the operator template with slot substitution when present", () => {
+  it("renders the operator template with slot substitution, wrapped in the shared shell", () => {
     const theme = themeWith({
       applicationReceived:
         "<p>Hi {{candidate.name}} — {{campaign.role_title}}</p>",
     });
     const html = applicationReceivedEmail(theme, NAME, ROLE, CLIENT);
-    expect(html).toBe(`<p>Hi ${NAME} — ${ROLE}</p>`);
-    // The generated kit shell is entirely absent — this is the bespoke body only.
-    expect(html).not.toContain("<table");
-    expect(html).not.toContain("<!DOCTYPE");
+    // CT7: the bespoke body now fills only the BODY REGION of the one shared
+    // wrapper (palette / fonts / footer) — it is no longer a standalone document.
+    expect(html).toContain(`<p>Hi ${NAME} — ${ROLE}</p>`);
+    // The shared wrapper surrounds it: full document shell + brand card + footer.
+    expect(html).toContain("<!DOCTYPE");
+    expect(html).toContain("<table");
+    expect(html).toContain("Sent by TalentStream");
+    // The kit's OWN default copy is gone — the bespoke body replaced the whole
+    // body region (heading + greeting + message + extras + sign-off).
+    expect(html).not.toContain("got your application");
+    expect(html).not.toContain("Hi Thabo Mokoena,");
   });
 
   it("falls back to the kit output when the theme carries no emailTemplates", () => {
@@ -69,15 +76,20 @@ describe("bespoke email dispatch (CT6)", () => {
     expect(html).toContain("got your application");
   });
 
-  it("renders {{action.url}} for a bespoke chatInvitation template", () => {
+  it("renders {{action.url}} for a bespoke chatInvitation template, wrapped in the shared shell", () => {
     const theme = themeWith({
       chatInvitation:
         '<a href="{{action.url}}">Start the chat with {{candidate.name}}</a>',
     });
     const html = chatInvitationEmail(theme, NAME, ROLE, CLIENT, CHAT_URL);
-    expect(html).toBe(
+    // The action link is slot-substituted inside the shared wrapper's body region.
+    expect(html).toContain(
       `<a href="${CHAT_URL}">Start the chat with ${NAME}</a>`
     );
     expect(html).toContain(CHAT_URL);
+    // Wrapper present (document shell + footer); kit's own default copy gone.
+    expect(html).toContain("<!DOCTYPE");
+    expect(html).toContain("Sent by TalentStream");
+    expect(html).not.toContain("follow-up questions");
   });
 });

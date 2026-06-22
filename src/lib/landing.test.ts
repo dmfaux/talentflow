@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeLandingTemplate } from "@/lib/landing";
 import type { EmailTheme } from "@/lib/theme";
+import { DEFAULT_LANDING_COPY, type LandingCopy } from "@/lib/theme-copy";
 import { validateHtmlTemplate, replaceSlots, type SlotData } from "@/lib/slots";
 
 // A representative EmailTheme. Built inline (not imported from theme.ts) so this
@@ -24,6 +25,14 @@ const THEME: EmailTheme = {
   fontSans: "'Instrument Sans', sans-serif",
   logo: null,
   showPoweredBy: true,
+  // CT7: the default Instrument @import pair + structured landing copy. Set
+  // explicitly so this db-free THEME exercises the same fields the resolver
+  // hands makeLandingTemplate in production.
+  fontImports: [
+    "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap",
+    "https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap",
+  ],
+  landingCopy: DEFAULT_LANDING_COPY,
 };
 
 describe("makeLandingTemplate", () => {
@@ -120,10 +129,123 @@ describe("makeLandingTemplate", () => {
     // No unreplaced slot markers survive.
     expect(rendered).not.toMatch(/\{\{/);
     expect(rendered).toContain("Staff Engineer");
-    expect(rendered).toContain("Engineering"); // department eyebrow kept
+    // Department now renders as the first meta PILL (the eyebrow is the headline).
+    expect(rendered).toContain('<span class="ats-pill">Engineering</span>');
     expect(rendered).toContain("Acme &amp; Co"); // escaped company name
     expect(rendered).toContain("Build things that matter.");
-    // Empty optional fields → their pills are stripped (location/type/salary).
-    expect(rendered).not.toContain('class="ats-pill"');
+    // The headline copy carries a {{client.name}} slot → it is resolved + escaped
+    // in element content by the downstream replaceSlots pass (not pre-escaped).
+    expect(rendered).toContain('<p class="ats-eyebrow">Join Acme &amp; Co</p>');
+    // Empty optional fields → their pills are stripped (location/type/salary): the
+    // only ats-pill spans left are the single department pill.
+    expect((rendered.match(/class="ats-pill"/g) ?? []).length).toBe(1);
+  });
+
+  it("renders the resolved landing copy with the default theme copy", () => {
+    const html = makeLandingTemplate(THEME);
+    // Headline → hero eyebrow; applyHeading → apply-card head; intro → lead para.
+    expect(html).toContain(
+      `<p class="ats-eyebrow">${DEFAULT_LANDING_COPY.headline}</p>`
+    );
+    expect(html).toContain(
+      `<h2 class="ats-apply-head">${DEFAULT_LANDING_COPY.applyHeading}</h2>`
+    );
+    expect(html).toContain(`<p class="ats-intro">${DEFAULT_LANDING_COPY.intro}</p>`);
+    // Each default highlight appears as a bulleted list item.
+    for (const h of DEFAULT_LANDING_COPY.highlights) {
+      expect(html).toContain(`<li class="ats-highlight">${h}</li>`);
+    }
+    expect(html).toContain('<ul class="ats-highlights">');
+    // Default copy keeps the contract intact + still passes validation.
+    expect(validateHtmlTemplate(html)).toEqual({ ok: true });
+    expect(html).toContain('<div id="application-form"></div>');
+  });
+
+  it("renders custom landingCopy verbatim (headline / highlights / applyHeading)", () => {
+    const landingCopy: LandingCopy = {
+      headline: "X",
+      intro: "A custom intro paragraph.",
+      highlights: ["a", "b"],
+      applyHeading: "Apply now",
+    };
+    const html = makeLandingTemplate({ ...THEME, landingCopy });
+    expect(html).toContain('<p class="ats-eyebrow">X</p>');
+    expect(html).toContain('<h2 class="ats-apply-head">Apply now</h2>');
+    expect(html).toContain('<li class="ats-highlight">a</li>');
+    expect(html).toContain('<li class="ats-highlight">b</li>');
+    // Default highlights must NOT leak through when the operator chose their own.
+    expect(html).not.toContain(DEFAULT_LANDING_COPY.highlights[0]);
+    expect(validateHtmlTemplate(html)).toEqual({ ok: true });
+  });
+
+  it("renders no highlights container when the highlights array is empty", () => {
+    const html = makeLandingTemplate({
+      ...THEME,
+      landingCopy: { ...DEFAULT_LANDING_COPY, highlights: [] },
+    });
+    expect(html).not.toContain('<ul class="ats-highlights">');
+    expect(html).not.toContain('class="ats-highlight"');
+    // The rest of the page is intact.
+    expect(validateHtmlTemplate(html)).toEqual({ ok: true });
+  });
+
+  it("inserts operator copy RAW so embedded slot tokens survive to replaceSlots", () => {
+    // headline carries a {{client.name}} token — it must NOT be HTML-escaped at
+    // build time (no &lbrace; etc.); it stays a live slot for the render pass.
+    const html = makeLandingTemplate({
+      ...THEME,
+      landingCopy: {
+        ...DEFAULT_LANDING_COPY,
+        headline: "Hello {{client.name}}",
+      },
+    });
+    expect(html).toContain('<p class="ats-eyebrow">Hello {{client.name}}</p>');
+    const rendered = replaceSlots(html, {
+      client: { name: "Acme" },
+      campaign: {
+        role_title: "Engineer",
+        role_description: null,
+        department: null,
+        location: null,
+        employment_type: null,
+        salary_range_min: null,
+        salary_range_max: null,
+      },
+    });
+    expect(rendered).toContain('<p class="ats-eyebrow">Hello Acme</p>');
+  });
+
+  it("falls back to DEFAULT_LANDING_COPY when landingCopy is absent", () => {
+    const { landingCopy: _omit, ...noCopy } = THEME;
+    void _omit;
+    const html = makeLandingTemplate(noCopy);
+    expect(html).toContain(
+      `<p class="ats-eyebrow">${DEFAULT_LANDING_COPY.headline}</p>`
+    );
+    expect(html).toContain(
+      `<h2 class="ats-apply-head">${DEFAULT_LANDING_COPY.applyHeading}</h2>`
+    );
+  });
+
+  it("emits one @import per fontImports URL, and none for an explicit empty list", () => {
+    const oneFont = makeLandingTemplate({
+      ...THEME,
+      fontImports: ["https://fonts.googleapis.com/x"],
+    });
+    expect(oneFont).toContain("@import url('https://fonts.googleapis.com/x');");
+
+    // An explicit [] means "system fonts" → no @import.
+    const noFonts = makeLandingTemplate({ ...THEME, fontImports: [] });
+    expect(noFonts).not.toContain("@import");
+  });
+
+  it("back-fills the Instrument defaults when fontImports is absent (RD-1: pre-CT7 snapshot)", () => {
+    // A pre-CT7 snapshot has no fontImports key. It must NOT lose its web fonts —
+    // it back-fills to the Instrument defaults rather than emitting no @import.
+    const { fontImports: _f, ...noFontsField } = THEME;
+    void _f;
+    const out = makeLandingTemplate(noFontsField);
+    expect(out).toContain("@import url('");
+    expect(out).toContain("Instrument");
   });
 });

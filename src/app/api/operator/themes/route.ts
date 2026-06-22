@@ -39,8 +39,16 @@ export async function POST(request: NextRequest) {
         name: values.name,
         scope: values.scope,
         palette: values.palette,
+        // CT7: the 3 author-chosen seeds that derive `palette` (null on the legacy
+        // direct-palette path).
+        seed_primary: values.seed_primary,
+        seed_accent: values.seed_accent,
+        seed_bg: values.seed_bg,
         font_display: values.font_display,
         font_sans: values.font_sans,
+        // CT7: the chosen font-registry keys (null for legacy direct-stack input).
+        font_display_key: values.font_display_key,
+        font_body_key: values.font_body_key,
         logo_url: values.logo_url,
         logo_background: values.logo_background,
         logo_position: values.logo_position,
@@ -49,6 +57,10 @@ export async function POST(request: NextRequest) {
         // CT6: per-template bespoke email HTML (custom themes only; gallery rows
         // are forced to null by normaliseThemeFields).
         email_templates: values.email_templates,
+        // CT7: structured landing + email copy (allowed on gallery too; null →
+        // renderer defaults).
+        landing_copy: values.landing_copy,
+        email_copy: values.email_copy,
         preview_image_url: values.preview_image_url,
         created_by: ctx.userId,
       })

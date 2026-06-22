@@ -239,6 +239,13 @@
       "when": 1781941787463,
       "tag": "0033_redundant_sauron",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1782028580030,
+      "tag": "0034_large_sunfire",
+      "breakpoints": true
     }
   ]
 }

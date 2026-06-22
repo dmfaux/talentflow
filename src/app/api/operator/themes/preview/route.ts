@@ -14,10 +14,48 @@ import {
   type EmailTemplateType,
   isEmailTemplateType,
 } from "@/lib/email-slots";
-import { DEFAULT_EMAIL_THEME, type EmailTheme } from "@/lib/theme";
-import { normaliseEmailTemplates, normaliseThemePalette } from "@/lib/theme-fields";
+import { type EmailTheme } from "@/lib/theme";
+import {
+  normaliseThemeFields,
+  type ThemeWriteValues,
+} from "@/lib/theme-fields";
+import { fontImportsFor } from "@/lib/theme-fonts";
 import { isLogoBackground, isLogoPosition } from "@/lib/utils";
 import { NextRequest } from "next/server";
+
+// Map validated ThemeWriteValues into the EmailTheme the renderers read. Reuses
+// normaliseThemeFields' palette/font/copy derivation so the live preview matches
+// exactly what a saved theme would resolve to (no parallel derivation to drift).
+// Logo is assembled from the body (the preview payload carries the brand's logo
+// fields verbatim); copy/fontImports/emailTemplates ride from the validated values.
+function emailThemeFromValues(
+  values: ThemeWriteValues,
+  body: Record<string, unknown>
+): EmailTheme {
+  const logoUrl =
+    typeof body.logo_url === "string" && body.logo_url.trim()
+      ? body.logo_url.trim()
+      : null;
+  const logoBackground = isLogoBackground(body.logo_background)
+    ? body.logo_background
+    : "light";
+  const logoPosition = isLogoPosition(body.logo_position)
+    ? body.logo_position
+    : "top-left";
+  return {
+    palette: values.palette as EmailTheme["palette"],
+    fontDisplay: values.font_display,
+    fontSans: values.font_sans,
+    logo: logoUrl
+      ? { url: logoUrl, background: logoBackground, position: logoPosition }
+      : null,
+    showPoweredBy: values.show_powered_by,
+    emailTemplates: values.email_templates,
+    fontImports: fontImportsFor(values.font_display_key, values.font_body_key),
+    landingCopy: values.landing_copy,
+    emailCopy: values.email_copy,
+  };
+}
 
 // POST /api/operator/themes/preview — render a live email preview for the
 // theme-builder form (operator-gated).
@@ -82,15 +120,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const paletteResult = normaliseThemePalette(body.palette);
-    if (!paletteResult.ok) {
-      return error(
-        paletteResult.key
-          ? `palette.${paletteResult.key} must be a valid hex colour`
-          : "palette must include all 11 colour tokens"
-      );
-    }
-
     // The template to preview. Default to the application-received email so the
     // recolour-only preview keeps its existing behaviour when no type is sent;
     // any supplied value must be one of the nine known bespoke email types.
@@ -102,39 +131,23 @@ export async function POST(request: NextRequest) {
       type = body.template_type;
     }
 
-    // Draft bespoke templates ride on the theme so an override previews before it
-    // is saved. Validated against the per-type email contract (same as the write
-    // path) so a malformed draft returns a precise 400 rather than rendering junk.
-    const emailResult = normaliseEmailTemplates(body.email_templates);
-    if (!emailResult.ok) return error(emailResult.message);
+    // CT7: validate + derive the whole draft through the SAME contract the write
+    // path uses (seeds→palette, font keys→stacks/imports, copy normalisation,
+    // bespoke email_templates), so the preview is byte-faithful to a saved theme.
+    // The preview payload carries only render fields (no scope/name/org), so we
+    // inject preview-only placeholders: scope "custom" keeps the draft's bespoke
+    // email_templates alive (gallery would force them null), and the placeholder
+    // org/client satisfy the custom-scope invariant. None of these are persisted.
+    const result = normaliseThemeFields({
+      ...body,
+      scope: "custom",
+      name: "Preview",
+      org_id: "preview",
+      client_id: "preview",
+    });
+    if (!result.ok) return error(result.message, result.status);
 
-    const logoUrl =
-      typeof body.logo_url === "string" && body.logo_url.trim()
-        ? body.logo_url.trim()
-        : null;
-    const logoBackground = isLogoBackground(body.logo_background)
-      ? body.logo_background
-      : "light";
-    const logoPosition = isLogoPosition(body.logo_position)
-      ? body.logo_position
-      : "top-left";
-
-    const theme: EmailTheme = {
-      palette: paletteResult.palette,
-      fontDisplay:
-        (typeof body.font_display === "string" && body.font_display.trim()) ||
-        DEFAULT_EMAIL_THEME.fontDisplay,
-      fontSans:
-        (typeof body.font_sans === "string" && body.font_sans.trim()) ||
-        DEFAULT_EMAIL_THEME.fontSans,
-      logo: logoUrl
-        ? { url: logoUrl, background: logoBackground, position: logoPosition }
-        : null,
-      // The form forces this true for gallery; reflect whatever it sends.
-      showPoweredBy: body.show_powered_by !== false,
-      // CT6: the draft bespoke per-template HTML (null when none authored).
-      emailTemplates: emailResult.templates,
-    };
+    const theme = emailThemeFromValues(result.values, body);
 
     const html = renderSampleEmail(type, theme);
 

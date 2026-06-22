@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import type { ThemeSnapshot } from "@/lib/theme";
 import type { EmailTemplateMap } from "@/lib/email-slots";
+import type { LandingCopy, EmailCopy } from "@/lib/theme-copy";
 import {
   type AnyPgColumn,
   boolean,
@@ -120,9 +121,21 @@ export const themes = pgTable(
     name: text("name").notNull(),
     scope: text("scope").notNull().default("gallery"), // "gallery" | "custom"
     is_active: boolean("is_active").notNull().default(true),
-    palette: jsonb("palette").notNull(), // EmailTheme.palette keys (see resolver)
-    font_display: text("font_display").notNull(),
-    font_sans: text("font_sans").notNull(),
+    palette: jsonb("palette").notNull(), // EmailTheme.palette keys — the DERIVED 11 tokens
+    // The 3 author-chosen SEED colours (primary/accent/bg) that derive `palette`
+    // via derivePalette (theme-colors). Nullable: legacy rows authored before
+    // seed-based editing carry only `palette`; the builder back-fills seeds from
+    // palette.primary/accent/bg when one of these is null.
+    seed_primary: text("seed_primary"),
+    seed_accent: text("seed_accent"),
+    seed_bg: text("seed_bg"),
+    font_display: text("font_display").notNull(), // resolved CSS stack (webfont + email-safe fallbacks)
+    font_sans: text("font_sans").notNull(), // resolved CSS stack
+    // The curated font-registry keys the operator picked (theme-fonts). Drive the
+    // builder dropdowns and the per-font @import URLs at resolve time. Nullable for
+    // legacy rows (the resolver falls back to the stored stacks + default imports).
+    font_display_key: text("font_display_key"),
+    font_body_key: text("font_body_key"),
     logo_url: text("logo_url"), // null → adopt rendering brand's branding_logo_url
     logo_background: text("logo_background").notNull().default("light"),
     logo_position: text("logo_position").notNull().default("top-left"),
@@ -132,6 +145,13 @@ export const themes = pgTable(
     // Custom-scope themes only (write-side forces null for gallery), so the
     // resolver can render it unconditionally without a tier re-check.
     email_templates: jsonb("email_templates").$type<EmailTemplateMap>(),
+    // CT7: structured landing-page copy slots (headline/intro/highlights/apply
+    // heading), theme-level defaults the operator may override. Null → the
+    // renderer uses DEFAULT_LANDING_COPY. Rides into theme_snapshot.email at freeze.
+    landing_copy: jsonb("landing_copy").$type<LandingCopy>(),
+    // CT7: shared email copy blocks (greeting/sign-off/footer) + per-template
+    // subject/body overrides. Null → DEFAULT_EMAIL_COPY. Also frozen via the snapshot.
+    email_copy: jsonb("email_copy").$type<EmailCopy>(),
     preview_image_url: text("preview_image_url"), // CT2/CT3 consume
     created_by: uuid("created_by").references(() => users.id, {
       onDelete: "set null",

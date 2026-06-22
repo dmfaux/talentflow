@@ -297,3 +297,80 @@ describe("normaliseThemeFields — email_templates (CT6)", () => {
     if (!result.ok) expect(result.message).toMatch(/action\.url/);
   });
 });
+
+describe("normaliseThemeFields — CT7 seeds, font keys, copy", () => {
+  it("derives the 11-token palette from 3 seeds", () => {
+    const result = normaliseThemeFields(
+      base({
+        palette: undefined,
+        seeds: { primary: "#2c5bff", accent: "#05dbd6", bg: "#f0f3f7" },
+      })
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.values.seed_primary).toBe("#2c5bff");
+    expect(result.values.seed_bg).toBe("#f0f3f7");
+    expect(Object.keys(result.values.palette)).toHaveLength(
+      THEME_PALETTE_KEYS.length
+    );
+    expect(result.values.palette.primary).toBe("#2c5bff");
+  });
+
+  it("rejects invalid seed hex with a 400", () => {
+    const result = normaliseThemeFields(
+      base({ palette: undefined, seeds: { primary: "nope", accent: "#05dbd6", bg: "#fff" } })
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toMatch(/seeds/);
+  });
+
+  it("resolves font registry keys to stacks and stores the keys", () => {
+    const result = normaliseThemeFields(
+      base({
+        font_display: undefined,
+        font_sans: undefined,
+        font_display_key: "fraunces",
+        font_body_key: "inter",
+      })
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.values.font_display_key).toBe("fraunces");
+    expect(result.values.font_body_key).toBe("inter");
+    expect(result.values.font_display).toContain("Fraunces");
+    expect(result.values.font_sans).toContain("Inter");
+  });
+
+  it("rejects an unknown font key (strict at the write boundary)", () => {
+    const bad = normaliseThemeFields(base({ font_display_key: "frawnces" }));
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.message).toMatch(/font_display_key/);
+    const badBody = normaliseThemeFields(base({ font_body_key: "intur" }));
+    expect(badBody.ok).toBe(false);
+    if (!badBody.ok) expect(badBody.message).toMatch(/font_body_key/);
+  });
+
+  it("accepts gallery themes carrying landing_copy and email_copy", () => {
+    const result = normaliseThemeFields(
+      base({
+        landing_copy: { headline: "Join {{client.name}}", highlights: ["a", "b"] },
+        email_copy: { shared: { greeting: "Hi {{candidate.name}}," } },
+      })
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.values.landing_copy?.headline).toBe("Join {{client.name}}");
+    expect(result.values.email_copy?.shared.greeting).toBe("Hi {{candidate.name}},");
+  });
+
+  it("rejects landing_copy / email_copy that reference disallowed slots", () => {
+    expect(
+      normaliseThemeFields(base({ landing_copy: { headline: "Hi {{candidate.name}}" } })).ok
+    ).toBe(false);
+    expect(
+      normaliseThemeFields(
+        base({ email_copy: { perType: { applicationReceived: { body: "{{action.url}}" } } } })
+      ).ok
+    ).toBe(false);
+  });
+});

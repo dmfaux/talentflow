@@ -3,6 +3,17 @@ import { clients, organizations, themes } from "@/db/schema";
 import { isPremiumTier } from "@/lib/theme-fields";
 import { makeLandingTemplate } from "@/lib/landing";
 import type { EmailTemplateMap } from "@/lib/email-slots";
+import {
+  fontImportsFor,
+  DEFAULT_DISPLAY_FONT_KEY,
+  DEFAULT_BODY_FONT_KEY,
+} from "@/lib/theme-fonts";
+import {
+  DEFAULT_LANDING_COPY,
+  DEFAULT_EMAIL_COPY,
+  type LandingCopy,
+  type EmailCopy,
+} from "@/lib/theme-copy";
 import { eq } from "drizzle-orm";
 
 // ── Campaign Themes — the single resolution point (CT1) ──────────────
@@ -43,6 +54,21 @@ export interface EmailTheme {
    *  to the generated email kit. Riding on EmailTheme means it flows into
    *  theme_snapshot.email at freeze (RD-1 stability) with no call-site changes. */
   emailTemplates?: EmailTemplateMap | null;
+  /** CT7: the @import URLs for the chosen display + body web fonts. The landing
+   *  page emits these so the REAL chosen font loads; emails include them
+   *  best-effort (most clients strip @import and fall back to the email-safe part
+   *  of the font stack). Resolved from the font-registry keys and frozen into the
+   *  snapshot for stability. Empty/absent → no web-font @import (system fonts). */
+  fontImports?: string[] | null;
+  /** CT7: structured landing copy (headline / intro / highlights / apply heading),
+   *  theme-level defaults the operator may override. Rides on EmailTheme so it
+   *  flows into theme_snapshot.email at freeze; makeLandingTemplate reads it,
+   *  falling back to DEFAULT_LANDING_COPY when null. */
+  landingCopy?: LandingCopy | null;
+  /** CT7: shared email copy (greeting / sign-off / footer) + per-template
+   *  subject/body overrides. Rides on EmailTheme so it freezes with the snapshot;
+   *  the email kit reads it, falling back to DEFAULT_EMAIL_COPY when null. */
+  emailCopy?: EmailCopy | null;
 }
 
 /** The snapshot frozen onto a campaign at activation (RD-1). Stored on
@@ -92,6 +118,11 @@ export const DEFAULT_EMAIL_THEME: EmailTheme = {
   fontSans: FONT_SANS,
   logo: null,
   showPoweredBy: true,
+  // The default look uses the Instrument pairing; its @import URLs reproduce the
+  // fonts the landing + email previously loaded from a hardcoded @import.
+  fontImports: fontImportsFor(DEFAULT_DISPLAY_FONT_KEY, DEFAULT_BODY_FONT_KEY),
+  landingCopy: DEFAULT_LANDING_COPY,
+  emailCopy: DEFAULT_EMAIL_COPY,
 };
 
 /** The minimal client shape the resolver needs: the brand default theme id plus
@@ -156,6 +187,14 @@ export async function resolveCampaignTheme(
         // CT6: bespoke per-template email HTML (custom themes only; gallery rows
         // carry null by write-side invariant).
         emailTemplates: row.email_templates ?? null,
+        // CT7: resolve the chosen web-font @import URLs from the registry keys.
+        // Legacy rows (null keys) fall back to the default Instrument imports, so
+        // their rendered output is unchanged.
+        fontImports: fontImportsFor(row.font_display_key, row.font_body_key),
+        // CT7: structured landing copy + email copy overrides (null → renderer
+        // defaults). Ride on EmailTheme so they freeze into the snapshot.
+        landingCopy: row.landing_copy ?? null,
+        emailCopy: row.email_copy ?? null,
       };
       // CT6: the theme's bespoke landing body (custom themes only). Distinct from
       // a campaign's per-campaign html_template paste — precedence handled in

@@ -1,8 +1,9 @@
 import { error, requireApiOperator, success } from "@/lib/api";
 import { makeLandingTemplate } from "@/lib/landing";
 import { replaceSlots, type SlotData, validateHtmlTemplate } from "@/lib/slots";
-import { DEFAULT_EMAIL_THEME, type EmailTheme } from "@/lib/theme";
-import { normaliseThemePalette } from "@/lib/theme-fields";
+import { type EmailTheme } from "@/lib/theme";
+import { normaliseThemeFields } from "@/lib/theme-fields";
+import { fontImportsFor } from "@/lib/theme-fonts";
 import { isLogoBackground, isLogoPosition } from "@/lib/utils";
 import { NextRequest } from "next/server";
 
@@ -47,15 +48,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const paletteResult = normaliseThemePalette(body.palette);
-    if (!paletteResult.ok) {
-      return error(
-        paletteResult.key
-          ? `palette.${paletteResult.key} must be a valid hex colour`
-          : "palette must include all 11 colour tokens"
-      );
-    }
-
     // A non-blank pasted landing wins; validate it against the SAME slot/mount
     // contract a real page must satisfy so a malformed draft returns a precise
     // 400 rather than rendering a formless page.
@@ -69,7 +61,24 @@ export async function POST(request: NextRequest) {
       return success({ html: replaceSlots(pastedLanding, SAMPLE) });
     }
 
-    // No paste → render the palette-generated landing from the draft theme.
+    // No paste → render the generated landing from the draft theme. CT7: validate
+    // + derive the whole draft through the SAME write-path contract (seeds→palette,
+    // font keys→stacks/imports, landing_copy normalisation) so the generated page
+    // matches what a saved theme would resolve to. The preview payload carries
+    // only render fields (no scope/name/org); inject preview-only placeholders
+    // (none persisted). Scope "custom" simply avoids the gallery org/client
+    // forcing — landing_copy is allowed on either scope, so the generated landing
+    // is identical regardless.
+    const result = normaliseThemeFields({
+      ...body,
+      scope: "custom",
+      name: "Preview",
+      org_id: "preview",
+      client_id: "preview",
+    });
+    if (!result.ok) return error(result.message, result.status);
+    const values = result.values;
+
     const logoUrl =
       typeof body.logo_url === "string" && body.logo_url.trim()
         ? body.logo_url.trim()
@@ -82,18 +91,17 @@ export async function POST(request: NextRequest) {
       : "top-left";
 
     const theme: EmailTheme = {
-      palette: paletteResult.palette,
-      fontDisplay:
-        (typeof body.font_display === "string" && body.font_display.trim()) ||
-        DEFAULT_EMAIL_THEME.fontDisplay,
-      fontSans:
-        (typeof body.font_sans === "string" && body.font_sans.trim()) ||
-        DEFAULT_EMAIL_THEME.fontSans,
+      palette: values.palette as EmailTheme["palette"],
+      fontDisplay: values.font_display,
+      fontSans: values.font_sans,
       logo: logoUrl
         ? { url: logoUrl, background: logoBackground, position: logoPosition }
         : null,
       // The form forces this true for gallery; reflect whatever it sends.
-      showPoweredBy: body.show_powered_by !== false,
+      showPoweredBy: values.show_powered_by,
+      // CT7: the @import URLs + structured landing copy makeLandingTemplate reads.
+      fontImports: fontImportsFor(values.font_display_key, values.font_body_key),
+      landingCopy: values.landing_copy,
     };
 
     return success({ html: replaceSlots(makeLandingTemplate(theme), SAMPLE) });

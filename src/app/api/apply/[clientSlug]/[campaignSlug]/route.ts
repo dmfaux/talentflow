@@ -5,6 +5,7 @@ import { generateChatToken } from "@/lib/chat-auth";
 import {
   applicationReceivedEmail,
   brandEmailIdentity,
+  resolveEmailSubject,
   sendCandidateEmail,
 } from "@/lib/email";
 import { evaluateGating, GatingQuestion } from "@/lib/gating";
@@ -215,7 +216,9 @@ export async function POST(
     // Immediate confirmation email (fire-and-forget is acceptable here)
     sendCandidateEmail(
       trimmedEmail,
-      `Application received — ${roleTitle}`,
+      resolveEmailSubject(emailTheme, "applicationReceived", {
+        campaign: { role_title: roleTitle },
+      }),
       applicationReceivedEmail(emailTheme, candidateName, roleTitle, clientName),
       candidateId,
       brandEmailIdentity({

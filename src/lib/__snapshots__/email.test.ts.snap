@@ -16,7 +16,7 @@ exports[`email templates — branded theme render > applicationReceivedEmail car
   </style>
   <![endif]-->
   <style type="text/css">
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+    
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
     img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }
@@ -88,7 +88,7 @@ exports[`email templates — branded theme render > applicationReceivedEmail car
       <table role="presentation" width="580" cellpadding="0" cellspacing="0" border="0" style="max-width:580px;width:100%;">
         <tr><td style="padding:22px 44px;text-align:center;">
           <p style="margin:0;font-family:Arial, Helvetica, sans-serif;font-size:11px;color:#6f8678;line-height:1.55;letter-spacing:0.02em;">
-            Automated message &mdash; please do not reply
+            Automated message — please do not reply
           </p>
         </td></tr>
       </table>
@@ -115,7 +115,8 @@ exports[`email templates — byte-identical default render > applicationReceived
   </style>
   <![endif]-->
   <style type="text/css">
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
     img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }
@@ -210,7 +211,7 @@ exports[`email templates — byte-identical default render > applicationReceived
         <tr><td style="padding:22px 44px;text-align:center;">
           <p style="margin:0;font-family:'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:11px;color:#9fb5c4;line-height:1.55;letter-spacing:0.02em;">
             Sent by TalentStream&ensp;&middot;&ensp;AI-powered recruitment campaigns<br>
-            Automated message &mdash; please do not reply
+            Automated message — please do not reply
           </p>
         </td></tr>
       </table>
@@ -237,7 +238,8 @@ exports[`email templates — byte-identical default render > chatAccessEmail 1`]
   </style>
   <![endif]-->
   <style type="text/css">
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
     img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }
@@ -325,7 +327,7 @@ exports[`email templates — byte-identical default render > chatAccessEmail 1`]
         <tr><td style="padding:22px 44px;text-align:center;">
           <p style="margin:0;font-family:'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:11px;color:#9fb5c4;line-height:1.55;letter-spacing:0.02em;">
             Sent by TalentStream&ensp;&middot;&ensp;AI-powered recruitment campaigns<br>
-            Automated message &mdash; please do not reply
+            Automated message — please do not reply
           </p>
         </td></tr>
       </table>
@@ -352,7 +354,8 @@ exports[`email templates — byte-identical default render > chatInvitationEmail
   </style>
   <![endif]-->
   <style type="text/css">
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
     img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }
@@ -456,7 +459,7 @@ exports[`email templates — byte-identical default render > chatInvitationEmail
         <tr><td style="padding:22px 44px;text-align:center;">
           <p style="margin:0;font-family:'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:11px;color:#9fb5c4;line-height:1.55;letter-spacing:0.02em;">
             Sent by TalentStream&ensp;&middot;&ensp;AI-powered recruitment campaigns<br>
-            Automated message &mdash; please do not reply
+            Automated message — please do not reply
           </p>
         </td></tr>
       </table>
@@ -483,7 +486,8 @@ exports[`email templates — byte-identical default render > chatNudgeEmail 1`] 
   </style>
   <![endif]-->
   <style type="text/css">
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
     img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }
@@ -575,7 +579,7 @@ exports[`email templates — byte-identical default render > chatNudgeEmail 1`] 
         <tr><td style="padding:22px 44px;text-align:center;">
           <p style="margin:0;font-family:'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:11px;color:#9fb5c4;line-height:1.55;letter-spacing:0.02em;">
             Sent by TalentStream&ensp;&middot;&ensp;AI-powered recruitment campaigns<br>
-            Automated message &mdash; please do not reply
+            Automated message — please do not reply
           </p>
         </td></tr>
       </table>
@@ -602,7 +606,8 @@ exports[`email templates — byte-identical default render > gatingFailedEmail 1
   </style>
   <![endif]-->
   <style type="text/css">
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
     img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }
@@ -684,7 +689,7 @@ exports[`email templates — byte-identical default render > gatingFailedEmail 1
         <tr><td style="padding:22px 44px;text-align:center;">
           <p style="margin:0;font-family:'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:11px;color:#9fb5c4;line-height:1.55;letter-spacing:0.02em;">
             Sent by TalentStream&ensp;&middot;&ensp;AI-powered recruitment campaigns<br>
-            Automated message &mdash; please do not reply
+            Automated message — please do not reply
           </p>
         </td></tr>
       </table>
@@ -711,7 +716,8 @@ exports[`email templates — byte-identical default render > gatingPassedEmail 1
   </style>
   <![endif]-->
   <style type="text/css">
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
     img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }
@@ -793,7 +799,7 @@ exports[`email templates — byte-identical default render > gatingPassedEmail 1
         <tr><td style="padding:22px 44px;text-align:center;">
           <p style="margin:0;font-family:'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:11px;color:#9fb5c4;line-height:1.55;letter-spacing:0.02em;">
             Sent by TalentStream&ensp;&middot;&ensp;AI-powered recruitment campaigns<br>
-            Automated message &mdash; please do not reply
+            Automated message — please do not reply
           </p>
         </td></tr>
       </table>
@@ -820,7 +826,8 @@ exports[`email templates — byte-identical default render > invitationEmail 1`]
   </style>
   <![endif]-->
   <style type="text/css">
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
     img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }
@@ -912,7 +919,7 @@ exports[`email templates — byte-identical default render > invitationEmail 1`]
         <tr><td style="padding:22px 44px;text-align:center;">
           <p style="margin:0;font-family:'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:11px;color:#9fb5c4;line-height:1.55;letter-spacing:0.02em;">
             Sent by TalentStream&ensp;&middot;&ensp;AI-powered recruitment campaigns<br>
-            Automated message &mdash; please do not reply
+            Automated message — please do not reply
           </p>
         </td></tr>
       </table>
@@ -939,7 +946,8 @@ exports[`email templates — byte-identical default render > noResponseEmail 1`]
   </style>
   <![endif]-->
   <style type="text/css">
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
     img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }
@@ -1021,7 +1029,7 @@ exports[`email templates — byte-identical default render > noResponseEmail 1`]
         <tr><td style="padding:22px 44px;text-align:center;">
           <p style="margin:0;font-family:'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:11px;color:#9fb5c4;line-height:1.55;letter-spacing:0.02em;">
             Sent by TalentStream&ensp;&middot;&ensp;AI-powered recruitment campaigns<br>
-            Automated message &mdash; please do not reply
+            Automated message — please do not reply
           </p>
         </td></tr>
       </table>
@@ -1048,7 +1056,8 @@ exports[`email templates — byte-identical default render > passwordResetEmail 
   </style>
   <![endif]-->
   <style type="text/css">
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
     img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }
@@ -1136,7 +1145,7 @@ exports[`email templates — byte-identical default render > passwordResetEmail 
         <tr><td style="padding:22px 44px;text-align:center;">
           <p style="margin:0;font-family:'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:11px;color:#9fb5c4;line-height:1.55;letter-spacing:0.02em;">
             Sent by TalentStream&ensp;&middot;&ensp;AI-powered recruitment campaigns<br>
-            Automated message &mdash; please do not reply
+            Automated message — please do not reply
           </p>
         </td></tr>
       </table>
@@ -1163,7 +1172,8 @@ exports[`email templates — byte-identical default render > rejectionConfirmati
   </style>
   <![endif]-->
   <style type="text/css">
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
     img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }
@@ -1246,7 +1256,7 @@ exports[`email templates — byte-identical default render > rejectionConfirmati
         <tr><td style="padding:22px 44px;text-align:center;">
           <p style="margin:0;font-family:'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:11px;color:#9fb5c4;line-height:1.55;letter-spacing:0.02em;">
             Sent by TalentStream&ensp;&middot;&ensp;AI-powered recruitment campaigns<br>
-            Automated message &mdash; please do not reply
+            Automated message — please do not reply
           </p>
         </td></tr>
       </table>
@@ -1273,7 +1283,8 @@ exports[`email templates — byte-identical default render > rejectionEmail 1`] 
   </style>
   <![endif]-->
   <style type="text/css">
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
     body, table, td, a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
     table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
     img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; }
@@ -1355,7 +1366,7 @@ exports[`email templates — byte-identical default render > rejectionEmail 1`] 
         <tr><td style="padding:22px 44px;text-align:center;">
           <p style="margin:0;font-family:'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif;font-size:11px;color:#9fb5c4;line-height:1.55;letter-spacing:0.02em;">
             Sent by TalentStream&ensp;&middot;&ensp;AI-powered recruitment campaigns<br>
-            Automated message &mdash; please do not reply
+            Automated message — please do not reply
           </p>
         </td></tr>
       </table>

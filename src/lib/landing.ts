@@ -25,6 +25,23 @@
 // keeps it safe to import anywhere and trivially unit-testable.
 
 import type { EmailTheme } from "@/lib/theme";
+import { DEFAULT_LANDING_COPY } from "@/lib/theme-copy";
+import {
+  fontImportsFor,
+  DEFAULT_DISPLAY_FONT_KEY,
+  DEFAULT_BODY_FONT_KEY,
+} from "@/lib/theme-fonts";
+
+// RD-1 back-fill: a pre-CT7 theme snapshot carries no fontImports key. An active
+// campaign regenerates its landing from that snapshot, so a missing value must
+// fall back to the Instrument defaults (what the landing previously loaded) — not
+// to "no web font". A theme that deliberately chose system fonts stores an
+// explicit [] (preserved by `??`). Sourced from theme-fonts (pure) to avoid a
+// value import of theme.ts (which imports this module → would be a cycle).
+const DEFAULT_LANDING_FONT_IMPORTS = fontImportsFor(
+  DEFAULT_DISPLAY_FONT_KEY,
+  DEFAULT_BODY_FONT_KEY
+);
 
 // Map an EmailTheme.palette onto CSS custom properties consumed by the layout
 // below. Kebab-cased so the stylesheet reads naturally (var(--primary-deep)).
@@ -82,6 +99,34 @@ export function makeLandingTemplate(theme: EmailTheme): string {
     ? `\n      <footer class="ats-footer">Powered by TalentStream</footer>`
     : "";
 
+  // Theme-level landing copy (headline / intro / highlights / apply heading).
+  // null → DEFAULT_LANDING_COPY. Strings are OPERATOR-authored TRUSTED free text
+  // that MAY embed slot tokens like {{client.name}}; this codebase deliberately
+  // does NOT sanitise operator theme content (CT6 design choice). They are
+  // inserted RAW into element CONTENT so embedded {{slots}} survive the
+  // downstream replaceSlots pass and are escaped THERE — never escapeAttr'd here
+  // (escapeAttr stays for the logo URL/attributes only).
+  const copy = theme.landingCopy ?? DEFAULT_LANDING_COPY;
+
+  // CT7 web fonts: one @import per resolved font URL. A MISSING value (pre-CT7
+  // snapshot) back-fills to the Instrument defaults; an explicit [] (system fonts)
+  // is preserved → no @import. The --font-display/--font-sans vars still come from
+  // theme.fontDisplay/fontSans below.
+  const fontImports = (theme.fontImports ?? DEFAULT_LANDING_FONT_IMPORTS)
+    .map((u) => `@import url('${u}');`)
+    .join("\n    ");
+
+  // Highlights → a tinted bulleted list. Empty array → render nothing (no empty
+  // <ul> container). Each item is raw operator copy (see the copy note above).
+  const highlights =
+    copy.highlights.length > 0
+      ? `\n        <ul class="ats-highlights">
+          ${copy.highlights
+            .map((h) => `<li class="ats-highlight">${h}</li>`)
+            .join("\n          ")}
+        </ul>`
+      : "";
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -89,7 +134,7 @@ export function makeLandingTemplate(theme: EmailTheme): string {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{campaign.role_title}}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap');
+    ${fontImports}
 
     :root {
 ${paletteVars(theme.palette)}
@@ -153,6 +198,13 @@ ${paletteVars(theme.palette)}
       color: var(--ink);
     }
     .ats-rule { width: 64px; height: 3px; margin: 28px 0 0; background: var(--primary); border-radius: 2px; }
+    .ats-intro {
+      margin: 24px 0 0;
+      max-width: 620px;
+      font-family: var(--font-sans);
+      font-size: 18px;
+      color: var(--ink-soft);
+    }
     .ats-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
     .ats-pill {
       display: inline-block;
@@ -165,6 +217,33 @@ ${paletteVars(theme.palette)}
       line-height: 1.2;
     }
     .ats-pill--accent { background: var(--accent); color: var(--ink); }
+
+    /* Highlights — operator selling-points as a tinted bullet list. */
+    .ats-highlights {
+      list-style: none;
+      margin: 26px 0 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .ats-highlight {
+      position: relative;
+      padding-left: 26px;
+      font-family: var(--font-sans);
+      font-size: 16px;
+      color: var(--ink-soft);
+    }
+    .ats-highlight::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.6em;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--primary);
+    }
 
     /* Body — description beside the framed apply card. */
     .ats-body {
@@ -228,14 +307,16 @@ ${paletteVars(theme.palette)}
 
     <div class="ats-wrap">
       <section class="ats-hero">
-        {{#campaign.department}}<p class="ats-eyebrow">{{campaign.department}}</p>{{/campaign.department}}
+        <p class="ats-eyebrow">${copy.headline}</p>
         <h1 class="ats-title">{{campaign.role_title}}</h1>
         <div class="ats-rule"></div>
+        <p class="ats-intro">${copy.intro}</p>
         <div class="ats-meta">
+          {{#campaign.department}}<span class="ats-pill">{{campaign.department}}</span>{{/campaign.department}}
           {{#campaign.location}}<span class="ats-pill">{{campaign.location}}</span>{{/campaign.location}}
           {{#campaign.employment_type}}<span class="ats-pill">{{campaign.employment_type}}</span>{{/campaign.employment_type}}
           {{#campaign.salary_range}}<span class="ats-pill ats-pill--accent">{{campaign.salary_range}}</span>{{/campaign.salary_range}}
-        </div>
+        </div>${highlights}
       </section>
 
       <div class="ats-body">
@@ -247,7 +328,7 @@ ${paletteVars(theme.palette)}
         </main>
         <aside class="ats-apply">
           <div class="ats-apply-card">
-            <h2 class="ats-apply-head">Apply for this role</h2>
+            <h2 class="ats-apply-head">${copy.applyHeading}</h2>
             <div id="application-form"></div>
           </div>
         </aside>
