@@ -148,6 +148,13 @@ function sinceDays(days: number): Date {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 }
 
+/** First instant of the current calendar month (local time) — the billing period
+ *  basis shared by the projection and the ceiling check. */
+export function startOfCurrentMonth(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
 /**
  * Org-scoped spend over the last `days`. Reads usage_events through orgScope —
  * NEVER the operator raw-org-id path — so one org can never see another's spend.
@@ -268,6 +275,31 @@ export interface SpendProjection {
   hardCeilingCredits: number | null;
   inFlightCount: number; // candidates still drawing credits
   costToFinishInclVat: number; // ≈ R to finish the in-flight pipeline
+  paused: boolean; // ceiling reached → new scoring intake is held (Phase 4)
+  heldCount: number; // candidates parked at gating_passed (held backlog)
+}
+
+/**
+ * Total billed credits for an org since `since`, by RAW orgId — for enforcement
+ * / ceiling checks, NOT a tenant read (mirrors getOrgMargin's raw-orgId query).
+ */
+export async function creditsForOrgSince(orgId: string, since: Date): Promise<number> {
+  const rows = await db
+    .select(SPEND_COLUMNS)
+    .from(usageEvents)
+    .where(
+      and(
+        eq(usageEvents.org_id, orgId),
+        eq(usageEvents.kind, "ai_tokens"),
+        gt(usageEvents.created_at, since),
+      ),
+    )
+    .groupBy(usageEvents.model_tier, usageEvents.model);
+  let credits = 0;
+  for (const r of rows) {
+    credits += billedCredits(baseUnits(r.inputTokens ?? 0, r.outputTokens ?? 0), rowTier(r));
+  }
+  return credits;
 }
 
 /** Candidate statuses that will still draw AI credits (queued/active scoring or
@@ -282,7 +314,7 @@ const INFLIGHT_STATUSES = ["gating_passed", "scoring", "follow_up"];
  */
 export async function getSpendProjection(ctx: TenantContext): Promise<SpendProjection> {
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthStart = startOfCurrentMonth();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const dayOfMonth = now.getDate();
   const periodLabel = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -338,6 +370,13 @@ export async function getSpendProjection(ctx: TenantContext): Promise<SpendProje
     costToFinishExVat += r.n * billedCredits(BASE_UNITS_PER_CANDIDATE, tier) * CREDIT_PRICE_ZAR;
   }
 
+  // Held backlog = candidates parked at gating_passed (when intake is paused they
+  // stay here with no job). Cheap indexed count.
+  const [held] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(candidates)
+    .where(and(orgScope(candidates, ctx), eq(candidates.status, "gating_passed")));
+
   return {
     periodLabel,
     mtdCredits: mtd.totalCredits,
@@ -348,6 +387,8 @@ export async function getSpendProjection(ctx: TenantContext): Promise<SpendProje
     hardCeilingCredits,
     inFlightCount,
     costToFinishInclVat: costToFinishExVat * (1 + VAT_RATE),
+    paused: hardCeilingCredits != null && mtd.totalCredits >= hardCeilingCredits,
+    heldCount: held?.n ?? 0,
   };
 }
 

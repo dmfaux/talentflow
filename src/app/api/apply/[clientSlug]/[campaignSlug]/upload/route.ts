@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { campaigns, candidates, clients } from "@/db/schema";
 import { uploadCV } from "@/lib/azure-storage";
 import { getQueue } from "@/lib/queue";
+import { getCeilingStatus } from "@/lib/spend-ceiling";
 import { and, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -54,8 +55,10 @@ export async function POST(
 
     if (blobPath) {
       await db.update(candidates).set({ cv_url: blobPath, updated_at: new Date() }).where(eq(candidates.id, candidateId));
-      if (candidate.gating_passed) {
-        // The worker owns the move to 'scoring' once it starts processing.
+      if (candidate.gating_passed && !(await getCeilingStatus(campaign.org_id)).over) {
+        // The worker owns the move to 'scoring' once it starts processing. When
+        // the org is over its spend ceiling (Phase 4) we hold the candidate at
+        // gating_passed (no job); a cap-raise resumes the backlog.
         await getQueue().enqueue(
           { type: "candidate-processing", candidateId },
           { orgId: campaign.org_id, deduplicationId: `process-${candidateId}` }

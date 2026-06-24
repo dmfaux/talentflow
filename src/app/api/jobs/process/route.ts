@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { candidates, jobs } from "@/db/schema";
 import { handleJob } from "@/lib/queue/worker";
 import type { JobPayload } from "@/lib/queue/types";
+import { getCeilingStatus } from "@/lib/spend-ceiling";
 import { eq, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -38,6 +39,26 @@ export async function POST(request: NextRequest) {
   // table is the queue — with Service Bus the table cannot see in-flight
   // messages, so requeuing here would double-process.
   if (process.env.QUEUE_PROVIDER !== "servicebus") {
+    // Spend ceiling (Phase 4): don't recover NEW scoring (the gating_passed
+    // branch) for orgs over their cap — that would defeat the intake pause.
+    // Stuck in-flight 'scoring' candidates still recover (they're draining).
+    // getCeilingStatus is free for orgs with no ceiling configured.
+    const heldOrgs = await db
+      .selectDistinct({ orgId: candidates.org_id })
+      .from(candidates)
+      .where(eq(candidates.status, "gating_passed"));
+    const overCeilingOrgIds: string[] = [];
+    for (const { orgId } of heldOrgs) {
+      if ((await getCeilingStatus(orgId)).over) overCeilingOrgIds.push(orgId);
+    }
+    const ceilingExclusion =
+      overCeilingOrgIds.length > 0
+        ? sql`AND ${candidates.org_id} NOT IN (${sql.join(
+            overCeilingOrgIds.map((id) => sql`${id}`),
+            sql`, `
+          )})`
+        : sql``;
+
     // S10: stamp org_id (candidates.org_id is NOT NULL → recovery rows always
     // get a non-null org_id) and org-namespace the deduplication_id, matching
     // namespaceDedup("<orgId>", "process-recovery-<id>") so per-tenant dedup is
@@ -59,6 +80,7 @@ export async function POST(request: NextRequest) {
               ${candidates.cv_url} IS NOT NULL
               OR ${candidates.created_at} < now() - interval '15 minutes'
             )
+            ${ceilingExclusion}
           )
           OR (
             ${candidates.status} = 'scoring'

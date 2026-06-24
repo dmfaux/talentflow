@@ -11,6 +11,7 @@ import {
 import { evaluateGating, GatingQuestion } from "@/lib/gating";
 import { getOrgStatus } from "@/lib/org-status";
 import { getQueue } from "@/lib/queue";
+import { getCeilingStatus } from "@/lib/spend-ceiling";
 import { resolveCampaignTheme } from "@/lib/theme";
 import { recordUsageEvent } from "@/lib/usage";
 import { and, eq } from "drizzle-orm";
@@ -236,10 +237,16 @@ export async function POST(
       // candidate stays in 'gating_passed' until the worker starts — the
       // worker owns the move to 'scoring'.
       if (cvStored) {
-        await queue.enqueue(
-          { type: "candidate-processing", candidateId },
-          { orgId: campaign.org_id, deduplicationId: `process-${candidateId}` }
-        );
+        // Spend ceiling (Phase 4): when the org has hit its cap, hold the
+        // candidate at gating_passed (no job) instead of scoring — a cap-raise
+        // (resumeOrgIntake) drains the backlog. getCeilingStatus is free when no
+        // ceiling is configured (the default).
+        if (!(await getCeilingStatus(campaign.org_id)).over) {
+          await queue.enqueue(
+            { type: "candidate-processing", candidateId },
+            { orgId: campaign.org_id, deduplicationId: `process-${candidateId}` }
+          );
+        }
       }
     } else {
       // Queue soft rejection email — delivered after 24 hours

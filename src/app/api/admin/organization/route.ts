@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { organizations } from "@/db/schema";
 import { authorizeApiOrg, error, getApiTenant, success } from "@/lib/api";
+import { getCeilingStatus, resumeOrgIntake } from "@/lib/spend-ceiling";
 import { eq } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
@@ -19,6 +20,7 @@ function orgView(org: typeof organizations.$inferSelect) {
     contact_name: org.contact_name,
     contact_email: org.contact_email,
     status: org.status,
+    hard_ceiling_credits: org.hard_ceiling_credits, // owner-settable spend cap (Phase 4)
   };
 }
 
@@ -76,8 +78,20 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    // Owner-settable spend ceiling (Phase 4). Raising/clearing it is the
+    // self-service "let them finish" path; lowering it pauses new intake.
+    if (body.hard_ceiling_credits !== undefined) {
+      const hc = body.hard_ceiling_credits;
+      if (hc !== null && (typeof hc !== "number" || !Number.isInteger(hc) || hc < 0)) {
+        return error("hard_ceiling_credits must be a non-negative integer or null");
+      }
+      updates.hard_ceiling_credits = hc;
+    }
+
     if (Object.keys(updates).length === 0) {
-      return error("No editable fields supplied (name, contact_name, contact_email)");
+      return error(
+        "No editable fields supplied (name, contact_name, contact_email, hard_ceiling_credits)"
+      );
     }
 
     updates.updated_at = new Date();
@@ -86,6 +100,15 @@ export async function PATCH(request: NextRequest) {
       .set(updates)
       .where(eq(organizations.id, ctx.effectiveOrgId))
       .returning();
+
+    // If the ceiling moved and the org is no longer over it, drain the held
+    // backlog (resume paused intake).
+    if (
+      updates.hard_ceiling_credits !== undefined &&
+      !(await getCeilingStatus(ctx.effectiveOrgId)).over
+    ) {
+      await resumeOrgIntake(ctx.effectiveOrgId);
+    }
 
     return success(orgView(row));
   } catch (err) {

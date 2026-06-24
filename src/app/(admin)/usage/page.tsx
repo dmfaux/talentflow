@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { canManageOrg, useTenant } from "@/components/admin/tenant-provider";
 
 type ModelTier = "essential" | "professional" | "executive";
@@ -32,6 +32,8 @@ interface SpendProjection {
   hardCeilingCredits: number | null;
   inFlightCount: number;
   costToFinishInclVat: number;
+  paused: boolean;
+  heldCount: number;
 }
 
 interface CampaignSpendRow {
@@ -80,15 +82,22 @@ export default function UsagePage() {
   const [data, setData] = useState<UsageData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!allowed) return;
+  const load = useCallback(() => {
     setLoading(true);
     fetch(`/api/admin/usage?days=${days}`)
       .then((r) => r.json())
       .then((res) => setData(res.data ?? null))
       .catch(() => setData(null))
       .finally(() => setLoading(false));
-  }, [days, allowed]);
+  }, [days]);
+
+  useEffect(() => {
+    if (!allowed) return;
+    // load() flips a loading flag before an async fetch — the standard
+    // fetch-on-mount/range-change idiom, not a render cascade.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, [allowed, load]);
 
   if (!allowed) {
     return (
@@ -143,6 +152,20 @@ export default function UsagePage() {
         </div>
       ) : (
         <>
+          {projection?.paused && (
+            <div className="mb-6 rounded-xl border border-saffron/40 bg-saffron/10 px-5 py-4">
+              <p className="text-[0.9rem] font-medium text-ink">
+                Spend ceiling reached — new candidate intake is paused
+              </p>
+              <p className="mt-1 text-[0.82rem] text-ink-muted">
+                {projection.heldCount > 0
+                  ? `${projection.heldCount.toLocaleString("en-ZA")} application${
+                      projection.heldCount === 1 ? "" : "s"
+                    } held — they won't be scored until you raise the ceiling below. Candidates already in process and open chats continue.`
+                  : "New applications won't be scored until you raise the ceiling below. Candidates already in process and open chats continue."}
+              </p>
+            </div>
+          )}
           <div className="grid sm:grid-cols-3 gap-4">
             <StatCard
               label="Spend (incl. VAT)"
@@ -165,6 +188,14 @@ export default function UsagePage() {
           </div>
 
           {projection && <ThisMonth p={projection} />}
+
+          {projection && (
+            <CeilingControls
+              key={String(projection.hardCeilingCredits)}
+              current={projection.hardCeilingCredits}
+              onSaved={load}
+            />
+          )}
 
           <div className="mt-8 rounded-2xl border border-rule bg-paper p-6">
             <div className="flex items-center justify-between mb-5">
@@ -229,6 +260,81 @@ export default function UsagePage() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// ── Spend-ceiling editor (owner self-service; Phase 4) ───────────────
+function CeilingControls({ current, onSaved }: { current: number | null; onSaved: () => void }) {
+  const [value, setValue] = useState(current != null ? String(current) : "");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function save(next: number | null) {
+    setSaving(true);
+    setErr("");
+    try {
+      const res = await fetch("/api/admin/organization", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hard_ceiling_credits: next }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setErr(d.error || "Could not save");
+        return;
+      }
+      onSaved();
+    } catch {
+      setErr("Something went wrong");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const parsed = value.trim() === "" ? null : Math.max(0, parseInt(value, 10) || 0);
+
+  return (
+    <div className="mt-8 rounded-2xl border border-rule bg-paper p-6">
+      <h2 className="font-display text-[1.1rem] text-ink mb-1.5">Spend ceiling</h2>
+      <p className="text-[0.82rem] text-ink-muted mb-4">
+        New candidate intake pauses once this month&apos;s credits reach the ceiling. Candidates
+        already in process and open chats always finish. Leave blank for no cap.
+      </p>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <input
+          type="number"
+          min={0}
+          step={1000}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="No ceiling"
+          className="h-10 w-44 rounded-lg border border-rule bg-canvas px-3.5 font-mono text-sm text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-faint focus:border-cobalt"
+        />
+        <span className="text-[0.8rem] text-ink-faint">credits / month</span>
+        <button
+          type="button"
+          onClick={() => save(parsed)}
+          disabled={saving}
+          className="h-9 rounded-lg bg-ink px-4 text-[0.8rem] font-medium text-canvas transition-colors hover:opacity-90 disabled:opacity-40 cursor-pointer"
+        >
+          Save
+        </button>
+        {current != null && (
+          <button
+            type="button"
+            onClick={() => {
+              setValue("");
+              save(null);
+            }}
+            disabled={saving}
+            className="h-9 rounded-lg border border-rule px-4 text-[0.8rem] font-medium text-ink-muted transition-colors hover:text-ink disabled:opacity-40 cursor-pointer"
+          >
+            Remove cap
+          </button>
+        )}
+      </div>
+      {err && <p className="mt-2 text-[0.78rem] text-red">{err}</p>}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import {
 import { clientIp, error, requireApiOperator, success } from "@/lib/api";
 import { recordOperatorAudit } from "@/lib/operator-audit";
 import { getOrgMargin } from "@/lib/pricing";
+import { getCeilingStatus, resumeOrgIntake } from "@/lib/spend-ceiling";
 import { isModelTier } from "@/lib/ai";
 import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
@@ -323,6 +324,15 @@ export async function PATCH(
         ip,
         endedAt: now,
       });
+    }
+
+    // If the spend ceiling moved and the org is no longer over it, drain the
+    // held backlog (Phase 4 resume).
+    if (
+      updates.hard_ceiling_credits !== undefined &&
+      !(await getCeilingStatus(id)).over
+    ) {
+      await resumeOrgIntake(id);
     }
 
     return success(row);
