@@ -34,6 +34,15 @@ interface OrgUsage {
   tokens: { input: number; output: number };
   allTime: { input: number; output: number };
 }
+interface OrgSpendMargin {
+  period: string;
+  credits: number;
+  billedExVat: number;
+  rawCostZar: number;
+  marginZar: number;
+  marginPct: number;
+}
+type ModelTier = "essential" | "professional" | "executive";
 interface OrgDetail {
   id: string;
   name: string;
@@ -41,6 +50,8 @@ interface OrgDetail {
   tier: string;
   status: string;
   billing_email: string | null;
+  operator_max_model_tier: string;
+  hard_ceiling_credits: number | null;
   suspended_at: string | null;
   deleted_at: string | null;
   created_at: string;
@@ -49,6 +60,7 @@ interface OrgDetail {
   owner: OrgOwner | null;
   pendingInvite: PendingInvite | null;
   usage: OrgUsage;
+  spend: OrgSpendMargin;
 }
 
 const TIER_OPTIONS: Array<{ value: Tier; label: string; helper: string }> = [
@@ -56,6 +68,15 @@ const TIER_OPTIONS: Array<{ value: Tier; label: string; helper: string }> = [
   { value: "premium", label: "Premium", helper: "One bespoke template · reduced rate" },
   { value: "enterprise", label: "Enterprise", helper: "Retainer · unlimited & bespoke" },
 ];
+
+const MODEL_TIER_OPTIONS: Array<{ value: ModelTier; label: string }> = [
+  { value: "essential", label: "Essential" },
+  { value: "professional", label: "Professional" },
+  { value: "executive", label: "Executive" },
+];
+const isModelTierValue = (v: string): v is ModelTier =>
+  v === "essential" || v === "professional" || v === "executive";
+const zar = (n: number) => "R" + Math.round(n).toLocaleString("en-ZA");
 
 const STATUS_BADGE: Record<string, string> = {
   active: "bg-green-light text-green",
@@ -76,6 +97,8 @@ export default function OperatorOrgDetailPage() {
 
   const [tier, setTier] = useState<Tier>("standard");
   const [billingEmail, setBillingEmail] = useState("");
+  const [operatorMaxTier, setOperatorMaxTier] = useState<ModelTier>("executive");
+  const [hardCeiling, setHardCeiling] = useState("");
   const [saving, setSaving] = useState(false);
   const [resending, setResending] = useState(false);
 
@@ -89,15 +112,31 @@ export default function OperatorOrgDetailPage() {
         setOrg(data);
         setTier(normaliseTier(data.tier));
         setBillingEmail(data.billing_email ?? "");
+        setOperatorMaxTier(
+          isModelTierValue(data.operator_max_model_tier)
+            ? data.operator_max_model_tier
+            : "executive"
+        );
+        setHardCeiling(
+          data.hard_ceiling_credits != null ? String(data.hard_ceiling_credits) : ""
+        );
       })
       .catch(() => setLoadError("Organisation not found"))
       .finally(() => setLoading(false));
   }, [id]);
 
+  const ceilingValue =
+    hardCeiling.trim() === "" ? null : Math.max(0, parseInt(hardCeiling, 10) || 0);
+  const orgOperatorMaxTier =
+    org && isModelTierValue(org.operator_max_model_tier)
+      ? org.operator_max_model_tier
+      : "executive";
   const dirty =
     !!org &&
     (tier !== normaliseTier(org.tier) ||
-      (billingEmail.trim() || null) !== (org.billing_email ?? null));
+      (billingEmail.trim() || null) !== (org.billing_email ?? null) ||
+      operatorMaxTier !== orgOperatorMaxTier ||
+      ceilingValue !== (org.hard_ceiling_credits ?? null));
 
   async function save() {
     if (!org) return;
@@ -106,7 +145,12 @@ export default function OperatorOrgDetailPage() {
       const res = await fetch(`/api/operator/organizations/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier, billing_email: billingEmail.trim() || null }),
+        body: JSON.stringify({
+          tier,
+          billing_email: billingEmail.trim() || null,
+          operator_max_model_tier: operatorMaxTier,
+          hard_ceiling_credits: ceilingValue,
+        }),
       });
       const { data, error } = await res.json();
       if (!res.ok) {
@@ -115,6 +159,9 @@ export default function OperatorOrgDetailPage() {
       }
       setOrg((prev) => (prev ? { ...prev, ...data } : prev));
       setBillingEmail(data.billing_email ?? "");
+      setHardCeiling(
+        data.hard_ceiling_credits != null ? String(data.hard_ceiling_credits) : ""
+      );
       toast("Billing settings updated", "success");
     } catch {
       toast("Something went wrong", "error");
@@ -160,7 +207,7 @@ export default function OperatorOrgDetailPage() {
   ];
 
   const nf = (n: number) => n.toLocaleString("en-ZA");
-  const { usage } = org;
+  const { usage, spend } = org;
   const usageRows = [
     { label: "AI calls", value: usage.byKind.ai_tokens.count },
     { label: "Candidates created", value: usage.byKind.candidate_created.count },
@@ -316,6 +363,53 @@ export default function OperatorOrgDetailPage() {
             />
           </div>
 
+          <div className="mt-5">
+            <label className="mb-2 block text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-muted">
+              Max model tier (vendor cap)
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {MODEL_TIER_OPTIONS.map((opt) => {
+                const selected = operatorMaxTier === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setOperatorMaxTier(opt.value)}
+                    className={`rounded-lg border px-3 py-2 text-[0.8rem] font-medium transition-colors cursor-pointer ${
+                      selected
+                        ? "border-cobalt bg-cobalt-tint text-ink"
+                        : "border-border bg-paper text-ink-soft hover:border-border-strong"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-[0.68rem] text-ink-muted">
+              Caps which intelligence tiers this org&apos;s campaigns can select.
+            </p>
+          </div>
+
+          <div className="mt-5">
+            <label htmlFor="hard_ceiling" className="mb-1.5 block text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-muted">
+              Spend ceiling (credits / month)
+            </label>
+            <input
+              id="hard_ceiling"
+              type="number"
+              min={0}
+              step={1000}
+              value={hardCeiling}
+              onChange={(e) => setHardCeiling(e.target.value)}
+              placeholder="No ceiling"
+              className="h-10 w-full rounded-lg border border-border bg-cream/40 px-3.5 font-mono text-sm text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20"
+            />
+            <p className="mt-1.5 text-[0.68rem] text-ink-muted">
+              New candidate intake pauses past this. Blank = uncapped (plan default).
+            </p>
+          </div>
+
           <div className="mt-5 flex justify-end">
             <button
               onClick={save}
@@ -366,6 +460,28 @@ export default function OperatorOrgDetailPage() {
             <span className="font-mono text-ink-soft">{nf(usage.allTime.input)}</span> in&nbsp;/&nbsp;
             <span className="font-mono text-ink-soft">{nf(usage.allTime.output)}</span> out
           </p>
+
+          {/* Operator-only: billed spend vs raw model cost (last 30 days). */}
+          <div className="mt-4 rounded-lg border border-border bg-cream/40 p-3.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[0.7rem] text-ink-soft">Billed (ex VAT)</span>
+              <span className="font-mono text-sm tabular-nums text-ink">{zar(spend.billedExVat)}</span>
+            </div>
+            <div className="mt-1.5 flex items-center justify-between">
+              <span className="text-[0.7rem] text-ink-soft">Raw model cost</span>
+              <span className="font-mono text-sm tabular-nums text-ink-soft">{zar(spend.rawCostZar)}</span>
+            </div>
+            <div className="mt-1.5 flex items-center justify-between border-t border-border pt-1.5">
+              <span className="text-[0.7rem] font-semibold text-ink">Margin</span>
+              <span className="font-mono text-sm tabular-nums text-green">
+                {zar(spend.marginZar)}
+                <span className="text-ink-muted"> · {Math.round(spend.marginPct * 100)}%</span>
+              </span>
+            </div>
+            <p className="mt-2 text-[0.62rem] uppercase tracking-[0.12em] text-ink-muted">
+              {nf(Math.round(spend.credits))} credits · operator-only
+            </p>
+          </div>
 
           {/* Per-kind volume */}
           <dl className="mt-5 space-y-2.5 border-t border-border pt-4">

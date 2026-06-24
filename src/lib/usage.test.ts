@@ -134,6 +134,7 @@ describe("recordUsageEvent", () => {
       kind: "ai_tokens",
       provider: null,
       model: null,
+      model_tier: null,
       input_tokens: null,
       output_tokens: null,
       campaign_id: null,
@@ -166,5 +167,10 @@ describe("recordUsageEvent", () => {
       candidate_id: "cand1",
       quantity: 3,
     });
+  });
+
+  it("stamps the supplied model tier", () => {
+    recordUsageEvent({ orgId: "o1", kind: "ai_tokens", modelTier: "executive" });
+    expect(captured.rows[0]).toMatchObject({ model_tier: "executive" });
   });
 });

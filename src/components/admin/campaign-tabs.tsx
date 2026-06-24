@@ -46,6 +46,16 @@ export function CampaignTabs({ activeTab, shortlistCount, campaignId }: Props) {
             </span>
           )}
         </button>
+        <button
+          onClick={() => setTab("spend")}
+          className={`rounded-md px-4 py-1.5 text-[0.78rem] font-medium transition-colors cursor-pointer ${
+            activeTab === "spend"
+              ? "bg-surface text-charcoal shadow-sm"
+              : "text-txt-muted hover:text-txt-secondary"
+          }`}
+        >
+          AI Spend
+        </button>
       </div>
 
       {activeTab === "shortlist" && shortlistCount > 0 && (

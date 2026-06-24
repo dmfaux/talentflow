@@ -11,6 +11,8 @@ import {
 } from "@/db/schema";
 import { clientIp, error, requireApiOperator, success } from "@/lib/api";
 import { recordOperatorAudit } from "@/lib/operator-audit";
+import { getOrgMargin } from "@/lib/pricing";
+import { isModelTier } from "@/lib/ai";
 import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
@@ -59,7 +61,7 @@ export async function GET(
 
     // Onboarding status (S9): the accepted Owner vs the pending org-level Owner
     // invite, so the detail page can render "owner active" vs "invite / resend".
-    const [[brands], [camps], [cands], owner, pendingInvite, usageRows, [allTime]] =
+    const [[brands], [camps], [cands], owner, pendingInvite, usageRows, [allTime], margin] =
       await Promise.all([
         db
           .select({ total: sql<number>`count(*)::int` })
@@ -107,6 +109,9 @@ export async function GET(
           })
           .from(usageEvents)
           .where(eq(usageEvents.org_id, id)),
+        // Operator-only billed-vs-cost margin (last 30d). Raw cost never leaves
+        // the operator shell — getOrgMargin takes a raw orgId by design.
+        getOrgMargin(id, 30),
       ]);
 
     // Shape rows into a fixed-key map so the UI never has to guard on missing
@@ -161,6 +166,15 @@ export async function GET(
         tokens: { input: periodInput, output: periodOutput },
         allTime: { input: allTime.inputTokens, output: allTime.outputTokens },
       },
+      // Operator-only billed spend + raw cost + margin (last 30d).
+      spend: {
+        period: "30d",
+        credits: margin.credits,
+        billedExVat: margin.billedExVat,
+        rawCostZar: margin.rawCostZar,
+        marginZar: margin.marginZar,
+        marginPct: margin.marginPct,
+      },
     });
   } catch (err) {
     console.error("GET /api/operator/organizations/[id] error:", err);
@@ -209,8 +223,32 @@ export async function PATCH(
       updates.billing_email = trimmed;
     }
 
+    // Usage-based pricing caps. operator_max_model_tier is the vendor ceiling on
+    // model intelligence; hard_ceiling_credits is the per-period spend cap.
+    if (body.operator_max_model_tier !== undefined) {
+      if (!isModelTier(body.operator_max_model_tier)) {
+        return error(
+          "operator_max_model_tier must be essential, professional, or executive"
+        );
+      }
+      updates.operator_max_model_tier = body.operator_max_model_tier;
+    }
+
+    if (body.hard_ceiling_credits !== undefined) {
+      const hc = body.hard_ceiling_credits;
+      if (
+        hc !== null &&
+        (typeof hc !== "number" || !Number.isInteger(hc) || hc < 0)
+      ) {
+        return error("hard_ceiling_credits must be a non-negative integer or null");
+      }
+      updates.hard_ceiling_credits = hc;
+    }
+
     if (Object.keys(updates).length === 0) {
-      return error("No editable fields supplied (tier, billing_email)");
+      return error(
+        "No editable fields supplied (tier, billing_email, operator_max_model_tier, hard_ceiling_credits)"
+      );
     }
 
     updates.updated_at = new Date();
@@ -244,6 +282,42 @@ export async function PATCH(
         metadata: {
           from: org.billing_email,
           to: updates.billing_email,
+          slug: org.slug,
+        },
+        ip,
+        endedAt: now,
+      });
+    }
+    if (
+      updates.operator_max_model_tier !== undefined &&
+      updates.operator_max_model_tier !== org.operator_max_model_tier
+    ) {
+      await recordOperatorAudit({
+        operatorUserId: ctx.userId,
+        action: "set_org_caps",
+        targetOrgId: id,
+        metadata: {
+          field: "operator_max_model_tier",
+          from: org.operator_max_model_tier,
+          to: updates.operator_max_model_tier,
+          slug: org.slug,
+        },
+        ip,
+        endedAt: now,
+      });
+    }
+    if (
+      updates.hard_ceiling_credits !== undefined &&
+      updates.hard_ceiling_credits !== org.hard_ceiling_credits
+    ) {
+      await recordOperatorAudit({
+        operatorUserId: ctx.userId,
+        action: "set_org_caps",
+        targetOrgId: id,
+        metadata: {
+          field: "hard_ceiling_credits",
+          from: org.hard_ceiling_credits,
+          to: updates.hard_ceiling_credits,
           slug: org.slug,
         },
         ip,

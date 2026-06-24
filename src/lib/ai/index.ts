@@ -17,3 +17,12 @@ export {
   type TokenUsage,
   type ProviderAttempt,
 } from "./providers";
+
+export {
+  resolveModelForTier,
+  clampTier,
+  asModelTier,
+  isModelTier,
+  type CallType,
+  type TierCaps,
+} from "./resolve-tier";

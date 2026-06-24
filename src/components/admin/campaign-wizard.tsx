@@ -8,6 +8,9 @@ import { renderMarkdown } from "@/lib/markdown";
 import { useTenant } from "./tenant-provider";
 import { BrandPicker } from "./brand-picker";
 import { ThemeCard, type Theme } from "./theme-card";
+// Type-only import — keeps the pricing module (and its @/db dependency) out of
+// this client bundle while sharing the ModelTier union.
+import type { ModelTier } from "@/lib/pricing";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -27,6 +30,9 @@ export interface CampaignWizardProps {
   cancelHref: string;
   /** Breadcrumb label shown at the top ("New Campaign", "Edit …"). */
   breadcrumbLabel: string;
+  /** The org's effective model-tier cap — tiers above it are shown locked.
+   *  Defaults to "executive" (all tiers open). */
+  orgMaxTier?: ModelTier;
 }
 
 interface Client {
@@ -75,6 +81,8 @@ export interface FormData {
   min_score: number;
   max_auto_advance_score: number;
   ghost_ttl_days: number;
+  /** Model-intelligence tier used to score this campaign's candidates. */
+  selected_model_tier: ModelTier;
   /** Campaign-level theme override; null inherits the brand default (CT3). */
   theme_id: string | null;
 }
@@ -104,7 +112,42 @@ const INITIAL: FormData = {
   min_score: 5,
   max_auto_advance_score: 8,
   ghost_ttl_days: 10,
+  selected_model_tier: "professional",
   theme_id: null,
+};
+
+// Display metadata for the scoring-intelligence selector. Credits-per-candidate
+// mirror the landing page (docs/pricing-model.md); the authoritative rates +
+// clamping live server-side in src/lib/pricing.ts + resolve-tier.ts.
+const MODEL_TIER_OPTIONS: {
+  value: ModelTier;
+  label: string;
+  blurb: string;
+  perCandidate: string;
+}[] = [
+  {
+    value: "essential",
+    label: "Essential",
+    blurb: "Fast, lean scoring — ideal for high-volume roles.",
+    perCandidate: "≈3 credits / candidate",
+  },
+  {
+    value: "professional",
+    label: "Professional",
+    blurb: "Balanced depth and nuance. The default for most roles.",
+    perCandidate: "≈7 credits / candidate",
+  },
+  {
+    value: "executive",
+    label: "Executive",
+    blurb: "Deepest reasoning for senior or business-critical hires.",
+    perCandidate: "≈18 credits / candidate",
+  },
+];
+const TIER_RANK: Record<ModelTier, number> = {
+  essential: 0,
+  professional: 1,
+  executive: 2,
 };
 
 function slugify(s: string) {
@@ -137,6 +180,7 @@ export function CampaignWizard({
   lockClient = false,
   cancelHref,
   breadcrumbLabel,
+  orgMaxTier = "executive",
 }: CampaignWizardProps) {
   const router = useRouter();
   const tenant = useTenant();
@@ -487,6 +531,7 @@ export function CampaignWizard({
         min_score: form.min_score,
         max_auto_advance_score: form.max_auto_advance_score,
       },
+      selected_model_tier: form.selected_model_tier,
       ghost_ttl_days: form.ghost_ttl_days,
       // null = inherit the brand default at render (CT3, RD-2).
       theme_id: form.theme_id,
@@ -1034,6 +1079,49 @@ export function CampaignWizard({
                 Ghost candidates transition to <span className="font-mono">no_response</span> — a blameless terminal state, distinct from <span className="font-mono">rejected</span>, with its own email template.
               </p>
             </div>
+
+            {/* Scoring intelligence (model tier) */}
+            <div>
+              <label className={labelClass}>Scoring Intelligence</label>
+              <p className="mb-2 text-xs text-txt-muted">
+                Which AI model scores this campaign&apos;s candidates. Higher tiers
+                reason more deeply and draw more credits per candidate from your
+                monthly allowance. Follow-up chats always run on Essential.
+              </p>
+              <div className="grid gap-2.5 sm:grid-cols-3">
+                {MODEL_TIER_OPTIONS.map((opt) => {
+                  const selected = form.selected_model_tier === opt.value;
+                  const locked = TIER_RANK[opt.value] > TIER_RANK[orgMaxTier];
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      disabled={locked}
+                      aria-pressed={selected}
+                      onClick={() => updateForm({ selected_model_tier: opt.value })}
+                      className={`flex flex-col rounded-lg border p-3.5 text-left transition-colors ${
+                        selected
+                          ? "border-accent bg-accent/5 ring-1 ring-accent/20"
+                          : "border-border bg-cream/40 hover:border-accent/50"
+                      } ${locked ? "cursor-not-allowed opacity-50 hover:border-border" : ""}`}
+                    >
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-sm font-medium text-charcoal">{opt.label}</span>
+                        {opt.value === "professional" && (
+                          <span className="rounded-full bg-charcoal/5 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-txt-muted">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs leading-snug text-txt-muted">{opt.blurb}</p>
+                      <span className="mt-2 font-mono text-[0.7rem] text-charcoal/70">
+                        {locked ? "Upgrade plan to unlock" : opt.perCandidate}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
 
@@ -1123,6 +1211,7 @@ export function CampaignWizard({
                 <p><span className="text-txt-muted">Min. score threshold:</span> <span className="text-charcoal font-mono">{form.min_score}</span><span className="text-txt-muted"> / 10</span>{form.min_score > 8 && <span className="ml-2 text-xs font-medium text-amber-600">Very high</span>}</p>
                 <p><span className="text-txt-muted">Auto-advance threshold:</span> <span className="text-charcoal font-mono">{form.max_auto_advance_score}</span><span className="text-txt-muted"> / 10 (skips chat)</span></p>
                 <p><span className="text-txt-muted">Follow-up chat window:</span> <span className="text-charcoal font-mono">{form.ghost_ttl_days}</span><span className="text-txt-muted"> days (nudge at day {form.ghost_ttl_days - 3})</span></p>
+                <p><span className="text-txt-muted">Scoring intelligence:</span> <span className="text-charcoal">{MODEL_TIER_OPTIONS.find((o) => o.value === form.selected_model_tier)?.label}</span><span className="text-txt-muted"> ({MODEL_TIER_OPTIONS.find((o) => o.value === form.selected_model_tier)?.perCandidate})</span></p>
               </div>
             </div>
 

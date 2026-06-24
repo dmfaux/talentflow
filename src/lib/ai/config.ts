@@ -38,9 +38,9 @@ export function getProviderChain(): ProviderName[] {
 // ── Model selection ─────────────────────────────────────────────────
 
 const DEFAULT_MODELS: Record<ProviderName, string> = {
-  anthropic: "claude-sonnet-4-20250514",
+  anthropic: "claude-sonnet-4-6",
   openai: "gpt-4o",
-  openrouter: "anthropic/claude-sonnet-4-20250514",
+  openrouter: "anthropic/claude-sonnet-4-6",
   local: "default",
 };
 

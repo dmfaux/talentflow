@@ -26,6 +26,9 @@ export const OPERATOR_AUDIT_ACTIONS = [
   "theme_create",
   "theme_update",
   "set_brand_default_theme",
+  // Usage-based pricing — operator sets the org's model-tier cap and/or spend
+  // ceiling. metadata.field distinguishes the two; both carry {from, to}.
+  "set_org_caps",
 ] as const;
 
 export type OperatorAuditAction = (typeof OPERATOR_AUDIT_ACTIONS)[number];

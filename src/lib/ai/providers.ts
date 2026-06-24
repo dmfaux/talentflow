@@ -111,9 +111,16 @@ function getHttpStatus(err: unknown): number | undefined {
 async function callProvider(
   providerName: ProviderName,
   system: string,
-  prompt: string
+  prompt: string,
+  anthropicModel?: string
 ): Promise<{ output: ScoringResult; text: string; modelId: string; usage: TokenUsage }> {
-  const modelId = getModelId(providerName);
+  // The tier model id is Anthropic-format (claude-…), so it only overrides the
+  // Anthropic primary. Fallback providers keep their env models — the usage row
+  // is billed at the SELECTED tier's rate regardless of which provider answered.
+  const modelId =
+    providerName === "anthropic" && anthropicModel
+      ? anthropicModel
+      : getModelId(providerName);
   const factory = getProviderFactory(providerName);
   const model = factory(modelId);
 
@@ -153,7 +160,8 @@ export function extractUsage(usage: {
 
 export async function callWithFallback(
   system: string,
-  prompt: string
+  prompt: string,
+  opts?: { anthropicModel?: string }
 ): Promise<AIResult> {
   const chain = getProviderChain();
   const attempts: ProviderAttempt[] = [];
@@ -161,7 +169,12 @@ export async function callWithFallback(
   for (const providerName of chain) {
     // First attempt
     try {
-      const result = await callProvider(providerName, system, prompt);
+      const result = await callProvider(
+        providerName,
+        system,
+        prompt,
+        opts?.anthropicModel
+      );
       return { ...result, providerName, attempts };
     } catch (err: unknown) {
       const status = getHttpStatus(err);
@@ -177,7 +190,12 @@ export async function callWithFallback(
           `AI: ${providerName} failed (${status ?? "validation"}), retrying once...`
         );
         try {
-          const result = await callProvider(providerName, system, prompt);
+          const result = await callProvider(
+            providerName,
+            system,
+            prompt,
+            opts?.anthropicModel
+          );
           return { ...result, providerName, attempts };
         } catch (retryErr: unknown) {
           const retryMessage =

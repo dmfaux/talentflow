@@ -672,6 +672,18 @@ export async function seed(db: Db): Promise<SeedSummary> {
   }
   console.log(`Organizations: ${orgIdBySlug.size} (${DEMO_ORGS.map((o) => o.slug).join(", ")})`);
 
+  // ── Plans (usage-based pricing config; docs/pricing-model.md §4) ──
+  // Reference config keyed by org tier. No inbound FKs, so a clean delete+insert
+  // keeps the numbers in sync on every re-seed. Credit sell price is global
+  // (CREDIT_PRICE_ZAR in src/lib/pricing.ts), not stored here.
+  await db.delete(schema.plans);
+  await db.insert(schema.plans).values([
+    { tier: "standard", base_fee_zar: 7500, included_credits: 6000, overage_discount_pct: 0 },
+    { tier: "premium", base_fee_zar: 18000, included_credits: 18000, overage_discount_pct: 10 },
+    { tier: "enterprise", base_fee_zar: 36000, included_credits: 45000, overage_discount_pct: 25 },
+  ]);
+  console.log("Plans: 3 (standard, premium, enterprise)");
+
   // ── Brands (clients) — globally-distinct slugs (S12 contract) ──
   const brandRows: { id: string; slug: string; name: string; orgId: string }[] = [];
   for (const o of DEMO_ORGS) {
@@ -1158,7 +1170,7 @@ export async function seed(db: Db): Promise<SeedSummary> {
     if (cand.ai_score === null) continue;
 
     const provider = pick(["anthropic", "anthropic", "openai"]);
-    const model = provider === "openai" ? "gpt-4o-2024-08-06" : "claude-sonnet-4-20250514";
+    const model = provider === "openai" ? "gpt-4o-2024-08-06" : "claude-sonnet-4-6";
     const brandId = campaignMeta.get(cand.campaign_id)!.clientId;
     const scoredAt = new Date(cand.created_at.getTime() + randInt(2, 30) * 60_000);
 
@@ -1192,6 +1204,7 @@ export async function seed(db: Db): Promise<SeedSummary> {
       kind: "ai_tokens",
       provider,
       model,
+      model_tier: "professional", // sonnet-4-6 / gpt-4o both map to professional
       input_tokens: randInt(1500, 6000),
       output_tokens: randInt(200, 900),
       campaign_id: cand.campaign_id,
@@ -1207,7 +1220,7 @@ export async function seed(db: Db): Promise<SeedSummary> {
         org_id: cand.org_id,
         candidate_id: cand.id,
         provider: "anthropic",
-        model_version: "claude-sonnet-4-20250514",
+        model_version: "claude-sonnet-4-6",
         full_prompt: `You are an expert recruitment assessor. Re-evaluate with chat context...\n\n## Chat Transcript\n[redacted]\n\n## Previous Score: ${cand.ai_score}`,
         full_response: JSON.stringify({
           overall_score: rescored,
@@ -1232,7 +1245,8 @@ export async function seed(db: Db): Promise<SeedSummary> {
         brand_id: brandId,
         kind: "ai_tokens",
         provider: "anthropic",
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
+        model_tier: "professional",
         input_tokens: randInt(1500, 6000),
         output_tokens: randInt(200, 900),
         campaign_id: cand.campaign_id,

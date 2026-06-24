@@ -8,7 +8,15 @@ import { CampaignTabs } from "@/components/admin/campaign-tabs";
 import { CandidateTable } from "@/components/admin/candidate-table";
 import { ShortlistTab } from "@/components/admin/shortlist-tab";
 import { canAccessBrand, orgScope, requireTenant } from "@/lib/tenant";
+import { getCampaignSpend } from "@/lib/pricing";
 import { Suspense } from "react";
+
+const zarFmt = (n: number) => "R" + Math.round(n).toLocaleString("en-ZA");
+const TIER_BAR: Record<string, string> = {
+  essential: "bg-green",
+  professional: "bg-accent",
+  executive: "bg-gold",
+};
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -46,6 +54,10 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
   });
 
   if (!campaign) notFound();
+
+  // AI spend for this campaign (only when the Spend tab is open — one extra query).
+  const campaignSpend =
+    activeTab === "spend" ? await getCampaignSpend(ctx, id) : null;
 
   // Role-gate the mutation controls (recruiter+ on this brand). Cosmetic only —
   // the campaign routes enforce the same check server-side.
@@ -360,7 +372,76 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
       <CampaignTabs activeTab={activeTab} shortlistCount={shortlisted} campaignId={id} />
 
       {/* Tab content */}
-      {activeTab === "shortlist" ? (
+      {activeTab === "spend" && campaignSpend ? (
+        <div className="rounded-xl border border-border bg-surface p-6">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="font-serif text-lg text-charcoal">AI spend for this campaign</h2>
+              <p className="mt-0.5 text-xs text-txt-muted">
+                All-time, estimated from metered usage. Final amounts appear on the org invoice.
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-cream px-2.5 py-1 text-[0.72rem] text-txt-secondary">
+              Scoring tier:{" "}
+              <span className="font-medium capitalize text-charcoal">
+                {campaign.selected_model_tier}
+              </span>
+            </span>
+          </div>
+
+          <div className="mb-6 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-lg border border-border bg-cream/40 p-4">
+              <p className="text-[0.7rem] uppercase tracking-[0.12em] text-txt-muted">Spend (incl. VAT)</p>
+              <p className="mt-1.5 font-serif text-2xl tabular-nums text-charcoal">{zarFmt(campaignSpend.totalInclVat)}</p>
+              <p className="mt-1 text-[0.72rem] text-txt-muted">
+                {Math.round(campaignSpend.totalCredits).toLocaleString("en-ZA")} cr ·{" "}
+                {zarFmt(campaignSpend.subtotalExVat)} + {zarFmt(campaignSpend.vat)} VAT
+              </p>
+            </div>
+            <div className="rounded-lg border border-border bg-cream/40 p-4">
+              <p className="text-[0.7rem] uppercase tracking-[0.12em] text-txt-muted">≈ Candidates analysed</p>
+              <p className="mt-1.5 font-serif text-2xl tabular-nums text-charcoal">
+                {Math.round(campaignSpend.estCandidates).toLocaleString("en-ZA")}
+              </p>
+              <p className="mt-1 text-[0.72rem] text-txt-muted">≈ 3–18 credits each, by tier</p>
+            </div>
+          </div>
+
+          {campaignSpend.totalCredits > 0 ? (
+            <div className="space-y-3">
+              {campaignSpend.byTier
+                .filter((t) => t.credits > 0)
+                .map((t) => {
+                  const max = Math.max(1, ...campaignSpend.byTier.map((x) => x.zar));
+                  return (
+                    <div key={t.tier}>
+                      <div className="mb-1.5 flex items-baseline justify-between">
+                        <span className="text-[0.85rem] text-txt-secondary">{t.label}</span>
+                        <span className="font-mono text-[0.85rem] text-charcoal">
+                          {zarFmt(t.zar)}
+                          <span className="ml-2 text-[0.74rem] text-txt-muted">
+                            {Math.round(t.credits).toLocaleString("en-ZA")} cr
+                          </span>
+                        </span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-cream">
+                        <div
+                          className={`h-full rounded-full ${TIER_BAR[t.tier] ?? "bg-accent"}`}
+                          style={{ width: `${(t.zar / max) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              <p className="mt-4 border-t border-border pt-4 font-mono text-[0.68rem] uppercase tracking-wide text-txt-muted">
+                Candidate chats always bill at Essential
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-txt-muted">No AI spend recorded for this campaign yet.</p>
+          )}
+        </div>
+      ) : activeTab === "shortlist" ? (
         <ShortlistTab
           campaignId={id}
           candidates={shortlistRows.map((c) => ({

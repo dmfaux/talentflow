@@ -1,22 +1,33 @@
 import type { LanguageModel } from "ai";
 import { getProviderChain, getModelId } from "./config";
+import { resolveModelForTier } from "./resolve-tier";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { ProviderName } from "./config";
 
+/** Chat is hard-pinned to the Essential tier — both the model actually run and
+ *  the billed rate (owner's decision; docs/pricing-model.md). For Anthropic (the
+ *  canonical chat provider) that's the Essential model id; a non-Anthropic head
+ *  provider keeps its env model but chat usage is still billed at the Essential
+ *  rate (tier = intent, not which provider answered). */
+function chatModelId(providerName: ProviderName): string {
+  return providerName === "anthropic"
+    ? resolveModelForTier("essential", "chat").model
+    : getModelId(providerName);
+}
+
 export function getChatModel(): LanguageModel {
-  const chain = getProviderChain();
-  const providerName = chain[0];
-  const modelId = getModelId(providerName);
-  return createModel(providerName, modelId);
+  const providerName = getProviderChain()[0];
+  return createModel(providerName, chatModelId(providerName));
 }
 
 /** Provider + model id backing getChatModel(), for usage attribution (S10).
- *  Resolved the same way (chain head) so it matches the model actually used. */
+ *  Resolved the same way (chain head + Essential pin) so it matches the model
+ *  actually used. */
 export function getChatModelMeta(): { providerName: ProviderName; modelId: string } {
   const providerName = getProviderChain()[0];
-  return { providerName, modelId: getModelId(providerName) };
+  return { providerName, modelId: chatModelId(providerName) };
 }
 
 function createModel(name: ProviderName, modelId: string): LanguageModel {

@@ -22,6 +22,32 @@ interface OrgSpend {
   totalInclVat: number;
 }
 
+interface SpendProjection {
+  periodLabel: string;
+  mtdCredits: number;
+  mtdInclVat: number;
+  projectedCredits: number;
+  projectedInclVat: number;
+  includedCredits: number;
+  hardCeilingCredits: number | null;
+  inFlightCount: number;
+  costToFinishInclVat: number;
+}
+
+interface CampaignSpendRow {
+  campaignId: string;
+  roleTitle: string;
+  clientName: string | null;
+  credits: number;
+  zarInclVat: number;
+}
+
+interface UsageData {
+  spend: OrgSpend;
+  projection: SpendProjection;
+  campaigns: CampaignSpendRow[];
+}
+
 const RANGES = [7, 30, 90] as const;
 
 const TIER_BAR: Record<ModelTier, string> = {
@@ -32,6 +58,9 @@ const TIER_BAR: Record<ModelTier, string> = {
 
 function zar(n: number): string {
   return "R" + Math.round(n).toLocaleString("en-ZA");
+}
+function credits(n: number): string {
+  return Math.round(n).toLocaleString("en-ZA");
 }
 
 function StatCard({ label, value, sub, accent }: { label: string; value: string; sub: string; accent: string }) {
@@ -48,7 +77,7 @@ export default function UsagePage() {
   const tenant = useTenant();
   const allowed = canManageOrg(tenant);
   const [days, setDays] = useState<number>(30);
-  const [data, setData] = useState<OrgSpend | null>(null);
+  const [data, setData] = useState<UsageData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -72,7 +101,10 @@ export default function UsagePage() {
     );
   }
 
-  const maxTierZar = data ? Math.max(1, ...data.byTier.map((t) => t.zar)) : 1;
+  const spend = data?.spend ?? null;
+  const projection = data?.projection ?? null;
+  const campaigns = data?.campaigns ?? [];
+  const maxTierZar = spend ? Math.max(1, ...spend.byTier.map((t) => t.zar)) : 1;
 
   return (
     <div className="p-6 sm:p-8 max-w-[1100px]">
@@ -105,64 +137,184 @@ export default function UsagePage() {
             <div key={i} className="h-28 rounded-xl border border-rule bg-paper animate-pulse" />
           ))}
         </div>
-      ) : !data || data.totalCredits === 0 ? (
+      ) : !spend ? (
         <div className="rounded-xl border border-rule bg-paper p-8 text-center">
-          <p className="text-ink-muted text-[0.9rem]">No AI usage recorded in this period yet.</p>
+          <p className="text-ink-muted text-[0.9rem]">Couldn&apos;t load usage. Try again shortly.</p>
         </div>
       ) : (
         <>
           <div className="grid sm:grid-cols-3 gap-4">
             <StatCard
               label="Spend (incl. VAT)"
-              value={zar(data.totalInclVat)}
-              sub={`${zar(data.subtotalExVat)} + ${zar(data.vat)} VAT`}
+              value={zar(spend.totalInclVat)}
+              sub={`${zar(spend.subtotalExVat)} + ${zar(spend.vat)} VAT`}
               accent="text-ink"
             />
             <StatCard
               label="AI credits used"
-              value={Math.round(data.totalCredits).toLocaleString("en-ZA")}
+              value={credits(spend.totalCredits)}
               sub="billed at R1.20 / credit (ex VAT)"
               accent="text-cobalt"
             />
             <StatCard
               label="≈ Candidates analysed"
-              value={Math.round(data.estCandidates).toLocaleString("en-ZA")}
+              value={credits(spend.estCandidates)}
               sub="≈ 3–18 credits each, by tier"
               accent="text-moss"
             />
           </div>
+
+          {projection && <ThisMonth p={projection} />}
 
           <div className="mt-8 rounded-2xl border border-rule bg-paper p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-display text-[1.1rem] text-ink">Spend by intelligence tier</h2>
               <span className="font-mono text-[0.7rem] text-ink-faint uppercase tracking-wide">ex VAT</span>
             </div>
-            <div className="space-y-4">
-              {data.byTier.map((t) => (
-                <div key={t.tier}>
-                  <div className="flex items-baseline justify-between mb-1.5">
-                    <span className="text-[0.88rem] text-ink-soft">{t.label}</span>
-                    <span className="font-mono text-[0.9rem] text-ink">
-                      {zar(t.zar)}
-                      <span className="text-ink-faint ml-2 text-[0.78rem]">
-                        {Math.round(t.credits).toLocaleString("en-ZA")} cr
+            {spend.totalCredits === 0 ? (
+              <p className="text-ink-muted text-[0.88rem]">No AI usage recorded in this period yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {spend.byTier.map((t) => (
+                  <div key={t.tier}>
+                    <div className="flex items-baseline justify-between mb-1.5">
+                      <span className="text-[0.88rem] text-ink-soft">{t.label}</span>
+                      <span className="font-mono text-[0.9rem] text-ink">
+                        {zar(t.zar)}
+                        <span className="text-ink-faint ml-2 text-[0.78rem]">{credits(t.credits)} cr</span>
                       </span>
-                    </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-canvas-2 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${TIER_BAR[t.tier]}`}
+                        style={{ width: `${(t.zar / maxTierZar) * 100}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 rounded-full bg-canvas-2 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${TIER_BAR[t.tier]}`}
-                      style={{ width: `${(t.zar / maxTierZar) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
             <p className="mt-6 pt-5 border-t border-rule font-mono text-[0.7rem] text-ink-faint tracking-wide">
               CANDIDATE CHATS ALWAYS BILL AT ESSENTIAL · FIGURES ESTIMATED FROM METERED USAGE
             </p>
           </div>
+
+          {campaigns.length > 0 && (
+            <div className="mt-8 rounded-2xl border border-rule bg-paper p-6">
+              <h2 className="font-display text-[1.1rem] text-ink mb-5">Spend by campaign</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[0.86rem]">
+                  <thead>
+                    <tr className="text-left text-[0.7rem] uppercase tracking-[0.1em] text-ink-faint border-b border-rule">
+                      <th className="pb-2 font-medium">Campaign</th>
+                      <th className="pb-2 font-medium text-right">Credits</th>
+                      <th className="pb-2 font-medium text-right">Spend (incl. VAT)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {campaigns.map((c) => (
+                      <tr key={c.campaignId} className="border-b border-rule/60 last:border-0">
+                        <td className="py-2.5 pr-4">
+                          <span className="text-ink-soft">{c.roleTitle}</span>
+                          {c.clientName && <span className="text-ink-faint"> · {c.clientName}</span>}
+                        </td>
+                        <td className="py-2.5 text-right font-mono text-ink-muted">{credits(c.credits)}</td>
+                        <td className="py-2.5 text-right font-mono text-ink">{zar(c.zarInclVat)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
+      )}
+    </div>
+  );
+}
+
+// ── This-month projection + allowance + pipeline ─────────────────────
+function ThisMonth({ p }: { p: SpendProjection }) {
+  const allowancePct = p.includedCredits > 0 ? Math.min(1, p.mtdCredits / p.includedCredits) : 0;
+  const projOver = p.includedCredits > 0 && p.projectedCredits > p.includedCredits;
+  const ceilingPct =
+    p.hardCeilingCredits && p.hardCeilingCredits > 0
+      ? Math.min(1, p.projectedCredits / p.hardCeilingCredits)
+      : null;
+
+  return (
+    <div className="mt-8 rounded-2xl border border-rule bg-paper p-6">
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="font-display text-[1.1rem] text-ink">This month ({p.periodLabel})</h2>
+        <span className="font-mono text-[0.7rem] text-ink-faint uppercase tracking-wide">run-rate projection</span>
+      </div>
+
+      <div className="grid gap-6 sm:grid-cols-2">
+        {/* Allowance drawdown */}
+        <div>
+          <div className="flex items-baseline justify-between mb-1.5">
+            <span className="text-[0.82rem] text-ink-muted">Included allowance used</span>
+            <span className="font-mono text-[0.84rem] text-ink">
+              {credits(p.mtdCredits)}
+              {p.includedCredits > 0 && (
+                <span className="text-ink-faint"> / {credits(p.includedCredits)} cr</span>
+              )}
+            </span>
+          </div>
+          <div className="h-2.5 rounded-full bg-canvas-2 overflow-hidden">
+            <div
+              className={`h-full rounded-full ${allowancePct >= 1 ? "bg-saffron" : "bg-cobalt"}`}
+              style={{ width: `${allowancePct * 100}%` }}
+            />
+          </div>
+          <p className="mt-2 text-[0.76rem] text-ink-faint">
+            {p.includedCredits > 0
+              ? `${credits(Math.max(0, p.includedCredits - p.mtdCredits))} credits left in this month's allowance`
+              : "Usage billed per credit; no included allowance on this plan"}
+          </p>
+        </div>
+
+        {/* Projection vs ceiling */}
+        <div>
+          <div className="flex items-baseline justify-between mb-1.5">
+            <span className="text-[0.82rem] text-ink-muted">Projected month-end</span>
+            <span className={`font-mono text-[0.84rem] ${projOver ? "text-saffron" : "text-ink"}`}>
+              {credits(p.projectedCredits)} cr
+              <span className="text-ink-faint"> · {zar(p.projectedInclVat)}</span>
+            </span>
+          </div>
+          {ceilingPct !== null ? (
+            <>
+              <div className="h-2.5 rounded-full bg-canvas-2 overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${ceilingPct >= 1 ? "bg-saffron" : "bg-ink/70"}`}
+                  style={{ width: `${ceilingPct * 100}%` }}
+                />
+              </div>
+              <p className="mt-2 text-[0.76rem] text-ink-faint">
+                Spend ceiling at {credits(p.hardCeilingCredits!)} credits — new candidate intake pauses there.
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-[0.76rem] text-ink-faint">
+              No spend ceiling set. Ask your operator to set one to cap a viral month.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* In-flight pipeline (viral-cap visibility) */}
+      {p.inFlightCount > 0 && (
+        <div className="mt-6 pt-5 border-t border-rule flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[0.86rem] text-ink-soft">
+            <span className="font-medium text-ink">{p.inFlightCount.toLocaleString("en-ZA")}</span> candidate
+            {p.inFlightCount === 1 ? "" : "s"} still in process
+            <span className="text-ink-muted"> ≈ {zar(p.costToFinishInclVat)} to complete (incl. VAT)</span>
+          </p>
+          <span className="font-mono text-[0.68rem] text-ink-faint uppercase tracking-wide">
+            in-flight scoring &amp; chats
+          </span>
+        </div>
       )}
     </div>
   );

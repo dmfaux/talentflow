@@ -179,6 +179,8 @@ export async function POST(request: NextRequest) {
       kind: "ai_tokens",
       provider: aiResult.providerName,
       model: aiResult.modelId,
+      // Job-spec parsing is a one-off setup step on the platform default model.
+      modelTier: "professional",
       inputTokens: aiResult.usage.inputTokens,
       outputTokens: aiResult.usage.outputTokens,
       campaignId: row.id,

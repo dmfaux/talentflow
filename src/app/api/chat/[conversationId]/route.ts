@@ -157,6 +157,7 @@ export async function POST(
         kind: "ai_tokens",
         provider: chatModel.providerName,
         model: chatModel.modelId,
+        modelTier: "essential", // chat is hard-pinned to Essential
         inputTokens: classification.usage.inputTokens,
         outputTokens: classification.usage.outputTokens,
         candidateId: conv.candidate_id,
@@ -214,6 +215,7 @@ export async function POST(
         kind: "ai_tokens",
         provider: chatModel.providerName,
         model: chatModel.modelId,
+        modelTier: "essential", // chat is hard-pinned to Essential
         inputTokens: streamUsage.inputTokens,
         outputTokens: streamUsage.outputTokens,
         candidateId: conv.candidate_id,
@@ -265,6 +267,7 @@ export async function POST(
           kind: "ai_tokens",
           provider: chatModel.providerName,
           model: chatModel.modelId,
+          modelTier: "essential", // chat is hard-pinned to Essential
           inputTokens: withdrawal.usage.inputTokens,
           outputTokens: withdrawal.usage.outputTokens,
           candidateId: conv.candidate_id,

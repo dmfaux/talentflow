@@ -1,6 +1,7 @@
 import { db } from "@/db";
-import { campaigns, clients } from "@/db/schema";
+import { campaigns, clients, organizations } from "@/db/schema";
 import { authorizeApiBrand, error, getApiTenant, success } from "@/lib/api";
+import { asModelTier, clampTier, isModelTier } from "@/lib/ai";
 import { brandScope, orgScope, resolveOwnedResource } from "@/lib/tenant";
 import { validateSlug } from "@/lib/slug";
 import { assertThemeAvailableForBrand, freezeCampaignTheme } from "@/lib/theme";
@@ -130,6 +131,27 @@ export async function POST(request: NextRequest) {
       themeId = trimmed;
     }
 
+    // Model-intelligence tier for scoring this campaign (defaults to
+    // professional), clamped to the org cap so a campaign can never request
+    // above what the owner/operator allows.
+    let selectedModelTier = asModelTier(body.selected_model_tier);
+    if (body.selected_model_tier !== undefined) {
+      if (!isModelTier(body.selected_model_tier)) {
+        return error(
+          "selected_model_tier must be essential, professional, or executive"
+        );
+      }
+      const org = await db.query.organizations.findFirst({
+        where: eq(organizations.id, brand.org_id),
+        columns: { max_model_tier: true, operator_max_model_tier: true },
+      });
+      selectedModelTier = clampTier(
+        body.selected_model_tier,
+        asModelTier(org?.operator_max_model_tier),
+        asModelTier(org?.max_model_tier)
+      );
+    }
+
     const [row] = await db
       .insert(campaigns)
       .values({
@@ -137,6 +159,7 @@ export async function POST(request: NextRequest) {
         client_id: brand.id,
         slug: body.slug,
         theme_id: themeId,
+        selected_model_tier: selectedModelTier,
         role_title: body.role_title,
         role_description: body.role_description ?? null,
         department: body.department ?? null,

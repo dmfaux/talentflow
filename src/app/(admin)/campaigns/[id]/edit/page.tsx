@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { campaigns } from "@/db/schema";
+import { campaigns, organizations } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { orgScope, requireTenant } from "@/lib/tenant";
+import { asModelTier, clampTier } from "@/lib/ai/resolve-tier";
 import {
   CampaignWizard,
   type FormData as WizardFormData,
@@ -76,8 +77,19 @@ export default async function EditCampaignPage({ params, searchParams }: Props) 
     min_score: rubric.min_score ?? 5,
     max_auto_advance_score: rubric.max_auto_advance_score ?? 8,
     ghost_ttl_days: campaign.ghost_ttl_days ?? 10,
+    selected_model_tier: asModelTier(campaign.selected_model_tier),
     theme_id: campaign.theme_id ?? null,
   };
+
+  // Effective model-tier cap (more restrictive of owner + operator caps).
+  const org = await db.query.organizations.findFirst({
+    where: eq(organizations.id, campaign.org_id),
+    columns: { max_model_tier: true, operator_max_model_tier: true },
+  });
+  const orgMaxTier = clampTier(
+    asModelTier(org?.max_model_tier),
+    asModelTier(org?.operator_max_model_tier)
+  );
 
   return (
     <>
@@ -86,6 +98,7 @@ export default async function EditCampaignPage({ params, searchParams }: Props) 
         mode="edit"
         campaignId={campaign.id}
         initialForm={initialForm}
+        orgMaxTier={orgMaxTier}
         lockClient
         cancelHref={`/campaigns/${campaign.id}`}
         breadcrumbLabel={`Edit ${campaign.role_title}`}

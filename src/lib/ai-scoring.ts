@@ -5,12 +5,26 @@ import { getQueue } from "./queue";
 import { recordUsageEvent } from "./usage";
 import {
   callWithFallback,
+  resolveModelForTier,
+  asModelTier,
   AllProvidersFailedError,
   SYSTEM_PROMPT,
   RESCORE_SYSTEM_PROMPT,
   type ScoringResult,
   type ProviderAttempt,
 } from "./ai";
+
+/** Resolve the scoring tier + Anthropic model for a candidate's campaign,
+ *  clamped to the org's caps. Shared by initial scoring and chat re-scoring. */
+function resolveScoringTier(c: {
+  campaign: { selected_model_tier: string };
+  organization: { max_model_tier: string; operator_max_model_tier: string };
+}) {
+  return resolveModelForTier(asModelTier(c.campaign.selected_model_tier), "scoring", {
+    operatorMax: asModelTier(c.organization.operator_max_model_tier),
+    orgMax: asModelTier(c.organization.max_model_tier),
+  });
+}
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -104,6 +118,9 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
       campaign: {
         with: { client: true },
       },
+      organization: {
+        columns: { max_model_tier: true, operator_max_model_tier: true },
+      },
     },
   });
 
@@ -128,10 +145,16 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
 
   const startTime = Date.now();
 
+  // Resolve the campaign's model tier (clamped to the org caps) → run that model
+  // and bill that tier, even if a fallback provider ends up answering.
+  const scoringTier = resolveScoringTier(candidate);
+
   // Call AI with provider fallback chain
   let aiResult;
   try {
-    aiResult = await callWithFallback(SYSTEM_PROMPT, userPrompt);
+    aiResult = await callWithFallback(SYSTEM_PROMPT, userPrompt, {
+      anthropicModel: scoringTier.model,
+    });
   } catch (err: unknown) {
     const attempts =
       err instanceof AllProvidersFailedError ? err.attempts : [];
@@ -156,6 +179,7 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
     kind: "ai_tokens",
     provider: aiResult.providerName,
     model: aiResult.modelId,
+    modelTier: scoringTier.tier,
     inputTokens: aiResult.usage.inputTokens,
     outputTokens: aiResult.usage.outputTokens,
     campaignId: candidate.campaign_id,
@@ -417,6 +441,9 @@ export async function rescoreWithChatContext(
       campaign: {
         with: { client: true },
       },
+      organization: {
+        columns: { max_model_tier: true, operator_max_model_tier: true },
+      },
     },
   });
 
@@ -501,9 +528,15 @@ export async function rescoreWithChatContext(
 
   const startTime = Date.now();
 
+  // Re-scoring runs at the campaign's selected tier (clamped to org caps), the
+  // same as initial scoring.
+  const scoringTier = resolveScoringTier(candidate);
+
   let aiResult;
   try {
-    aiResult = await callWithFallback(RESCORE_SYSTEM_PROMPT, userPrompt);
+    aiResult = await callWithFallback(RESCORE_SYSTEM_PROMPT, userPrompt, {
+      anthropicModel: scoringTier.model,
+    });
   } catch (err: unknown) {
     const processingTimeMs = Date.now() - startTime;
     const message = err instanceof Error ? err.message : "Unknown API error";
@@ -542,6 +575,7 @@ export async function rescoreWithChatContext(
     kind: "ai_tokens",
     provider: aiResult.providerName,
     model: aiResult.modelId,
+    modelTier: scoringTier.tier,
     inputTokens: aiResult.usage.inputTokens,
     outputTokens: aiResult.usage.outputTokens,
     campaignId: candidate.campaign_id,

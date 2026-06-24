@@ -24,6 +24,16 @@ export const organizations = pgTable(
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
     tier: text("tier").notNull().default("standard"), // moved up from clients (copy)
+    // Usage-based pricing (value-credit model). max_model_tier is the owner's cap
+    // on campaign model intelligence; operator_max_model_tier is the vendor cap
+    // (always ≥ the org cap). resolveModelForTier() clamps a campaign's selected
+    // tier to min(both). hard_ceiling_credits is the per-period spend cap (null =
+    // uncapped, falls back to the plan default); Phase 3 displays it, Phase 4 enforces.
+    max_model_tier: text("max_model_tier").notNull().default("executive"),
+    operator_max_model_tier: text("operator_max_model_tier")
+      .notNull()
+      .default("executive"),
+    hard_ceiling_credits: integer("hard_ceiling_credits"),
     billing_email: text("billing_email"), // moved up from clients (copy) — operator-owned
     // Tenant-editable org contact (S9), distinct from the operator-owned
     // billing_email. Both nullable/backfill-free; written via the tenant
@@ -38,6 +48,22 @@ export const organizations = pgTable(
   },
   (table) => [uniqueIndex("organizations_slug_idx").on(table.slug)]
 );
+
+// ── Plans (usage-based pricing config; one row per org tier) ─────────
+//
+// Operator-tunable monthly plan: base fee + included AI-credit allowance +
+// overage discount. The credit SELL price is global (CREDIT_PRICE_ZAR in
+// src/lib/pricing.ts) — it lives in code, not here. hard_ceiling_credits is a
+// plan-level default ceiling an org may override via organizations.hard_ceiling_credits.
+export const plans = pgTable("plans", {
+  tier: text("tier").primaryKey(), // standard | premium | enterprise (matches organizations.tier)
+  base_fee_zar: integer("base_fee_zar").notNull(),
+  included_credits: integer("included_credits").notNull(),
+  overage_discount_pct: integer("overage_discount_pct").notNull().default(0),
+  hard_ceiling_credits: integer("hard_ceiling_credits"),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
 
 // ── Clients (= brands) ──────────────────────────────────────────────
 
@@ -233,6 +259,12 @@ export const campaigns = pgTable(
     status: text("status").notNull().default("draft"),
     gating_config: jsonb("gating_config").notNull(),
     scoring_rubric: jsonb("scoring_rubric").notNull(),
+    // Usage-based pricing: which model-intelligence tier scores this campaign's
+    // candidates (essential|professional|executive). Clamped to the org cap at
+    // call time by resolveModelForTier(); chat is always pinned to essential.
+    selected_model_tier: text("selected_model_tier")
+      .notNull()
+      .default("professional"),
     campaign_start: timestamp("campaign_start"),
     campaign_end: timestamp("campaign_end"),
     salary_range_min: integer("salary_range_min"),
@@ -689,6 +721,12 @@ export const candidatesRelations = relations(candidates, ({ one, many }) => ({
     fields: [candidates.campaign_id],
     references: [campaigns.id],
   }),
+  // Tenant org — lets scoring load the model-tier caps (max_model_tier /
+  // operator_max_model_tier) alongside the candidate in one query.
+  organization: one(organizations, {
+    fields: [candidates.org_id],
+    references: [organizations.id],
+  }),
   scoringLogs: many(scoringLogs),
   messages: many(messages),
   conversations: many(conversations),
@@ -804,6 +842,11 @@ export const usageEvents = pgTable(
     kind: text("kind").notNull(), // ai_tokens | campaign_created | candidate_created | chat_message | email_sent
     provider: text("provider"), // ai_tokens only (e.g. 'anthropic')
     model: text("model"), // ai_tokens only (modelId from the SDK result)
+    // Friendly model-intelligence tier (essential|professional|executive) stamped
+    // at write time by resolveModelForTier(), so billing stays stable even if the
+    // model string changes. Null for legacy rows → getOrgSpend derives it via
+    // tierForModel(model). Indexed with org_id for per-tier spend rollups.
+    model_tier: text("model_tier"),
     input_tokens: integer("input_tokens"), // ai_tokens only; SDK usage.inputTokens (undefined→null)
     output_tokens: integer("output_tokens"), // ai_tokens only; SDK usage.outputTokens
     campaign_id: uuid("campaign_id").references(() => campaigns.id, {
@@ -818,6 +861,7 @@ export const usageEvents = pgTable(
   (table) => [
     index("usage_events_org_created_idx").on(table.org_id, table.created_at),
     index("usage_events_org_kind_idx").on(table.org_id, table.kind),
+    index("usage_events_org_model_tier_idx").on(table.org_id, table.model_tier),
   ]
 );
 

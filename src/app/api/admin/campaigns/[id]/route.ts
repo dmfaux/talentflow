@@ -1,11 +1,12 @@
 import { db } from "@/db";
-import { campaigns, candidates, clients } from "@/db/schema";
+import { campaigns, candidates, clients, organizations } from "@/db/schema";
 import {
   authorizeApiBrand,
   error,
   getApiTenant,
   success,
 } from "@/lib/api";
+import { asModelTier, clampTier, isModelTier } from "@/lib/ai";
 import { orgScope, resolveOwnedResource } from "@/lib/tenant";
 import { validateSlug } from "@/lib/slug";
 import { assertThemeAvailableForBrand, freezeCampaignTheme } from "@/lib/theme";
@@ -124,6 +125,25 @@ export async function PATCH(
       if (body[field] !== undefined) {
         updates[field] = body[field];
       }
+    }
+
+    // Model-intelligence tier — validated + clamped to the org cap (defence in
+    // depth: scoring also clamps a stale Executive under a lowered cap).
+    if (body.selected_model_tier !== undefined) {
+      if (!isModelTier(body.selected_model_tier)) {
+        return error(
+          "selected_model_tier must be essential, professional, or executive"
+        );
+      }
+      const org = await db.query.organizations.findFirst({
+        where: eq(organizations.id, existing.org_id),
+        columns: { max_model_tier: true, operator_max_model_tier: true },
+      });
+      updates.selected_model_tier = clampTier(
+        body.selected_model_tier,
+        asModelTier(org?.operator_max_model_tier),
+        asModelTier(org?.max_model_tier)
+      );
     }
 
     // Campaign-level theme override (CT3). `null` inherits the brand default at

@@ -1,5 +1,6 @@
 import { db } from "@/db";
 import { usageEvents } from "@/db/schema";
+import type { ModelTier } from "@/lib/pricing";
 
 // ── Per-org usage metering (S10) ─────────────────────────────────────
 //
@@ -24,6 +25,10 @@ export interface UsageEventInput {
   provider?: string | null;
   /** ai_tokens only — model id from the SDK result. */
   model?: string | null;
+  /** ai_tokens only — billed model-intelligence tier from resolveModelForTier().
+   *  Stamped at write time so billing is stable even if the model string drifts;
+   *  null for legacy rows → getOrgSpend derives it via tierForModel(model). */
+  modelTier?: ModelTier | null;
   /** SDK usage.inputTokens. v6 reports `number | undefined`; pass undefined→null
    *  so "unknown" is distinguishable from a genuine zero. Never coerce to 0. */
   inputTokens?: number | null;
@@ -49,6 +54,7 @@ export function recordUsageEvent(input: UsageEventInput): void {
       kind: input.kind,
       provider: input.provider ?? null,
       model: input.model ?? null,
+      model_tier: input.modelTier ?? null,
       input_tokens: input.inputTokens ?? null,
       output_tokens: input.outputTokens ?? null,
       campaign_id: input.campaignId ?? null,
