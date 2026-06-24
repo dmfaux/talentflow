@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { replaceSlots, type SlotData } from "@/lib/slots";
 import { renderMarkdown } from "@/lib/markdown";
 import { useTenant } from "./tenant-provider";
+import { BrandPicker } from "./brand-picker";
 import { ThemeCard, type Theme } from "./theme-card";
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -141,11 +142,10 @@ export function CampaignWizard({
   const tenant = useTenant();
   const [step, setStep] = useState(initialStep);
   const [form, setForm] = useState<FormData>({ ...INITIAL, ...initialForm });
-  // S8: in create mode the campaign's brand IS the active brand (no select).
-  // Keep form.client_id synced to it so the existing branding/slug/submit logic
-  // keeps working; edit mode keeps the campaign's own (locked) client_id.
-  const activeBrandName =
-    tenant.brands.find((b) => b.id === tenant.activeBrandId)?.name ?? null;
+  // S8: in create mode the campaign's brand IS the active brand (set via the
+  // BrandPicker below). The effect further down keeps form.client_id synced to
+  // it so the existing branding/slug/submit logic keeps working; edit mode keeps
+  // the campaign's own (locked) client_id.
   // Track if the user has manually touched the slug (or if edit mode
   // loaded an existing slug). In edit mode we treat the slug as manual
   // so auto-slugify from role_title changes doesn't clobber it.
@@ -588,26 +588,7 @@ export function CampaignWizard({
             <h2 className="text-base font-semibold text-charcoal">Campaign Basics</h2>
 
             {mode === "create" ? (
-              tenant.activeBrandId ? (
-                <div>
-                  <label className={labelClass}>Brand</label>
-                  <div className="flex h-10 items-center justify-between rounded-lg border border-border bg-cream/40 px-3.5">
-                    <span className="flex items-center gap-2 text-sm text-charcoal">
-                      <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent" />
-                      {activeBrandName ?? "Selected brand"}
-                    </span>
-                    <span className="text-[0.7rem] text-txt-muted">From the brand switcher</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-lg border border-dashed border-border bg-cream/40 p-4">
-                  <p className="text-sm font-medium text-charcoal">Choose a brand first</p>
-                  <p className="mt-1 text-xs text-txt-muted">
-                    Pick a brand from the switcher in the top bar to create this
-                    campaign in it. &ldquo;All brands&rdquo; can&apos;t own a campaign.
-                  </p>
-                </div>
-              )
+              <BrandPicker error={errors.client_id} />
             ) : (
               <div>
                 <label htmlFor="client_id" className={labelClass}>

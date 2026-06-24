@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTenant } from "@/components/admin/tenant-provider";
+import { BrandPicker } from "@/components/admin/brand-picker";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -120,11 +121,8 @@ export default function FromJobSpecPage() {
   const tenant = useTenant();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // S8: the brand is the active-brand context (set from the header switcher),
-  // not a selector. "All brands"/none blocks submission (the API 400s too).
-  const activeBrandName =
-    tenant.brands.find((b) => b.id === tenant.activeBrandId)?.name ?? null;
-
+  // S8: the campaign's brand is the active-brand context. BrandPicker sets it
+  // (defaulting to the only brand); submission stays gated on it below.
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [phase, setPhase] = useState<Phase>("upload");
@@ -226,28 +224,10 @@ export default function FromJobSpecPage() {
           </p>
 
           <div className="space-y-6">
-            {/* Active-brand context (set from the header switcher) */}
-            <div>
-              <label className="mb-1.5 block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
-                Brand
-              </label>
-              {tenant.activeBrandId ? (
-                <div className="flex h-10 items-center justify-between rounded-lg border border-border bg-cream/40 px-3.5">
-                  <span className="flex items-center gap-2 text-sm text-charcoal">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent" />
-                    {activeBrandName ?? "Selected brand"}
-                  </span>
-                  <span className="text-[0.7rem] text-txt-muted">From the brand switcher</span>
-                </div>
-              ) : (
-                <div className="rounded-lg border border-dashed border-border bg-cream/40 p-4">
-                  <p className="text-sm font-medium text-charcoal">Choose a brand first</p>
-                  <p className="mt-1 text-xs text-txt-muted">
-                    Pick a brand from the switcher in the top bar before uploading a job spec.
-                  </p>
-                </div>
-              )}
-            </div>
+            {/* Brand the campaign is created in. Defaults to the only brand
+                when there's one; a picker when there are several (S8: choosing
+                sets the active brand the API reads). */}
+            <BrandPicker />
 
             {/* File drop zone */}
             <div>
