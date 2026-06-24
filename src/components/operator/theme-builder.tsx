@@ -199,7 +199,14 @@ export function ThemeBuilder({
   const isGallery = scope === "gallery";
   const editing = !!initial;
 
-  const [name, setName] = useState(initial?.name ?? "");
+  // Pre-fill a real, editable default name for a NEW bespoke theme. The field is
+  // required (save() bails on an empty name), and a brand-anchored placeholder
+  // reads like a value, so an operator who never typed a name used to hit a
+  // silent bounce back to Basics. Seeding the actual state — not just the
+  // placeholder — makes "Create theme" work out of the box and removes the trap.
+  const [name, setName] = useState(
+    initial?.name ?? (!isGallery && brandName ? `${brandName} — Bespoke` : "")
+  );
 
   // ── Seeds: 3 colours the palette is derived from ──
   const [seeds, setSeeds] = useState<ThemeSeeds>(() => {
@@ -317,6 +324,11 @@ export function ThemeBuilder({
   const [emailShell, setEmailShell] = useState(initial?.email_shell ?? "");
 
   const [saving, setSaving] = useState(false);
+  // Set once "Create theme" is pressed, so the required-name error surfaces
+  // inline (not just as a transient toast) and then clears live as the operator
+  // types — mirroring the landing/email fields' live validation.
+  const [attemptedSave, setAttemptedSave] = useState(false);
+  const nameMissing = attemptedSave && !name.trim();
 
   // ── Section navigation + preview surface ──
   const [section, setSection] = useState<BuilderSection>("basics");
@@ -479,6 +491,7 @@ export function ThemeBuilder({
   }
 
   async function save() {
+    setAttemptedSave(true);
     if (!name.trim()) {
       toast("Give the theme a name", "error");
       goSection("basics");
@@ -690,9 +703,15 @@ export function ThemeBuilder({
                 id="theme_name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={isGallery ? "e.g. Aurora" : `${brandName ?? "Brand"} — Bespoke`}
-                className={inputClass}
+                placeholder={isGallery ? "e.g. Aurora" : `e.g. ${brandName ?? "Brand"} — Bespoke`}
+                aria-invalid={nameMissing}
+                className={`${inputClass}${
+                  nameMissing ? " border-red focus:border-red focus:ring-red/20" : ""
+                }`}
               />
+              {nameMissing && (
+                <p className="mt-1 text-xs text-red">A theme name is required.</p>
+              )}
 
               <div className="mt-4">
                 <label htmlFor="preview_image_url" className={labelClass}>
