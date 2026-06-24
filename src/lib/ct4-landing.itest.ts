@@ -40,10 +40,6 @@ import {
 const RUN = !!process.env.DATABASE_URL;
 const MOUNT = '<div id="application-form"></div>';
 
-// The Premium tenant override — a valid landing (mount present, no <script>).
-const OVERRIDE_LANDING = `<!DOCTYPE html><html><head><style>body{margin:0}</style></head><body><h2>Bespoke</h2>${MOUNT}</body></html>`;
-expect(validateHtmlTemplate(OVERRIDE_LANDING).ok).toBe(true);
-
 // A distinctive palette colour we can look for in the generated landing to prove
 // it was coloured from a specific theme.
 const BRANDED_PRIMARY = "#006341";
@@ -59,16 +55,12 @@ type ResolverClient = {
 };
 function campaign(opts: {
   theme_id?: string | null;
-  html_template?: string | null;
   theme_snapshot?: Awaited<ReturnType<typeof freezeCampaignTheme>> | null;
-  tier?: string | null;
   client: ResolverClient;
 }) {
   return {
     theme_id: opts.theme_id ?? null,
-    html_template: opts.html_template ?? null,
     theme_snapshot: opts.theme_snapshot ?? null,
-    tier: opts.tier ?? "standard",
     client: opts.client,
   };
 }
@@ -170,39 +162,11 @@ describe.skipIf(!RUN)("CT5 landing theme integration (DB-backed)", () => {
     expect(html).toContain(BRANDED_PRIMARY);
   });
 
-  it("draft + Premium override: the pasted HTML wins over the generated landing", async () => {
-    const html = await resolveEffectiveLanding(
-      campaign({
-        theme_id: fx.brandedTheme,
-        html_template: OVERRIDE_LANDING,
-        tier: "premium",
-        client: brand,
-      })
-    );
-    expect(html).toBe(OVERRIDE_LANDING);
-  });
-
-  it("draft + Standard override: the paste is ignored (Premium-only gate) — generated landing renders", async () => {
-    const html = await resolveEffectiveLanding(
-      campaign({
-        theme_id: fx.brandedTheme,
-        html_template: OVERRIDE_LANDING,
-        tier: "standard",
-        client: brand,
-      })
-    );
-    expect(html).not.toBe(OVERRIDE_LANDING);
-    expect(html).toContain(MOUNT);
-    expect(html).toContain(BRANDED_PRIMARY);
-  });
-
-  it("active campaign (no override): regenerates from the FROZEN palette, stable across theme edits", async () => {
-    // Freeze at activation — no override, so landingHtml is null and the look is
-    // carried by the frozen email palette.
+  it("active campaign (no bespoke landing): regenerates from the FROZEN palette, stable across theme edits", async () => {
+    // Freeze at activation — the gallery theme has no bespoke landing, so
+    // landingHtml is null and the look is carried by the frozen email palette.
     const snapshot = await freezeCampaignTheme({
       theme_id: fx.brandedTheme,
-      html_template: null,
-      tier: "premium",
       client: brand,
     });
     expect(snapshot.landingHtml).toBeNull();
@@ -235,44 +199,4 @@ describe.skipIf(!RUN)("CT5 landing theme integration (DB-backed)", () => {
       .where(eq(themes.id, fx.brandedTheme));
   });
 
-  it("active campaign (Premium override): the frozen override renders verbatim", async () => {
-    const snapshot = await freezeCampaignTheme({
-      theme_id: fx.brandedTheme,
-      html_template: OVERRIDE_LANDING,
-      tier: "premium",
-      client: brand,
-    });
-    expect(snapshot.landingHtml).toBe(OVERRIDE_LANDING);
-
-    const html = await resolveEffectiveLanding(
-      campaign({ theme_id: fx.brandedTheme, theme_snapshot: snapshot, client: brand })
-    );
-    expect(html).toBe(OVERRIDE_LANDING);
-  });
-
-  it("freezeCampaignTheme stores override-or-null, gated by tier (never the themed landing)", async () => {
-    const premium = await freezeCampaignTheme({
-      theme_id: fx.brandedTheme,
-      html_template: OVERRIDE_LANDING,
-      tier: "premium",
-      client: brand,
-    });
-    expect(premium.landingHtml).toBe(OVERRIDE_LANDING);
-
-    const standard = await freezeCampaignTheme({
-      theme_id: fx.brandedTheme,
-      html_template: OVERRIDE_LANDING,
-      tier: "standard",
-      client: brand,
-    });
-    expect(standard.landingHtml).toBeNull();
-
-    const noOverride = await freezeCampaignTheme({
-      theme_id: fx.brandedTheme,
-      html_template: null,
-      tier: "premium",
-      client: brand,
-    });
-    expect(noOverride.landingHtml).toBeNull();
-  });
 });

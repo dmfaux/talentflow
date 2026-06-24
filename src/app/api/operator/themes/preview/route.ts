@@ -1,19 +1,5 @@
 import { error, requireApiOperator, success } from "@/lib/api";
-import {
-  applicationReceivedEmail,
-  chatAccessEmail,
-  chatInvitationEmail,
-  chatNudgeEmail,
-  gatingFailedEmail,
-  gatingPassedEmail,
-  noResponseEmail,
-  rejectionConfirmationEmail,
-  rejectionEmail,
-} from "@/lib/email";
-import {
-  type EmailTemplateType,
-  isEmailTemplateType,
-} from "@/lib/email-slots";
+import { chatInvitationEmail, resolveEmailSubject } from "@/lib/email";
 import { type EmailTheme } from "@/lib/theme";
 import {
   normaliseThemeFields,
@@ -24,10 +10,10 @@ import { isLogoBackground, isLogoPosition } from "@/lib/utils";
 import { NextRequest } from "next/server";
 
 // Map validated ThemeWriteValues into the EmailTheme the renderers read. Reuses
-// normaliseThemeFields' palette/font/copy derivation so the live preview matches
-// exactly what a saved theme would resolve to (no parallel derivation to drift).
-// Logo is assembled from the body (the preview payload carries the brand's logo
-// fields verbatim); copy/fontImports/emailTemplates ride from the validated values.
+// normaliseThemeFields' palette/font derivation so the live preview matches
+// exactly what a saved theme resolves to (no parallel derivation to drift). The
+// bespoke email_shell rides through, so a custom draft previews its real chrome;
+// a gallery draft (no shell) previews the in-code default chrome, recoloured.
 function emailThemeFromValues(
   values: ThemeWriteValues,
   body: Record<string, unknown>
@@ -50,67 +36,28 @@ function emailThemeFromValues(
       ? { url: logoUrl, background: logoBackground, position: logoPosition }
       : null,
     showPoweredBy: values.show_powered_by,
-    emailTemplates: values.email_templates,
+    emailShell: values.email_shell,
     fontImports: fontImportsFor(values.font_display_key, values.font_body_key),
-    landingCopy: values.landing_copy,
-    emailCopy: values.email_copy,
   };
 }
 
 // POST /api/operator/themes/preview — render a live email preview for the
 // theme-builder form (operator-gated).
 //
-// This MUST be a server endpoint: src/lib/email.ts imports @/db at module scope,
-// so its template functions can't be pulled into a client component. The builder
+// MUST be a server endpoint: src/lib/email.ts imports @/db at module scope, so
+// its template functions can't be pulled into a client component. The builder
 // posts its unsaved form values here (debounced) and drops the returned HTML into
 // an <iframe srcDoc>. We render the exact send-path template so the preview is
-// faithful to what candidates receive.
-//
-// CT6: the body may carry an optional `template_type` (one of the nine bespoke
-// email types; default "applicationReceived") AND the draft `email_templates`
-// map, so a bespoke per-template override previews live BEFORE it is saved — the
-// EmailTheme we build rides those templates through renderThemedEmail exactly as
-// the send path does. With no override for the chosen type (or no map at all) the
-// generated kit is rendered, so the recolour-only preview keeps working.
-
-// Realistic sample data substituted into both the generated kit and any bespoke
-// override (via the email slots). The action URL backs every link-bearing
-// template; closeBy + adminReason cover the chatNudge / rejectionConfirmation
-// slots. adminReason is intentionally blank so its conditional block disappears.
+// faithful: a custom draft's email_shell wraps a real (deterministic) body; a
+// recolour-only draft renders the default chrome. chatInvitation is the sample —
+// it exercises the most chrome (brand header, info card, action button, footer)
+// inside the shell.
 const SAMPLE = {
   candidate: "Sam",
   role: "Senior Software Engineer",
   company: "Northwind Studio",
   url: "https://example.com/continue",
-  closeBy: "12 July 2026",
-  adminReason: "",
 } as const;
-
-// Map each bespoke email type to its themed send-path template, called with the
-// sample data in the same argument order the send path uses (note chatAccess has
-// no company name, and chatNudge / rejectionConfirmation take extra arguments).
-function renderSampleEmail(type: EmailTemplateType, theme: EmailTheme): string {
-  switch (type) {
-    case "applicationReceived":
-      return applicationReceivedEmail(theme, SAMPLE.candidate, SAMPLE.role, SAMPLE.company);
-    case "gatingPassed":
-      return gatingPassedEmail(theme, SAMPLE.candidate, SAMPLE.role, SAMPLE.company);
-    case "gatingFailed":
-      return gatingFailedEmail(theme, SAMPLE.candidate, SAMPLE.role, SAMPLE.company);
-    case "rejection":
-      return rejectionEmail(theme, SAMPLE.candidate, SAMPLE.role, SAMPLE.company);
-    case "chatInvitation":
-      return chatInvitationEmail(theme, SAMPLE.candidate, SAMPLE.role, SAMPLE.company, SAMPLE.url);
-    case "chatAccess":
-      return chatAccessEmail(theme, SAMPLE.candidate, SAMPLE.role, SAMPLE.url);
-    case "chatNudge":
-      return chatNudgeEmail(theme, SAMPLE.candidate, SAMPLE.role, SAMPLE.company, SAMPLE.url, SAMPLE.closeBy);
-    case "noResponse":
-      return noResponseEmail(theme, SAMPLE.candidate, SAMPLE.role, SAMPLE.company);
-    case "rejectionConfirmation":
-      return rejectionConfirmationEmail(theme, SAMPLE.candidate, SAMPLE.role, SAMPLE.company, SAMPLE.adminReason);
-  }
-}
 
 export async function POST(request: NextRequest) {
   const { ctx, response } = await requireApiOperator();
@@ -120,24 +67,12 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // The template to preview. Default to the application-received email so the
-    // recolour-only preview keeps its existing behaviour when no type is sent;
-    // any supplied value must be one of the nine known bespoke email types.
-    let type: EmailTemplateType = "applicationReceived";
-    if (body.template_type != null) {
-      if (!isEmailTemplateType(body.template_type)) {
-        return error("template_type is not a known email template");
-      }
-      type = body.template_type;
-    }
-
-    // CT7: validate + derive the whole draft through the SAME contract the write
-    // path uses (seeds→palette, font keys→stacks/imports, copy normalisation,
-    // bespoke email_templates), so the preview is byte-faithful to a saved theme.
-    // The preview payload carries only render fields (no scope/name/org), so we
-    // inject preview-only placeholders: scope "custom" keeps the draft's bespoke
-    // email_templates alive (gallery would force them null), and the placeholder
-    // org/client satisfy the custom-scope invariant. None of these are persisted.
+    // Validate + derive the whole draft through the SAME contract the write path
+    // uses (seeds→palette, font keys→stacks/imports, email_shell validation), so
+    // the preview is byte-faithful to a saved theme. The preview payload carries
+    // only render fields (no scope/name/org); inject preview-only placeholders.
+    // Scope "custom" keeps the draft's email_shell alive (gallery would force it
+    // null) and satisfies the custom-scope invariant. None of these are persisted.
     const result = normaliseThemeFields({
       ...body,
       scope: "custom",
@@ -147,11 +82,35 @@ export async function POST(request: NextRequest) {
     });
     if (!result.ok) return error(result.message, result.status);
 
+    // Draw the brand's real name into the sample so the preview reads like this
+    // brand's send; fall back to the default stand-in when none is supplied
+    // (e.g. gallery themes, which aren't brand-scoped).
+    const company =
+      typeof body.brand_name === "string" && body.brand_name.trim()
+        ? body.brand_name.trim()
+        : SAMPLE.company;
+
     const theme = emailThemeFromValues(result.values, body);
+    const data = {
+      candidate: { name: SAMPLE.candidate },
+      campaign: { role_title: SAMPLE.role },
+      client: { name: company },
+    };
+    const html = chatInvitationEmail(
+      theme,
+      SAMPLE.candidate,
+      SAMPLE.role,
+      company,
+      SAMPLE.url
+    );
+    // The real subject (same resolver the send path uses) labels the inbox mock.
+    const subject = resolveEmailSubject("chatInvitation", data);
 
-    const html = renderSampleEmail(type, theme);
-
-    return success({ html });
+    return success({
+      html,
+      subject,
+      sample: { company, candidate: SAMPLE.candidate, role: SAMPLE.role },
+    });
   } catch (err) {
     console.error("POST /api/operator/themes/preview error:", err);
     return error("Internal server error", 500);

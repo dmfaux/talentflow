@@ -192,6 +192,20 @@ export function contrastRatio(hexA: string, hexB: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+/**
+ * Pure black or white — whichever has the higher WCAG contrast against `bg`.
+ * Used for text/icons placed directly ON a brand colour (e.g. a primary-coloured
+ * button), where a LIGHT brand primary (a yellow, say) would make white text
+ * illegible. Mirrors the monochrome fallback in `ensureContrast`. A dark primary
+ * (e.g. the default cobalt) resolves to "#ffffff" — unchanged from the old
+ * hard-coded white.
+ */
+export function readableTextOn(bg: string): "#ffffff" | "#000000" {
+  return contrastRatio("#ffffff", bg) >= contrastRatio("#000000", bg)
+    ? "#ffffff"
+    : "#000000";
+}
+
 // ---------------------------------------------------------------------------
 // Core derivation
 // ---------------------------------------------------------------------------

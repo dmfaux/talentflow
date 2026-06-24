@@ -1,7 +1,5 @@
 import { relations, sql } from "drizzle-orm";
 import type { ThemeSnapshot } from "@/lib/theme";
-import type { EmailTemplateMap } from "@/lib/email-slots";
-import type { LandingCopy, EmailCopy } from "@/lib/theme-copy";
 import {
   type AnyPgColumn,
   boolean,
@@ -129,6 +127,13 @@ export const themes = pgTable(
     seed_primary: text("seed_primary"),
     seed_accent: text("seed_accent"),
     seed_bg: text("seed_bg"),
+    // Per-token operator OVERRIDES of the derived palette. A PARTIAL map of only
+    // the tokens the operator pinned by hand (e.g. a neutral-grey ink ramp instead
+    // of the primary-tinted derivation); the rest keep tracking the seeds. The
+    // stored `palette` above is the fully resolved map — derivePalette(seeds) with
+    // these merged over it — so renderers read one column and never re-derive.
+    // Null/`{}` = pure derivation. Legacy direct-palette rows carry null.
+    palette_overrides: jsonb("palette_overrides"),
     font_display: text("font_display").notNull(), // resolved CSS stack (webfont + email-safe fallbacks)
     font_sans: text("font_sans").notNull(), // resolved CSS stack
     // The curated font-registry keys the operator picked (theme-fonts). Drive the
@@ -140,19 +145,14 @@ export const themes = pgTable(
     logo_background: text("logo_background").notNull().default("light"),
     logo_position: text("logo_position").notNull().default("top-left"),
     show_powered_by: boolean("show_powered_by").notNull().default(true),
-    landing_html: text("landing_html"), // CT4/CT6 consumes (bespoke landing)
-    // CT6: per-template bespoke email HTML, sparse-keyed by EmailTemplateType.
-    // Custom-scope themes only (write-side forces null for gallery), so the
-    // resolver can render it unconditionally without a tier re-check.
-    email_templates: jsonb("email_templates").$type<EmailTemplateMap>(),
-    // CT7: structured landing-page copy slots (headline/intro/highlights/apply
-    // heading), theme-level defaults the operator may override. Null → the
-    // renderer uses DEFAULT_LANDING_COPY. Rides into theme_snapshot.email at freeze.
-    landing_copy: jsonb("landing_copy").$type<LandingCopy>(),
-    // CT7: shared email copy blocks (greeting/sign-off/footer) + per-template
-    // subject/body overrides. Null → DEFAULT_EMAIL_COPY. Also frozen via the snapshot.
-    email_copy: jsonb("email_copy").$type<EmailCopy>(),
-    preview_image_url: text("preview_image_url"), // CT2/CT3 consume
+    landing_html: text("landing_html"), // bespoke landing page (custom/Premium themes only)
+    // The bespoke email "shell": one MSO-safe HTML document whose chrome matches
+    // the bespoke landing, carrying a BODY_MARKER where each transactional email's
+    // body is injected at send time. Custom-scope themes only (write-side forces
+    // null for gallery), so the resolver renders it unconditionally without a tier
+    // re-check; rides into theme_snapshot.email at freeze.
+    email_shell: text("email_shell"),
+    preview_image_url: text("preview_image_url"), // operator-uploaded preview thumbnail
     created_by: uuid("created_by").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -231,8 +231,6 @@ export const campaigns = pgTable(
     location: text("location"),
     employment_type: text("employment_type"),
     status: text("status").notNull().default("draft"),
-    html_template: text("html_template"),
-    design_brief: text("design_brief"),
     gating_config: jsonb("gating_config").notNull(),
     scoring_rubric: jsonb("scoring_rubric").notNull(),
     campaign_start: timestamp("campaign_start"),

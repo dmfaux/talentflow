@@ -10,6 +10,10 @@ import { eq, sql, type SQL } from "drizzle-orm";
 import * as schema from "./schema";
 import { isStorageConfigured, uploadCV } from "../lib/azure-storage";
 import { namespaceDedup } from "../lib/queue/types";
+// Pure, alias-free modules (safe under tsx): the colour engine + font registry the
+// gallery catalogue derives its palettes/stacks from — the same ones the builder uses.
+import { derivePalette } from "../lib/theme-colors";
+import { resolveBodyFont, resolveDisplayFont } from "../lib/theme-fonts";
 import {
   DEMO_ORGS,
   DEMO_USERS,
@@ -791,37 +795,87 @@ export async function seed(db: Db): Promise<SeedSummary> {
     `Users: ${tenantDefs.length} tenant + 1 operator; Memberships: ${membershipRows.length}\n`
   );
 
-  // ── Gallery theme (Campaign Themes CT1) ──
-  // One pickable gallery default reproducing today's TalentStream look (palette =
-  // the in-code DEFAULT_EMAIL_THEME). CT1 does NOT point any brand's
-  // default_theme_id at it — that is CT3; it exists so tenants have a pickable
-  // default from day one. Literals are duplicated here (not imported from
-  // lib/theme) because the seed runs under tsx, which does not resolve the `@/`
-  // alias that lib/theme depends on. created_by references the operator.
-  await db.insert(schema.themes).values({
-    org_id: null,
-    client_id: null,
-    name: "TalentStream Classic",
-    scope: "gallery",
-    is_active: true,
-    palette: {
-      bg: "#f0f3f7", card: "#ffffff", primary: "#2c5bff", primaryDeep: "#1a45d4",
-      primaryTint: "#e8eeff", accent: "#05dbd6", ink: "#11123c", inkSoft: "#2f3941",
-      inkMuted: "#5a6b7a", inkFaint: "#9fb5c4", border: "#d1dce6",
+  // ── Gallery theme catalogue (Campaign Themes) ──
+  // The predefined set Standard subscribers pick from: ONE shared layout in a
+  // range of distinct colour ways (the owner's "same theme, different colours").
+  // Each is authored from 3 seeds — derivePalette builds the contrast-checked
+  // 11-token palette — plus a deliberate font pairing, so an operator can re-edit
+  // any of them in the theme builder. "TalentStream Classic" reproduces today's
+  // default look. derivePalette / the font registry are imported by RELATIVE path
+  // (both pure, no `@/` alias) so this stays tsx-safe. No brand's default_theme_id
+  // is pointed at any of these — they exist so tenants have a set to pick from.
+  const GALLERY_CATALOGUE: {
+    name: string;
+    seeds: { primary: string; accent: string; bg: string };
+    displayKey: string;
+    bodyKey: string;
+  }[] = [
+    {
+      name: "TalentStream Classic",
+      seeds: { primary: "#2c5bff", accent: "#05dbd6", bg: "#f0f3f7" },
+      displayKey: "instrument-serif",
+      bodyKey: "instrument-sans",
     },
-    font_display:
-      "'Instrument Serif', Georgia, 'Times New Roman', 'DejaVu Serif', serif",
-    font_sans:
-      "'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif",
-    logo_url: null,
-    logo_background: "light",
-    logo_position: "top-left",
-    show_powered_by: true,
-    landing_html: null,
-    preview_image_url: null,
-    created_by: operatorId,
-  });
-  console.log("Gallery themes: 1 (TalentStream Classic)\n");
+    {
+      name: "Terracotta",
+      seeds: { primary: "#b5532f", accent: "#2c6e6b", bg: "#f7f1e9" },
+      displayKey: "dm-serif-display",
+      bodyKey: "work-sans",
+    },
+    {
+      name: "Forest",
+      seeds: { primary: "#1f6f54", accent: "#c9a227", bg: "#f3f6f3" },
+      displayKey: "playfair-display",
+      bodyKey: "source-sans-3",
+    },
+    {
+      name: "Plum",
+      seeds: { primary: "#6b2d5c", accent: "#d98cae", bg: "#faf6f8" },
+      displayKey: "libre-baskerville",
+      bodyKey: "dm-sans",
+    },
+    {
+      name: "Slate & Coral",
+      seeds: { primary: "#33415c", accent: "#ff6b5e", bg: "#f4f5f6" },
+      displayKey: "space-grotesk",
+      bodyKey: "inter",
+    },
+    {
+      name: "Midnight",
+      seeds: { primary: "#3b5bdb", accent: "#f5b945", bg: "#14161c" },
+      displayKey: "fraunces",
+      bodyKey: "work-sans",
+    },
+  ];
+
+  await db.insert(schema.themes).values(
+    GALLERY_CATALOGUE.map((t) => ({
+      org_id: null,
+      client_id: null,
+      name: t.name,
+      scope: "gallery" as const,
+      is_active: true,
+      seed_primary: t.seeds.primary,
+      seed_accent: t.seeds.accent,
+      seed_bg: t.seeds.bg,
+      palette: derivePalette(t.seeds),
+      font_display: resolveDisplayFont(t.displayKey).stack,
+      font_sans: resolveBodyFont(t.bodyKey).stack,
+      font_display_key: t.displayKey,
+      font_body_key: t.bodyKey,
+      logo_url: null,
+      logo_background: "light",
+      logo_position: "top-left",
+      show_powered_by: true,
+      landing_html: null,
+      email_shell: null,
+      preview_image_url: null,
+      created_by: operatorId,
+    }))
+  );
+  console.log(
+    `Gallery themes: ${GALLERY_CATALOGUE.length} (${GALLERY_CATALOGUE.map((t) => t.name).join(", ")})\n`
+  );
 
   // Accumulator for metered usage events (awaited + batched at the end).
   const usageEventsToInsert: (typeof schema.usageEvents.$inferInsert)[] = [];

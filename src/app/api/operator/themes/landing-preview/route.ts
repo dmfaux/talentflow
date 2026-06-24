@@ -48,6 +48,21 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
+    // Draw the brand's real name into the sample so the preview reads like this
+    // brand's posting; fall back to the default stand-in when none is supplied.
+    const clientName =
+      typeof body.brand_name === "string" && body.brand_name.trim()
+        ? body.brand_name.trim()
+        : SAMPLE.client.name;
+    const sample: SlotData = { ...SAMPLE, client: { name: clientName } };
+    // Echoed back so the dialog's browser chrome can label the URL/role to match.
+    const sampleMeta = {
+      company: clientName,
+      role: SAMPLE.campaign.role_title,
+      department: SAMPLE.campaign.department,
+      location: SAMPLE.campaign.location,
+    };
+
     // A non-blank pasted landing wins; validate it against the SAME slot/mount
     // contract a real page must satisfy so a malformed draft returns a precise
     // 400 rather than rendering a formless page.
@@ -58,17 +73,19 @@ export async function POST(request: NextRequest) {
     if (pastedLanding) {
       const check = validateHtmlTemplate(pastedLanding);
       if (!check.ok) return error(check.errors.join("; "));
-      return success({ html: replaceSlots(pastedLanding, SAMPLE) });
+      return success({
+        html: replaceSlots(pastedLanding, sample),
+        sample: sampleMeta,
+      });
     }
 
-    // No paste → render the generated landing from the draft theme. CT7: validate
-    // + derive the whole draft through the SAME write-path contract (seeds→palette,
-    // font keys→stacks/imports, landing_copy normalisation) so the generated page
-    // matches what a saved theme would resolve to. The preview payload carries
-    // only render fields (no scope/name/org); inject preview-only placeholders
-    // (none persisted). Scope "custom" simply avoids the gallery org/client
-    // forcing — landing_copy is allowed on either scope, so the generated landing
-    // is identical regardless.
+    // No paste → render the generated landing from the draft theme: validate +
+    // derive the whole draft through the SAME write-path contract (seeds→palette,
+    // font keys→stacks/imports) so the generated page matches what a saved theme
+    // would resolve to. The preview payload carries only render fields (no
+    // scope/name/org); inject preview-only placeholders (none persisted). Scope
+    // "custom" simply avoids the gallery org/client forcing — the generated
+    // landing is identical regardless of scope.
     const result = normaliseThemeFields({
       ...body,
       scope: "custom",
@@ -99,12 +116,14 @@ export async function POST(request: NextRequest) {
         : null,
       // The form forces this true for gallery; reflect whatever it sends.
       showPoweredBy: values.show_powered_by,
-      // CT7: the @import URLs + structured landing copy makeLandingTemplate reads.
+      // The @import URLs makeLandingTemplate emits for the chosen web fonts.
       fontImports: fontImportsFor(values.font_display_key, values.font_body_key),
-      landingCopy: values.landing_copy,
     };
 
-    return success({ html: replaceSlots(makeLandingTemplate(theme), SAMPLE) });
+    return success({
+      html: replaceSlots(makeLandingTemplate(theme), sample),
+      sample: sampleMeta,
+    });
   } catch (err) {
     console.error("POST /api/operator/themes/landing-preview error:", err);
     return error("Internal server error", 500);

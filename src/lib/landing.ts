@@ -4,9 +4,9 @@
 // editorial layout whose every colour, font, and logo is supplied by the
 // resolved theme. A theme themes BOTH surfaces — emails via makeEmailKit, the
 // landing via makeLandingTemplate — and a tenant picking a theme gets a
-// renderable landing with nothing to paste. The optional per-campaign paste
-// (campaigns.html_template) is a Premium-only override, resolved upstream in
-// theme.ts; this module never sees it.
+// renderable landing with nothing to paste. A custom (Premium) theme's bespoke
+// landing override (themes.landing_html) is resolved upstream in theme.ts; this
+// module never sees it.
 //
 // Output contract (matches a pasted template so it flows through the SAME
 // pipeline — slots.ts validateHtmlTemplate/replaceSlots → HtmlTemplateRenderer):
@@ -99,14 +99,11 @@ export function makeLandingTemplate(theme: EmailTheme): string {
     ? `\n      <footer class="ats-footer">Powered by TalentStream</footer>`
     : "";
 
-  // Theme-level landing copy (headline / intro / highlights / apply heading).
-  // null → DEFAULT_LANDING_COPY. Strings are OPERATOR-authored TRUSTED free text
-  // that MAY embed slot tokens like {{client.name}}; this codebase deliberately
-  // does NOT sanitise operator theme content (CT6 design choice). They are
-  // inserted RAW into element CONTENT so embedded {{slots}} survive the
-  // downstream replaceSlots pass and are escaped THERE — never escapeAttr'd here
-  // (escapeAttr stays for the logo URL/attributes only).
-  const copy = theme.landingCopy ?? DEFAULT_LANDING_COPY;
+  // Fixed landing copy (headline / intro / highlights / apply heading). The
+  // strings MAY embed slot tokens like {{client.name}}; they are inserted RAW into
+  // element CONTENT so embedded {{slots}} survive the downstream replaceSlots pass
+  // and are escaped THERE (escapeAttr stays for the logo URL/attributes only).
+  const copy = DEFAULT_LANDING_COPY;
 
   // CT7 web fonts: one @import per resolved font URL. A MISSING value (pre-CT7
   // snapshot) back-fills to the Instrument defaults; an explicit [] (system fonts)

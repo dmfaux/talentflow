@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Theme builder — redesign prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --cream: #f0f3f7;
+    --canvas-2: #e1e7ef;
+    --surface: #ffffff;
+    --border: #d1dce6;
+    --border-strong: #9fb5c4;
+    --ink: #11123c;
+    --ink-soft: #2f3941;
+    --ink-muted: #5a6b7a;
+    --ink-faint: #9fb5c4;
+    --cobalt: #2c5bff;
+    --cobalt-deep: #1a45d4;
+    --cobalt-tint: #e8eeff;
+    --vermillion: #05dbd6;
+    --vermillion-soft: #d4f7f6;
+    --moss: #0a8a5a;
+    --moss-soft: #d0f0de;
+    --saffron: #d68a0b;
+    --saffron-soft: #fff0cc;
+    --red: #c02616;
+    --red-light: #ffe0da;
+    --serif: "Fraunces", Georgia, serif;
+    --sans: "Instrument Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+    /* live preview brand accent (driven by the Primary seed) */
+    --brand: #2c5bff;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: var(--sans);
+    background: var(--cream);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--ink-muted);
+  }
+  .label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-family: var(--mono);
+    font-size: 0.64rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--ink-muted);
+  }
+  .label .opt { font-family: var(--sans); text-transform: none; letter-spacing: 0; color: var(--ink-faint); }
+  h1, h2, h3 { font-family: var(--serif); font-weight: 500; color: var(--ink); margin: 0; }
+
+  input[type=text], textarea, select {
+    width: 100%;
+    font-family: var(--sans);
+    font-size: 0.85rem;
+    color: var(--ink);
+    background: color-mix(in srgb, var(--cream) 55%, white);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 0.55rem 0.7rem;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  textarea { resize: vertical; line-height: 1.45; }
+  input[type=text]:focus, textarea:focus, select:focus {
+    border-color: var(--cobalt);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--cobalt) 14%, transparent);
+  }
+  .mono-input { font-family: var(--mono); font-size: 0.74rem; }
+
+  /* ── top bar ── */
+  .topbar {
+    position: sticky; top: 0; z-index: 30;
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: 0.7rem 1.4rem;
+    background: color-mix(in srgb, var(--surface) 86%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar-left { display: flex; align-items: center; gap: 0.9rem; min-width: 0; }
+  .back {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    font-size: 0.78rem; color: var(--ink-muted); text-decoration: none;
+    padding: 0.3rem 0.5rem; border-radius: 7px;
+  }
+  .back:hover { background: var(--cream); color: var(--ink-soft); }
+  .crumb { min-width: 0; }
+  .crumb .kind { font-family: var(--mono); font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.2em; color: var(--ink-faint); }
+  .crumb .title { font-family: var(--serif); font-size: 1.02rem; color: var(--ink); }
+  .crumb .title b { font-weight: 600; }
+  .topbar-actions { display: flex; align-items: center; gap: 0.5rem; }
+
+  .btn {
+    font-family: var(--sans); font-size: 0.82rem; font-weight: 500;
+    border-radius: 9px; padding: 0.5rem 1rem; cursor: pointer; border: 1px solid transparent;
+    transition: background .15s, border-color .15s, color .15s;
+  }
+  .btn-ghost { background: transparent; border-color: var(--border); color: var(--ink-soft); }
+  .btn-ghost:hover { background: var(--cream); }
+  .btn-primary { background: var(--cobalt); color: #fff; }
+  .btn-primary:hover { background: var(--cobalt-deep); }
+  .btn-soft { background: color-mix(in srgb, var(--cream) 60%, white); border-color: var(--border); color: var(--ink); }
+  .btn-soft:hover { background: var(--cream); border-color: var(--border-strong); }
+
+  /* ── 3-column shell ── */
+  .shell {
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr) 400px;
+    gap: 1.1rem;
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 1.1rem 1.4rem 4rem;
+    align-items: start;
+  }
+
+  /* ── rail ── */
+  .rail { position: sticky; top: 74px; display: flex; flex-direction: column; gap: 0.9rem; }
+  .rail-card { background: var(--surface); border: 1px solid var(--border); border-radius: 13px; padding: 0.7rem; }
+  .rail-group + .rail-group { margin-top: 0.4rem; }
+  .rail-grouplabel { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.55rem 0.45rem; }
+  .rail-grouplabel .line { height: 1px; flex: 1; background: var(--border); }
+  .rail-item {
+    display: flex; align-items: center; gap: 0.6rem; width: 100%;
+    border: none; background: transparent; cursor: pointer; text-align: left;
+    padding: 0.5rem 0.55rem; border-radius: 9px;
+    font-family: var(--sans); font-size: 0.86rem; color: var(--ink-muted);
+    position: relative; transition: background .12s, color .12s;
+  }
+  .rail-item:hover { background: var(--cream); color: var(--ink-soft); }
+  .rail-item .tick {
+    width: 16px; height: 16px; flex: none; border-radius: 50%;
+    border: 1.5px solid var(--border-strong); display: grid; place-items: center;
+    color: transparent; transition: all .15s;
+  }
+  .rail-item.done .tick { background: var(--moss); border-color: var(--moss); color: #fff; }
+  .rail-item.done .tick svg { display: block; }
+  .rail-item .tick svg { display: none; width: 9px; height: 9px; }
+  .rail-item .name { flex: 1; min-width: 0; }
+  .rail-item .meta { font-family: var(--mono); font-size: 0.56rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); }
+  .rail-item.active { background: var(--cobalt-tint); color: var(--ink); font-weight: 500; }
+  .rail-item.active::before {
+    content: ""; position: absolute; left: -0.7rem; top: 0.45rem; bottom: 0.45rem;
+    width: 3px; border-radius: 3px; background: var(--cobalt);
+  }
+  .rail-item .flag { color: var(--saffron); }
+
+  /* recipe = recolour → advanced group rests, but stays reachable */
+  body.recipe-recolour .rail-advanced { opacity: 0.55; }
+  body.recipe-recolour .rail-advanced:hover { opacity: 1; }
+
+  .rail-footer { padding: 0.2rem 0.55rem; }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+  .toggle-row .t-label { font-size: 0.78rem; color: var(--ink-soft); }
+  .toggle-row .t-sub { font-size: 0.66rem; color: var(--ink-faint); }
+  .switch { width: 38px; height: 22px; border-radius: 999px; border: none; background: var(--border-strong); position: relative; cursor: pointer; flex: none; transition: background .15s; }
+  .switch.on { background: var(--cobalt); }
+  .switch .knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s; }
+  .switch.on .knob { transform: translateX(16px); }
+
+  /* ── canvas ── */
+  .canvas { min-width: 0; }
+  .panel { display: none; }
+  .panel.active { display: block; animation: rise .18s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 13px; padding: 1.15rem 1.2rem; }
+  .card + .card { margin-top: 1rem; }
+  .card-head { margin-bottom: 0.9rem; }
+  .card-head h2 { font-size: 1.18rem; }
+  .card-head p { margin: 0.25rem 0 0; font-size: 0.8rem; color: var(--ink-muted); max-width: 46ch; }
+  .field + .field { margin-top: 0.95rem; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+
+  code.slot { font-family: var(--mono); font-size: 0.78em; background: var(--cobalt-tint); color: var(--cobalt-deep); padding: 0.05em 0.35em; border-radius: 5px; }
+
+  /* recipe chooser */
+  .recipe { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; margin-top: 0.3rem; }
+  .recipe label {
+    display: block; cursor: pointer; border: 1.5px solid var(--border); border-radius: 11px;
+    padding: 0.7rem 0.8rem; transition: border-color .12s, background .12s;
+  }
+  .recipe label:hover { border-color: var(--border-strong); }
+  .recipe input { position: absolute; opacity: 0; pointer-events: none; }
+  .recipe label .r-title { font-size: 0.86rem; font-weight: 500; color: var(--ink); display: flex; align-items: center; gap: 0.45rem; }
+  .recipe label .r-dot { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--border-strong); flex: none; transition: all .12s; }
+  .recipe label .r-sub { font-size: 0.7rem; color: var(--ink-muted); margin-top: 0.25rem; }
+  .recipe input:checked + .r-title .r-dot { border-color: var(--cobalt); box-shadow: inset 0 0 0 3px var(--cobalt); }
+  .recipe label:has(input:checked) { border-color: var(--cobalt); background: color-mix(in srgb, var(--cobalt-tint) 55%, white); }
+
+  /* colour seeds */
+  .seeds { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.7rem; margin-top: 0.2rem; }
+  .seed { border: 1px solid var(--border); border-radius: 11px; padding: 0.6rem; background: color-mix(in srgb, var(--cream) 50%, white); }
+  .seed .top { display: flex; align-items: center; gap: 0.6rem; }
+  .swatch { width: 38px; height: 38px; border-radius: 8px; border: 1px solid var(--border); flex: none; cursor: pointer; position: relative; overflow: hidden; }
+  .swatch input[type=color] { position: absolute; inset: -4px; opacity: 0; cursor: pointer; }
+  .seed .nm { font-size: 0.78rem; font-weight: 500; color: var(--ink-soft); }
+  .seed .hex { font-family: var(--mono); font-size: 0.68rem; color: var(--ink-muted); border: none; background: transparent; padding: 0; width: 100%; }
+  .seed .hex:focus { color: var(--ink); }
+  .seed .hint { margin-top: 0.45rem; font-size: 0.64rem; line-height: 1.35; color: var(--ink-faint); }
+
+  .disclosure { margin-top: 1rem; }
+  .disclosure > summary {
+    list-style: none; cursor: pointer; font-size: 0.76rem; color: var(--ink-muted);
+    display: inline-flex; align-items: center; gap: 0.4rem; user-select: none;
+  }
+  .disclosure > summary::-webkit-details-marker { display: none; }
+  .disclosure > summary .chev { transition: transform .15s; }
+  .disclosure[open] > summary .chev { transform: rotate(90deg); }
+  .derived { margin-top: 0.8rem; border: 1px dashed var(--border); border-radius: 11px; padding: 0.85rem; background: color-mix(in srgb, var(--cream) 35%, white); }
+  .derived-group + .derived-group { margin-top: 0.75rem; }
+  .derived-group > p { margin: 0 0 0.4rem; }
+  .tokens { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.4rem; }
+  .token { display: flex; align-items: center; gap: 0.4rem; border: 1px solid var(--border); border-radius: 7px; padding: 0.3rem 0.4rem; background: var(--surface); }
+  .token .chip { width: 17px; height: 17px; border-radius: 4px; border: 1px solid var(--border); flex: none; }
+  .token .t-nm { font-size: 0.6rem; color: var(--ink-soft); line-height: 1.1; }
+  .token .t-hex { font-family: var(--mono); font-size: 0.55rem; color: var(--ink-faint); }
+
+  /* type samples */
+  .sample { margin-top: 0.5rem; border: 1px solid var(--border); border-radius: 9px; padding: 0.6rem 0.75rem; background: color-mix(in srgb, var(--cream) 40%, white); color: var(--ink); }
+  .sample.display { font-family: var(--serif); font-size: 1.35rem; line-height: 1.1; }
+  .sample.body { font-size: 0.85rem; color: var(--ink-soft); }
+
+  /* subtabs */
+  .subtabs { display: inline-flex; padding: 3px; gap: 3px; background: var(--cream); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 1rem; }
+  .subtab { border: none; background: transparent; cursor: pointer; font-family: var(--sans); font-size: 0.8rem; color: var(--ink-muted); padding: 0.35rem 0.85rem; border-radius: 7px; }
+  .subtab.active { background: var(--surface); color: var(--ink); font-weight: 500; box-shadow: 0 1px 2px rgba(17,18,60,.06); }
+  .subpane { display: none; }
+  .subpane.active { display: block; }
+
+  /* slot chips */
+  .slotbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin-top: 0.4rem; }
+  .slotbar .ins { font-size: 0.62rem; color: var(--ink-faint); margin-right: 0.1rem; }
+  .chip {
+    font-family: var(--mono); font-size: 0.64rem; cursor: pointer;
+    background: var(--cobalt-tint); color: var(--cobalt-deep); border: 1px solid color-mix(in srgb, var(--cobalt) 18%, white);
+    border-radius: 999px; padding: 0.12rem 0.5rem; transition: background .12s;
+  }
+  .chip:hover { background: color-mix(in srgb, var(--cobalt-tint) 70%, var(--cobalt) 12%); }
+
+  /* two-state default */
+  .twostate .resting {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.6rem;
+    border: 1px dashed var(--border); border-radius: 9px; padding: 0.5rem 0.7rem;
+    background: color-mix(in srgb, var(--cream) 35%, white);
+  }
+  .twostate .resting .desc { font-size: 0.78rem; color: var(--ink-muted); font-style: italic; }
+  .twostate .editing { display: none; }
+  .twostate.is-editing .resting { display: none; }
+  .twostate.is-editing .editing { display: block; }
+  .linkbtn { background: none; border: none; cursor: pointer; font-family: var(--sans); font-size: 0.74rem; color: var(--cobalt); padding: 0; }
+  .linkbtn:hover { color: var(--cobalt-deep); text-decoration: underline; }
+  .reset-row { margin-top: 0.35rem; }
+
+  /* highlights */
+  .hl + .hl { margin-top: 0.5rem; }
+  .hl { display: flex; gap: 0.5rem; align-items: center; }
+  .hl .x { flex: none; width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--ink-faint); cursor: pointer; }
+  .hl .x:hover { border-color: color-mix(in srgb, var(--red) 40%, var(--border)); color: var(--red); }
+
+  /* per-email list */
+  .perlist { border: 1px solid var(--border); border-radius: 11px; overflow: hidden; }
+  .perrow { border-top: 1px solid var(--border); }
+  .perrow:first-child { border-top: none; }
+  .perrow > summary {
+    list-style: none; cursor: pointer; display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.6rem 0.8rem; user-select: none;
+  }
+  .perrow > summary::-webkit-details-marker { display: none; }
+  .perrow > summary .chev { color: var(--ink-faint); transition: transform .15s; }
+  .perrow[open] > summary .chev { transform: rotate(90deg); }
+  .perrow > summary .pe-name { flex: 1; font-size: 0.84rem; color: var(--ink); }
+  .pe-state { font-family: var(--mono); font-size: 0.56rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.1rem 0.45rem; border-radius: 999px; }
+  .pe-state.default { color: var(--ink-faint); background: var(--cream); }
+  .pe-state.tuned { color: var(--cobalt-deep); background: var(--cobalt-tint); }
+  .pe-state.need { color: var(--saffron); background: var(--saffron-soft); }
+  .perbody { padding: 0 0.8rem 0.9rem; }
+
+  /* numbered AI steps */
+  .advnote { display: flex; align-items: flex-start; gap: 0.6rem; border: 1px solid var(--border); border-radius: 11px; padding: 0.7rem 0.85rem; background: color-mix(in srgb, var(--saffron-soft) 28%, white); margin-bottom: 1rem; }
+  .advnote .ic { color: var(--saffron); flex: none; margin-top: 1px; }
+  .advnote p { margin: 0; font-size: 0.78rem; color: var(--ink-soft); }
+  .steps { counter-reset: step; }
+  .step { display: grid; grid-template-columns: 30px 1fr; gap: 0.75rem; padding: 0.7rem 0; border-top: 1px solid var(--border); }
+  .step:first-child { border-top: none; }
+  .step .num {
+    counter-increment: step; font-family: var(--serif); font-size: 0.95rem; font-weight: 600; color: var(--cobalt);
+    width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--cobalt-tint);
+    display: grid; place-items: center; background: color-mix(in srgb, var(--cobalt-tint) 50%, white);
+  }
+  .step .num::before { content: counter(step); }
+  .step .s-title { font-size: 0.84rem; font-weight: 500; color: var(--ink); }
+  .step .s-sub { font-size: 0.72rem; color: var(--ink-muted); margin-top: 0.1rem; }
+  .step .s-body { margin-top: 0.5rem; }
+  .valid { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; color: var(--moss); margin-top: 0.4rem; }
+
+  /* ── preview ── */
+  .preview { position: sticky; top: 74px; }
+  .preview-card { background: var(--surface); border: 1px solid var(--border); border-radius: 13px; padding: 0.85rem; }
+  .preview-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.7rem; }
+  .surfsw { display: inline-flex; padding: 2px; gap: 2px; background: var(--cream); border: 1px solid var(--border); border-radius: 8px; }
+  .surfsw button { border: none; background: transparent; cursor: pointer; font-family: var(--mono); font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-muted); padding: 0.2rem 0.5rem; border-radius: 6px; }
+  .surfsw button.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(17,18,60,.07); }
+  .preview-context { font-family: var(--mono); font-size: 0.56rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-faint); }
+
+  .frame { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--cream); }
+  .surf { display: none; }
+  .surf.active { display: block; }
+
+  /* email mock */
+  .em { background: #fff; }
+  .em-bar { height: 6px; background: var(--brand); }
+  .em-pad { padding: 1rem 1.1rem 1.3rem; }
+  .em-logo { font-family: var(--serif); font-weight: 600; font-size: 0.95rem; color: var(--ink); letter-spacing: -0.01em; }
+  .em-logo b { color: var(--brand); }
+  .em-eyebrow { font-family: var(--mono); font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.18em; color: var(--brand); margin: 0.9rem 0 0.35rem; }
+  .em-h { font-family: var(--serif); font-size: 1.3rem; color: var(--ink); line-height: 1.15; }
+  .em-p { font-size: 0.8rem; color: var(--ink-soft); margin: 0.7rem 0; }
+  .em-rolecard { border-left: 3px solid var(--brand); background: color-mix(in srgb, var(--brand) 7%, white); padding: 0.6rem 0.75rem; border-radius: 0 8px 8px 0; }
+  .em-rolecard .l { font-family: var(--mono); font-size: 0.5rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--ink-muted); }
+  .em-rolecard .v { font-size: 0.82rem; color: var(--ink); }
+  .em-rolecard .v + .l { margin-top: 0.4rem; }
+  .em-btn { display: inline-block; margin-top: 0.9rem; background: var(--brand); color: #fff; font-size: 0.76rem; font-weight: 500; padding: 0.45rem 0.9rem; border-radius: 8px; }
+  .em-foot { margin-top: 1rem; padding-top: 0.7rem; border-top: 1px solid var(--border); font-size: 0.62rem; color: var(--ink-faint); }
+
+  /* landing mock */
+  .ld { background: #fff; }
+  .ld-hero { padding: 1.1rem 1.1rem 1rem; background: linear-gradient(180deg, color-mix(in srgb, var(--brand) 9%, white), #fff); }
+  .ld-logo { font-family: var(--serif); font-weight: 600; font-size: 0.9rem; color: var(--ink); }
+  .ld-logo b { color: var(--brand); }
+  .ld-h { font-family: var(--serif); font-size: 1.5rem; line-height: 1.08; color: var(--ink); margin: 0.9rem 0 0; }
+  .ld-intro { font-size: 0.78rem; color: var(--ink-soft); margin: 0.6rem 0 0; }
+  .ld-list { margin: 0.9rem 1.1rem 0; padding: 0; list-style: none; }
+  .ld-list li { display: flex; gap: 0.45rem; font-size: 0.76rem; color: var(--ink-soft); padding: 0.22rem 0; }
+  .ld-list li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); margin-top: 0.42rem; flex: none; }
+  .ld-apply { margin: 1rem 1.1rem 1.2rem; border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem; }
+  .ld-apply .h { font-family: var(--serif); font-size: 0.95rem; color: var(--ink); }
+  .ld-apply .ph { height: 30px; border-radius: 7px; background: var(--cream); border: 1px solid var(--border); margin-top: 0.5rem; }
+  .ld-apply .btn-fill { margin-top: 0.55rem; background: var(--brand); color: #fff; text-align: center; font-size: 0.76rem; font-weight: 500; padding: 0.45rem; border-radius: 8px; }
+
+  .preview-note { margin-top: 0.55rem; font-size: 0.64rem; color: var(--ink-muted); }
+
+  @media (max-width: 1100px) {
+    .shell { grid-template-columns: 200px minmax(0,1fr); }
+    .preview { display: none; }
+  }
+</style>
+</head>
+<body class="recipe-recolour">
+
+  <!-- top bar -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <a class="back" href="#">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 3L4.5 7l4 4"/></svg>
+        Themes
+      </a>
+      <div class="crumb">
+        <div class="kind">New bespoke theme</div>
+        <div class="title">for <b id="crumbBrand">MTN Networks</b></div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost">Cancel</button>
+      <button class="btn btn-primary">Create theme</button>
+    </div>
+  </header>
+
+  <div class="shell">
+
+    <!-- ── rail ── -->
+    <nav class="rail" aria-label="Theme outline">
+      <div class="rail-card">
+        <div class="rail-group">
+          <div class="rail-grouplabel"><span class="eyebrow">The theme</span><span class="line"></span></div>
+          <button class="rail-item active done" data-section="basics" data-surface="email"><span class="tick"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5l2 2 4-5"/></svg></span><span class="name">Basics</span></button>
+          <button class="rail-item done" data-section="colour" data-surface="email"><span class="tick"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5l2 2 4-5"/></svg></span><span class="name">Colour</span></button>
+          <button class="rail-item" data-section="type" data-surface="landing"><span class="tick"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5l2 2 4-5"/></svg></span><span class="name">Type</span></button>
+          <button class="rail-item" data-section="words" data-surface="landing"><span class="tick"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5l2 2 4-5"/></svg></span><span class="name">Words</span></button>
+        </div>
+
+        <div class="rail-group rail-advanced">
+          <div class="rail-grouplabel"><span class="eyebrow">Advanced · opt-in</span><span class="line"></span></div>
+          <button class="rail-item" data-section="bespoke-landing" data-surface="landing"><span class="tick"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5l2 2 4-5"/></svg></span><span class="name">Bespoke landing</span></button>
+          <button class="rail-item" data-section="bespoke-emails" data-surface="email"><span class="tick"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5l2 2 4-5"/></svg></span><span class="name">Bespoke emails</span></button>
+        </div>
+      </div>
+
+      <div class="rail-card">
+        <div class="rail-footer">
+          <div class="toggle-row">
+            <div>
+              <div class="t-label">Powered-by footer</div>
+              <div class="t-sub">Off = fully white-label</div>
+            </div>
+            <button class="switch on" id="poweredSwitch" role="switch" aria-checked="true"><span class="knob"></span></button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- ── canvas ── -->
+    <main class="canvas">
+
+      <!-- BASICS -->
+      <section class="panel active" id="panel-basics">
+        <div class="card">
+          <div class="card-head">
+            <h2>Basics</h2>
+            <p>Name the theme, then pick the path you're on. You can switch later — nothing locks.</p>
+          </div>
+          <div class="field">
+            <label class="label" for="themeName">Theme name</label>
+            <input type="text" id="themeName" value="MTN Networks — Primary" />
+          </div>
+          <div class="field">
+            <label class="label">What are you building?</label>
+            <div class="recipe">
+              <label>
+                <input type="radio" name="recipe" value="recolour" checked />
+                <span class="r-title"><span class="r-dot"></span>On-brand recolour</span>
+                <span class="r-sub">Colour, type and words. Fast — most brands stop here.</span>
+              </label>
+              <label>
+                <input type="radio" name="recipe" value="bespoke" />
+                <span class="r-title"><span class="r-dot"></span>Fully hand-authored</span>
+                <span class="r-sub">White-label landing + emails, built with AI. Opens the advanced steps.</span>
+              </label>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="thumb">Card thumbnail URL <span class="opt">optional</span></label>
+            <input type="text" id="thumb" class="mono-input" placeholder="Defaults to a live render of the email" />
+          </div>
+        </div>
+      </section>
+
+      <!-- COLOUR -->
+      <section class="panel" id="panel-colour">
+        <div class="card">
+          <div class="card-head">
+            <h2>Colour</h2>
+            <p>Pick three. We derive the other eight — surfaces, borders and a four-step text ramp — and check contrast for you.</p>
+          </div>
+          <div class="seeds">
+            <div class="seed">
+              <div class="top">
+                <span class="swatch" style="background:#2c5bff"><input type="color" value="#2c5bff" data-seed="primary" /></span>
+                <div style="min-width:0">
+                  <div class="nm">Primary</div>
+                  <input class="hex" value="#2c5bff" data-seed-hex="primary" />
+                </div>
+              </div>
+              <div class="hint">Buttons, links, headings</div>
+            </div>
+            <div class="seed">
+              <div class="top">
+                <span class="swatch" style="background:#05dbd6"><input type="color" value="#05dbd6" /></span>
+                <div style="min-width:0">
+                  <div class="nm">Accent</div>
+                  <input class="hex" value="#05dbd6" />
+                </div>
+              </div>
+              <div class="hint">Highlights, secondary marks</div>
+            </div>
+            <div class="seed">
+              <div class="top">
+                <span class="swatch" style="background:#f0f3f7"><input type="color" value="#f0f3f7" /></span>
+                <div style="min-width:0">
+                  <div class="nm">Background</div>
+                  <input class="hex" value="#f0f3f7" />
+                </div>
+              </div>
+              <div class="hint">Page canvas behind the card</div>
+            </div>
+          </div>
+
+          <details class="disclosure">
+            <summary><svg class="chev" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2.5L8 6l-4 3.5"/></svg> Show the 11 derived tokens</summary>
+            <div class="derived">
+              <div class="derived-group">
+                <p class="eyebrow">Surfaces</p>
+                <div class="tokens">
+                  <div class="token"><span class="chip" style="background:#f0f3f7"></span><div><div class="t-nm">Page bg</div><div class="t-hex">#f0f3f7</div></div></div>
+                  <div class="token"><span class="chip" style="background:#ffffff"></span><div><div class="t-nm">Card</div><div class="t-hex">#ffffff</div></div></div>
+                  <div class="token"><span class="chip" style="background:#d1dce6"></span><div><div class="t-nm">Border</div><div class="t-hex">#d1dce6</div></div></div>
+                  <div class="token" style="visibility:hidden"></div>
+                </div>
+              </div>
+              <div class="derived-group">
+                <p class="eyebrow">Brand</p>
+                <div class="tokens">
+                  <div class="token"><span class="chip" style="background:#2c5bff"></span><div><div class="t-nm">Primary</div><div class="t-hex">#2c5bff</div></div></div>
+                  <div class="token"><span class="chip" style="background:#1a45d4"></span><div><div class="t-nm">Deep</div><div class="t-hex">#1a45d4</div></div></div>
+                  <div class="token"><span class="chip" style="background:#e8eeff"></span><div><div class="t-nm">Tint</div><div class="t-hex">#e8eeff</div></div></div>
+                  <div class="token"><span class="chip" style="background:#05dbd6"></span><div><div class="t-nm">Accent</div><div class="t-hex">#05dbd6</div></div></div>
+                </div>
+              </div>
+              <div class="derived-group">
+                <p class="eyebrow">Text</p>
+                <div class="tokens">
+                  <div class="token"><span class="chip" style="background:#11123c"></span><div><div class="t-nm">Headings</div><div class="t-hex">#11123c</div></div></div>
+                  <div class="token"><span class="chip" style="background:#2f3941"></span><div><div class="t-nm">Body</div><div class="t-hex">#2f3941</div></div></div>
+                  <div class="token"><span class="chip" style="background:#5a6b7a"></span><div><div class="t-nm">Muted</div><div class="t-hex">#5a6b7a</div></div></div>
+                  <div class="token"><span class="chip" style="background:#9fb5c4"></span><div><div class="t-nm">Faint</div><div class="t-hex">#9fb5c4</div></div></div>
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- TYPE -->
+      <section class="panel" id="panel-type">
+        <div class="card">
+          <div class="card-head">
+            <h2>Type</h2>
+            <p>A display face for headings, a body face for copy. The real web font loads on landing pages; emails fall back to a safe family.</p>
+          </div>
+          <div class="row2">
+            <div class="field" style="margin-top:0">
+              <label class="label">Display font</label>
+              <select><option>Fraunces</option><option>Instrument Serif</option><option>Playfair Display</option><option>Libre Baskerville</option></select>
+              <div class="sample display">MTN Networks</div>
+            </div>
+            <div class="field" style="margin-top:0">
+              <label class="label">Body font</label>
+              <select><option>Instrument Sans</option><option>Inter</option><option>Work Sans</option><option>System default</option></select>
+              <div class="sample body">The quick brown fox jumps over the lazy dog.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- WORDS -->
+      <section class="panel" id="panel-words">
+        <div class="card">
+          <div class="card-head">
+            <h2>Words</h2>
+            <p>Copy for the landing page and the candidate emails. Click a slot chip to drop a placeholder that fills in per campaign.</p>
+          </div>
+
+          <div class="subtabs" role="tablist">
+            <button class="subtab active" data-sub="landing" data-surface="landing">Landing</button>
+            <button class="subtab" data-sub="emails" data-surface="email">Emails</button>
+          </div>
+
+          <!-- landing words -->
+          <div class="subpane active" id="sub-landing">
+            <div class="field" style="margin-top:0">
+              <label class="label">Headline</label>
+              <input type="text" class="slotted" value="Join {{client.name}}" />
+              <div class="slotbar"><span class="ins">insert</span>
+                <button class="chip" data-token="{{client.name}}">client.name</button>
+                <button class="chip" data-token="{{campaign.role_title}}">campaign.role_title</button>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label">Intro</label>
+              <textarea class="slotted" rows="3">We're glad you're here. Take a moment to learn about the role below, then apply — it only takes a few minutes.</textarea>
+            </div>
+            <div class="field">
+              <label class="label">Highlights <span class="opt">3 / 6</span></label>
+              <div class="hl"><input type="text" value="A team that values your growth" /><button class="x" aria-label="Remove">✕</button></div>
+              <div class="hl"><input type="text" value="Meaningful, high-impact work" /><button class="x" aria-label="Remove">✕</button></div>
+              <div class="hl"><input type="text" value="A fair, transparent hiring process" /><button class="x" aria-label="Remove">✕</button></div>
+            </div>
+            <div class="field">
+              <label class="label">Apply card heading</label>
+              <input type="text" value="Apply for this role" />
+            </div>
+          </div>
+
+          <!-- email words -->
+          <div class="subpane" id="sub-emails">
+            <p class="eyebrow" style="display:block;margin-bottom:0.6rem">Shared on every email</p>
+            <div class="field" style="margin-top:0">
+              <label class="label">Greeting</label>
+              <input type="text" class="slotted" value="Hi {{candidate.name}}," />
+              <div class="slotbar"><span class="ins">insert</span>
+                <button class="chip" data-token="{{candidate.name}}">candidate.name</button>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="label">Sign-off</label>
+              <div class="twostate" id="signoff">
+                <div class="resting">
+                  <span class="desc">Using the default — no signature line. Each email keeps its own closing.</span>
+                  <button class="linkbtn" data-customise>Customise</button>
+                </div>
+                <div class="editing">
+                  <input type="text" value="— The MTN team" />
+                  <div class="reset-row"><button class="linkbtn" data-reset>Reset to default</button></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="label">Footer</label>
+              <input type="text" value="Automated message — please do not reply" />
+            </div>
+
+            <div class="field">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem">
+                <label class="label" style="margin:0">Per email</label>
+                <span class="pe-state tuned">1 tuned</span>
+              </div>
+              <div class="perlist">
+                <details class="perrow" open>
+                  <summary>
+                    <svg class="chev" width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2.5L8 6l-4 3.5"/></svg>
+                    <span class="pe-name">Application received</span><span class="pe-state tuned">tuned</span>
+                  </summary>
+                  <div class="perbody">
+                    <div class="field" style="margin-top:0">
+                      <label class="label">Subject line</label>
+                      <input type="text" class="slotted" value="We've got your application — {{campaign.role_title}}" />
+                      <div class="slotbar"><span class="ins">insert</span>
+                        <button class="chip" data-token="{{candidate.name}}">candidate.name</button>
+                        <button class="chip" data-token="{{campaign.role_title}}">campaign.role_title</button>
+                        <button class="chip" data-token="{{client.name}}">client.name</button>
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label class="label">Body copy</label>
+                      <div class="twostate" id="ar-body">
+                        <div class="resting">
+                          <span class="desc">Using the default body for this email.</span>
+                          <button class="linkbtn" data-customise>Customise</button>
+                        </div>
+                        <div class="editing">
+                          <textarea rows="3">Thanks for applying. We've received your application and it's being reviewed — you'll hear from us soon with an update on next steps.</textarea>
+                          <div class="reset-row"><button class="linkbtn" data-reset>Reset to default</button></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+                <details class="perrow">
+                  <summary>
+                    <svg class="chev" width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2.5L8 6l-4 3.5"/></svg>
+                    <span class="pe-name">Passed screening</span><span class="pe-state default">default</span>
+                  </summary>
+                  <div class="perbody"><p style="font-size:0.78rem;color:var(--ink-muted);margin:0">Subject + body editor, same as above.</p></div>
+                </details>
+                <details class="perrow">
+                  <summary>
+                    <svg class="chev" width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2.5L8 6l-4 3.5"/></svg>
+                    <span class="pe-name">Chat access (verify)</span><span class="pe-state need">needs action.url</span>
+                  </summary>
+                  <div class="perbody"><p style="font-size:0.78rem;color:var(--ink-muted);margin:0">This email's chips offer only <code class="slot">{{candidate.name}}</code>, <code class="slot">{{campaign.role_title}}</code> and <code class="slot">{{action.url}}</code> — no <code class="slot">{{client.name}}</code>, because the verify email has no company context.</p></div>
+                </details>
+                <details class="perrow">
+                  <summary>
+                    <svg class="chev" width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2.5L8 6l-4 3.5"/></svg>
+                    <span class="pe-name">+ 6 more emails</span><span class="pe-state default">all default</span>
+                  </summary>
+                  <div class="perbody"><p style="font-size:0.78rem;color:var(--ink-muted);margin:0">Rejection, Chat invitation, Chat reminder, No response, Rejection confirmation, Did not pass screening.</p></div>
+                </details>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BESPOKE LANDING -->
+      <section class="panel" id="panel-bespoke-landing">
+        <div class="card">
+          <div class="card-head">
+            <h2>Bespoke landing</h2>
+            <p>A hand-authored page that supersedes the generated one. Only for full white-label control.</p>
+          </div>
+          <div class="advnote">
+            <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5M8 11h.01" stroke-linecap="round"/></svg>
+            <p>You don't need this for an on-brand page — the generated landing already uses your colour, type and words. This is for a completely custom layout.</p>
+          </div>
+          <div class="steps">
+            <div class="step"><div class="num"></div><div><div class="s-title">Describe the page</div><div class="s-sub">Layout, tone, sections to include — folded into the prompt.</div><div class="s-body"><textarea rows="2" placeholder="A bold split-hero with a testimonial strip…"></textarea></div></div></div>
+            <div class="step"><div class="num"></div><div><div class="s-title">Copy the prompt</div><div class="s-sub">Pre-loaded with your exact colours and logo.</div><div class="s-body"><button class="btn btn-soft">Copy AI prompt → paste into Claude / ChatGPT</button></div></div></div>
+            <div class="step"><div class="num"></div><div><div class="s-title">Paste the result</div><div class="s-sub">We validate the slots and mount points live.</div><div class="s-body"><textarea class="mono-input" rows="5" placeholder="Paste the complete HTML page here…"></textarea></div></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BESPOKE EMAILS -->
+      <section class="panel" id="panel-bespoke-emails">
+        <div class="card">
+          <div class="card-head">
+            <h2>Bespoke emails</h2>
+            <p>Rewrite a single email's HTML end to end. The shared header, footer and palette still wrap it.</p>
+          </div>
+          <div class="advnote">
+            <svg class="ic" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5M8 11h.01" stroke-linecap="round"/></svg>
+            <p>The tuned subject + body under <b>Words → Emails</b> is enough for most brands. Use this only when you need a fully custom email layout.</p>
+          </div>
+          <div class="steps">
+            <div class="step"><div class="num"></div><div><div class="s-title">Pick the email</div><div class="s-sub">Each has its own slot contract.</div><div class="s-body" style="display:flex;align-items:center;gap:0.6rem"><select style="max-width:230px"><option>Chat invitation</option><option>Application received</option><option>Rejection</option></select><span class="pe-state need">must include action.url</span></div></div></div>
+            <div class="step"><div class="num"></div><div><div class="s-title">Describe the voice</div><div class="s-sub">Tone, phrasing, sign-off style.</div><div class="s-body"><textarea rows="2" placeholder="Formal, warm, no jargon…"></textarea></div></div></div>
+            <div class="step"><div class="num"></div><div><div class="s-title">Copy the prompt</div><div class="s-body"><button class="btn btn-soft">Copy AI prompt for “Chat invitation”</button></div></div></div>
+            <div class="step"><div class="num"></div><div><div class="s-title">Paste the result</div><div class="s-body"><textarea class="mono-input" rows="5" placeholder="Paste the complete email HTML here…">&lt;!doctype html&gt; … {{action.url}} …</textarea><div class="valid"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6.5L5 9l4.5-6"/></svg> Valid template · 4,201 characters · <button class="linkbtn">Preview email</button></div></div></div></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ── preview ── -->
+    <aside class="preview" aria-label="Live preview">
+      <div class="preview-card">
+        <div class="preview-top">
+          <div class="surfsw">
+            <button data-surf="email" class="active">Email</button>
+            <button data-surf="landing">Landing</button>
+          </div>
+          <span class="preview-context" id="previewCtx">Application received</span>
+        </div>
+
+        <div class="frame">
+          <!-- email surface -->
+          <div class="surf active" id="surf-email">
+            <div class="em">
+              <div class="em-bar"></div>
+              <div class="em-pad">
+                <div class="em-logo"><b id="emBrand">MTN</b> Networks</div>
+                <div class="em-eyebrow">Confirmation</div>
+                <div class="em-h">We've got your application</div>
+                <p class="em-p" id="emGreeting">Hi Sam,</p>
+                <p class="em-p">Thank you for applying. We've received your application and it's being reviewed.</p>
+                <div class="em-rolecard">
+                  <div class="l">Role</div><div class="v">Senior Software Engineer</div>
+                  <div class="l">Company</div><div class="v" id="emCompany">MTN Networks</div>
+                </div>
+                <span class="em-btn">View your application</span>
+                <div class="em-foot">You'll hear from us soon with an update on next steps.</div>
+              </div>
+            </div>
+          </div>
+          <!-- landing surface -->
+          <div class="surf" id="surf-landing">
+            <div class="ld">
+              <div class="ld-hero">
+                <div class="ld-logo"><b id="ldBrand">MTN</b> Networks</div>
+                <h3 class="ld-h" id="ldHeadline">Join MTN Networks</h3>
+                <p class="ld-intro">We're glad you're here. Learn about the role below, then apply.</p>
+              </div>
+              <ul class="ld-list">
+                <li>A team that values your growth</li>
+                <li>Meaningful, high-impact work</li>
+                <li>A fair, transparent hiring process</li>
+              </ul>
+              <div class="ld-apply">
+                <div class="h">Apply for this role</div>
+                <div class="ph"></div>
+                <div class="ph"></div>
+                <div class="btn-fill">Submit application</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="preview-note" id="previewNote">Rendered through the real send-path template with sample data.</p>
+      </div>
+    </aside>
+
+  </div>
+
+<script>
+  const body = document.body;
+
+  // ── rail navigation ──
+  const railItems = [...document.querySelectorAll('.rail-item')];
+  const panels = [...document.querySelectorAll('.panel')];
+  function showSection(section, surface) {
+    railItems.forEach(i => i.classList.toggle('active', i.dataset.section === section));
+    panels.forEach(p => p.classList.toggle('active', p.id === 'panel-' + section));
+    if (surface) setSurface(surface);
+  }
+  railItems.forEach(item => {
+    item.addEventListener('click', () => showSection(item.dataset.section, item.dataset.surface));
+  });
+
+  // ── preview surface ──
+  const surfs = { email: document.getElementById('surf-email'), landing: document.getElementById('surf-landing') };
+  const surfBtns = [...document.querySelectorAll('.surfsw button')];
+  const ctxLabel = document.getElementById('previewCtx');
+  function setSurface(surface) {
+    Object.entries(surfs).forEach(([k, el]) => el.classList.toggle('active', k === surface));
+    surfBtns.forEach(b => b.classList.toggle('active', b.dataset.surf === surface));
+    ctxLabel.textContent = surface === 'landing' ? 'Apply page' : 'Application received';
+  }
+  surfBtns.forEach(b => b.addEventListener('click', () => setSurface(b.dataset.surf)));
+
+  // ── Words subtabs (Landing | Emails) + preview follows ──
+  document.querySelectorAll('.subtab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.subtab').forEach(t => t.classList.toggle('active', t === tab));
+      document.querySelectorAll('.subpane').forEach(p => p.classList.toggle('active', p.id === 'sub-' + tab.dataset.sub));
+      if (tab.dataset.surface) setSurface(tab.dataset.surface);
+    });
+  });
+
+  // ── recipe: recolour rests the advanced group ──
+  document.querySelectorAll('input[name=recipe]').forEach(r => {
+    r.addEventListener('change', () => {
+      body.classList.toggle('recipe-recolour', r.value === 'recolour');
+      body.classList.toggle('recipe-bespoke', r.value === 'bespoke');
+    });
+  });
+
+  // ── two-state default controls ──
+  document.querySelectorAll('.twostate').forEach(ts => {
+    ts.querySelector('[data-customise]')?.addEventListener('click', () => {
+      ts.classList.add('is-editing');
+      ts.querySelector('.editing input, .editing textarea')?.focus();
+    });
+    ts.querySelector('[data-reset]')?.addEventListener('click', () => ts.classList.remove('is-editing'));
+  });
+
+  // ── slot chips: insert into the last-focused slotted field ──
+  let lastSlot = null;
+  document.querySelectorAll('.slotted').forEach(el => {
+    el.addEventListener('focus', () => lastSlot = el);
+  });
+  document.querySelectorAll('.chip[data-token]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      // prefer the slotted field within the same field block
+      const target = lastSlot && chip.closest('.field')?.contains(lastSlot)
+        ? lastSlot
+        : chip.closest('.field')?.querySelector('.slotted');
+      if (!target) return;
+      const t = chip.dataset.token;
+      const s = target.selectionStart ?? target.value.length;
+      const e = target.selectionEnd ?? target.value.length;
+      target.value = target.value.slice(0, s) + t + target.value.slice(e);
+      target.focus();
+      const pos = s + t.length;
+      target.setSelectionRange(pos, pos);
+      target.dispatchEvent(new Event('input'));
+    });
+  });
+
+  // ── powered-by switch ──
+  const pSwitch = document.getElementById('poweredSwitch');
+  pSwitch.addEventListener('click', () => {
+    const on = pSwitch.classList.toggle('on');
+    pSwitch.setAttribute('aria-checked', on);
+  });
+
+  // ── live preview bindings ──
+  const themeName = document.getElementById('themeName');
+  function brandShort(v) { return (v.split('—')[0].trim().split(' ')[0]) || 'Brand'; }
+  function brandFull(v) { return v.split('—')[0].trim() || 'Brand'; }
+  themeName.addEventListener('input', () => {
+    const full = brandFull(themeName.value), short = brandShort(themeName.value);
+    document.getElementById('crumbBrand').textContent = full;
+    document.getElementById('emBrand').textContent = short;
+    document.getElementById('ldBrand').textContent = short;
+    document.getElementById('emCompany').textContent = full;
+    document.getElementById('ldHeadline').textContent = 'Join ' + full;
+  });
+
+  // primary seed → preview brand accent
+  function bindPrimary(el) {
+    el.addEventListener('input', () => {
+      document.documentElement.style.setProperty('--brand', el.value);
+      const hex = document.querySelector('[data-seed-hex=primary]');
+      const pick = document.querySelector('[data-seed=primary]');
+      if (el.dataset.seed && hex) hex.value = el.value;
+      if (el.dataset.seedHex && pick) { pick.value = el.value; pick.parentElement.style.background = el.value; }
+    });
+  }
+  document.querySelectorAll('[data-seed=primary], [data-seed-hex=primary]').forEach(bindPrimary);
+
+  // greeting → preview greeting (sample fills the slot)
+  const greetingInput = document.querySelector('#sub-emails .slotted');
+  greetingInput?.addEventListener('input', () => {
+    document.getElementById('emGreeting').textContent = greetingInput.value.replace('{{candidate.name}}', 'Sam');
+  });
+</script>
+</body>
+</html>

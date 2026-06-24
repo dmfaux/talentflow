@@ -61,10 +61,6 @@ describe("resolveEffectiveLanding — snapshot branch (CT6)", () => {
     const html = await resolveEffectiveLanding({
       theme_id: null,
       client: brand,
-      // html_template / tier are part of the campaign shape but the snapshot
-      // branch ignores them entirely — a frozen body always wins.
-      html_template: "<draft-paste-should-be-ignored>",
-      tier: "premium",
       theme_snapshot: snapshot({ landingHtml: "<frozen-bespoke-landing>" }),
     });
     expect(html).toBe("<frozen-bespoke-landing>");
@@ -75,8 +71,6 @@ describe("resolveEffectiveLanding — snapshot branch (CT6)", () => {
     const html = await resolveEffectiveLanding({
       theme_id: null,
       client: brand,
-      html_template: null,
-      tier: "standard",
       theme_snapshot: snap,
     });
     // Byte-equal to the generator output for the FROZEN email theme.
@@ -90,8 +84,6 @@ describe("resolveEffectiveLanding — snapshot branch (CT6)", () => {
     const html = await resolveEffectiveLanding({
       theme_id: null,
       client: brand,
-      html_template: null,
-      tier: "premium",
       theme_snapshot: snap,
     });
     expect(html).toBe(makeLandingTemplate(snap.email));

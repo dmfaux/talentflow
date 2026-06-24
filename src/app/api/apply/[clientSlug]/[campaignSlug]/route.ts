@@ -216,7 +216,7 @@ export async function POST(
     // Immediate confirmation email (fire-and-forget is acceptable here)
     sendCandidateEmail(
       trimmedEmail,
-      resolveEmailSubject(emailTheme, "applicationReceived", {
+      resolveEmailSubject("applicationReceived", {
         campaign: { role_title: roleTitle },
       }),
       applicationReceivedEmail(emailTheme, candidateName, roleTitle, clientName),

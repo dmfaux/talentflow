@@ -58,6 +58,12 @@ export async function PATCH(
       seeds = null;
     }
 
+    // Palette-override merge: a body that sends overrides (including `{}` to clear
+    // them all) wins; an absent field keeps the stored map so an unedited row
+    // re-derives identically. Only meaningful alongside seeds — the seed path is
+    // the only branch normaliseThemeFields reads overrides on.
+    const palette_overrides = pick("palette_overrides");
+
     // CT7 font-key merge: send the stored keys (or the body's) through the
     // key-based path so an unedited row keeps its resolved stacks. Only fall back
     // to the legacy stack path when neither the body nor the row carries keys.
@@ -71,6 +77,7 @@ export async function PATCH(
       client_id: pick("client_id"),
       seeds,
       palette: pick("palette"),
+      palette_overrides,
       font_display_key,
       font_body_key,
       font_display: pick("font_display"),
@@ -80,9 +87,7 @@ export async function PATCH(
       logo_position: pick("logo_position"),
       show_powered_by: pick("show_powered_by"),
       landing_html: pick("landing_html"),
-      email_templates: pick("email_templates"),
-      landing_copy: pick("landing_copy"),
-      email_copy: pick("email_copy"),
+      email_shell: pick("email_shell"),
       preview_image_url: pick("preview_image_url"),
     });
     if (!result.ok) return error(result.message, result.status);
@@ -106,6 +111,8 @@ export async function PATCH(
         seed_primary: values.seed_primary,
         seed_accent: values.seed_accent,
         seed_bg: values.seed_bg,
+        // Per-token overrides layered over the derived palette (null = pure derivation).
+        palette_overrides: values.palette_overrides,
         font_display: values.font_display,
         font_sans: values.font_sans,
         // CT7: the chosen font-registry keys (null for legacy direct-stack input).
@@ -116,13 +123,8 @@ export async function PATCH(
         logo_position: values.logo_position,
         show_powered_by: values.show_powered_by,
         landing_html: values.landing_html,
-        // CT6: per-template bespoke email HTML (custom themes only; gallery rows
-        // are forced to null by normaliseThemeFields).
-        email_templates: values.email_templates,
-        // CT7: structured landing + email copy (allowed on gallery too; null →
-        // renderer defaults).
-        landing_copy: values.landing_copy,
-        email_copy: values.email_copy,
+        // The bespoke email shell (custom themes only; gallery forced null).
+        email_shell: values.email_shell,
         preview_image_url: values.preview_image_url,
         updated_at: new Date(),
       })

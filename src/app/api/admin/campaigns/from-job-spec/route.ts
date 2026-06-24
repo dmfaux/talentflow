@@ -157,7 +157,6 @@ export async function POST(request: NextRequest) {
         location: result.location ?? null,
         employment_type: result.employment_type ?? null,
         status: "draft",
-        design_brief: result.design_brief ?? null,
         gating_config: gatingConfig,
         scoring_rubric: {
           must_haves: result.must_haves,

@@ -84,11 +84,6 @@ export const JobSpecResultSchema = z.object({
       tenure: z.number().describe("0-100"),
     })
     .describe("Must sum to exactly 100"),
-  design_brief: z
-    .string()
-    .describe(
-      "A concise design brief (50 words or fewer) for the landing page template, describing tone, style, and key visual direction"
-    ),
 });
 
 export type JobSpecResult = z.infer<typeof JobSpecResultSchema>;
@@ -103,8 +98,7 @@ Rules:
 - Be faithful to the source document. Do not invent requirements that are not stated or implied.
 - For gating questions: derive 3-5 screening questions from the hardest requirements (e.g. right to work, required qualifications, years of experience, location availability). Each question must have 2-6 answer options with clear pass/fail criteria. Each option must be under 80 characters. The pass_criteria array must contain values that exactly match the value field of one or more options.
 - For scoring rubric: extract must-haves (essential requirements), nice-to-haves (preferred qualifications), and dealbreakers (absolute disqualifiers) directly from the job spec language.
-- For dimension weights: allocate exactly 100 points across skills, experience, progression, and tenure based on what the job spec emphasises most.
-- For the design brief: write a concise (max 50 words) creative direction for a landing page — mention tone (e.g. corporate, startup, technical), mood, and any industry-specific visual cues suggested by the role. DO NOT suggest colors as a predefined theme is alreaduy in place`;
+- For dimension weights: allocate exactly 100 points across skills, experience, progression, and tenure based on what the job spec emphasises most.`;
 
 export function buildJobSpecPrompt(
   extractedText: string,
@@ -179,12 +173,6 @@ function validateQuality(result: JobSpecResult): void {
     if (val < 0 || val > 100) {
       issues.push(`Dimension weight "${key}" is ${val}, must be 0-100`);
     }
-  }
-
-  // ── Design brief ──────────────────────────────────────────────────
-  const wordCount = result.design_brief.trim().split(/\s+/).length;
-  if (wordCount > 50) {
-    issues.push(`Design brief is ${wordCount} words (max 50)`);
   }
 
   if (issues.length > 0) {

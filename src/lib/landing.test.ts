@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { makeLandingTemplate } from "@/lib/landing";
 import type { EmailTheme } from "@/lib/theme";
-import { DEFAULT_LANDING_COPY, type LandingCopy } from "@/lib/theme-copy";
+import { DEFAULT_LANDING_COPY } from "@/lib/theme-copy";
 import { validateHtmlTemplate, replaceSlots, type SlotData } from "@/lib/slots";
 
 // A representative EmailTheme. Built inline (not imported from theme.ts) so this
@@ -25,14 +25,12 @@ const THEME: EmailTheme = {
   fontSans: "'Instrument Sans', sans-serif",
   logo: null,
   showPoweredBy: true,
-  // CT7: the default Instrument @import pair + structured landing copy. Set
-  // explicitly so this db-free THEME exercises the same fields the resolver
-  // hands makeLandingTemplate in production.
+  // The default Instrument @import pair. Set explicitly so this db-free THEME
+  // exercises the same fields the resolver hands makeLandingTemplate in production.
   fontImports: [
     "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap",
     "https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap",
   ],
-  landingCopy: DEFAULT_LANDING_COPY,
 };
 
 describe("makeLandingTemplate", () => {
@@ -161,45 +159,14 @@ describe("makeLandingTemplate", () => {
     expect(html).toContain('<div id="application-form"></div>');
   });
 
-  it("renders custom landingCopy verbatim (headline / highlights / applyHeading)", () => {
-    const landingCopy: LandingCopy = {
-      headline: "X",
-      intro: "A custom intro paragraph.",
-      highlights: ["a", "b"],
-      applyHeading: "Apply now",
-    };
-    const html = makeLandingTemplate({ ...THEME, landingCopy });
-    expect(html).toContain('<p class="ats-eyebrow">X</p>');
-    expect(html).toContain('<h2 class="ats-apply-head">Apply now</h2>');
-    expect(html).toContain('<li class="ats-highlight">a</li>');
-    expect(html).toContain('<li class="ats-highlight">b</li>');
-    // Default highlights must NOT leak through when the operator chose their own.
-    expect(html).not.toContain(DEFAULT_LANDING_COPY.highlights[0]);
-    expect(validateHtmlTemplate(html)).toEqual({ ok: true });
-  });
-
-  it("renders no highlights container when the highlights array is empty", () => {
-    const html = makeLandingTemplate({
-      ...THEME,
-      landingCopy: { ...DEFAULT_LANDING_COPY, highlights: [] },
-    });
-    expect(html).not.toContain('<ul class="ats-highlights">');
-    expect(html).not.toContain('class="ats-highlight"');
-    // The rest of the page is intact.
-    expect(validateHtmlTemplate(html)).toEqual({ ok: true });
-  });
-
-  it("inserts operator copy RAW so embedded slot tokens survive to replaceSlots", () => {
-    // headline carries a {{client.name}} token — it must NOT be HTML-escaped at
-    // build time (no &lbrace; etc.); it stays a live slot for the render pass.
-    const html = makeLandingTemplate({
-      ...THEME,
-      landingCopy: {
-        ...DEFAULT_LANDING_COPY,
-        headline: "Hello {{client.name}}",
-      },
-    });
-    expect(html).toContain('<p class="ats-eyebrow">Hello {{client.name}}</p>');
+  it("inserts the default copy RAW so embedded slot tokens survive to replaceSlots", () => {
+    // The default headline carries a {{client.name}} token — it must NOT be
+    // HTML-escaped at build time (no &lbrace; etc.); it stays a live slot for the
+    // downstream render pass.
+    const html = makeLandingTemplate(THEME);
+    expect(html).toContain(
+      `<p class="ats-eyebrow">${DEFAULT_LANDING_COPY.headline}</p>`
+    );
     const rendered = replaceSlots(html, {
       client: { name: "Acme" },
       campaign: {
@@ -212,19 +179,7 @@ describe("makeLandingTemplate", () => {
         salary_range_max: null,
       },
     });
-    expect(rendered).toContain('<p class="ats-eyebrow">Hello Acme</p>');
-  });
-
-  it("falls back to DEFAULT_LANDING_COPY when landingCopy is absent", () => {
-    const { landingCopy: _omit, ...noCopy } = THEME;
-    void _omit;
-    const html = makeLandingTemplate(noCopy);
-    expect(html).toContain(
-      `<p class="ats-eyebrow">${DEFAULT_LANDING_COPY.headline}</p>`
-    );
-    expect(html).toContain(
-      `<h2 class="ats-apply-head">${DEFAULT_LANDING_COPY.applyHeading}</h2>`
-    );
+    expect(rendered).toContain('<p class="ats-eyebrow">Join Acme</p>');
   });
 
   it("emits one @import per fontImports URL, and none for an explicit empty list", () => {

@@ -4,6 +4,7 @@ import {
   hexToHsl,
   hslToHex,
   contrastRatio,
+  readableTextOn,
   derivePalette,
   type DerivedPalette,
 } from "./theme-colors";
@@ -59,6 +60,27 @@ describe("contrastRatio", () => {
 
   it("primary vs white is > 4", () => {
     expect(contrastRatio("#2c5bff", "#ffffff")).toBeGreaterThan(4);
+  });
+});
+
+describe("readableTextOn", () => {
+  it("picks white on a dark brand primary (default cobalt) — byte-identical to the old hard-coded white", () => {
+    expect(readableTextOn("#2c5bff")).toBe("#ffffff");
+  });
+
+  it("picks black on a light brand primary (e.g. a yellow) so the button label stays legible", () => {
+    expect(readableTextOn("#ffdd00")).toBe("#000000");
+    expect(readableTextOn("#ffcc00")).toBe("#000000");
+  });
+
+  it("always returns the higher-contrast of black/white for any background", () => {
+    for (const bg of ["#2c5bff", "#ffdd00", "#006341", "#f0f3f7", "#14161c"]) {
+      const chosen = readableTextOn(bg);
+      const other = chosen === "#ffffff" ? "#000000" : "#ffffff";
+      expect(contrastRatio(chosen, bg)).toBeGreaterThanOrEqual(
+        contrastRatio(other, bg),
+      );
+    }
   });
 });
 

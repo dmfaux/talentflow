@@ -4,7 +4,7 @@ import { clientIp, error, requireApiOperator, success } from "@/lib/api";
 import { recordOperatorAudit } from "@/lib/operator-audit";
 import { normaliseThemeFields } from "@/lib/theme-fields";
 import { guardCustomThemeBrand } from "@/lib/theme";
-import { desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
 // ── CT2 · Operator theme authoring console — create + list ──────────
@@ -29,6 +29,23 @@ export async function POST(request: NextRequest) {
     if (values.scope === "custom") {
       const guard = await guardCustomThemeBrand(values.org_id!, values.client_id!);
       if (guard) return error(guard.message, guard.status);
+
+      // One bespoke theme per brand ("a bespoke template", singular): a brand
+      // that already has an active custom theme edits it rather than adding another.
+      const existingCustom = await db.query.themes.findFirst({
+        where: and(
+          eq(themes.client_id, values.client_id!),
+          eq(themes.scope, "custom"),
+          eq(themes.is_active, true)
+        ),
+        columns: { id: true },
+      });
+      if (existingCustom) {
+        return error(
+          "This brand already has a bespoke theme — edit the existing one instead.",
+          409
+        );
+      }
     }
 
     const [row] = await db
@@ -44,6 +61,8 @@ export async function POST(request: NextRequest) {
         seed_primary: values.seed_primary,
         seed_accent: values.seed_accent,
         seed_bg: values.seed_bg,
+        // Per-token overrides layered over the derived palette (null = pure derivation).
+        palette_overrides: values.palette_overrides,
         font_display: values.font_display,
         font_sans: values.font_sans,
         // CT7: the chosen font-registry keys (null for legacy direct-stack input).
@@ -54,13 +73,9 @@ export async function POST(request: NextRequest) {
         logo_position: values.logo_position,
         show_powered_by: values.show_powered_by,
         landing_html: values.landing_html,
-        // CT6: per-template bespoke email HTML (custom themes only; gallery rows
-        // are forced to null by normaliseThemeFields).
-        email_templates: values.email_templates,
-        // CT7: structured landing + email copy (allowed on gallery too; null →
-        // renderer defaults).
-        landing_copy: values.landing_copy,
-        email_copy: values.email_copy,
+        // The bespoke email shell (custom themes only; gallery rows are forced to
+        // null by normaliseThemeFields).
+        email_shell: values.email_shell,
         preview_image_url: values.preview_image_url,
         created_by: ctx.userId,
       })

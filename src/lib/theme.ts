@@ -2,18 +2,11 @@ import { db } from "@/db";
 import { clients, organizations, themes } from "@/db/schema";
 import { isPremiumTier } from "@/lib/theme-fields";
 import { makeLandingTemplate } from "@/lib/landing";
-import type { EmailTemplateMap } from "@/lib/email-slots";
 import {
   fontImportsFor,
   DEFAULT_DISPLAY_FONT_KEY,
   DEFAULT_BODY_FONT_KEY,
 } from "@/lib/theme-fonts";
-import {
-  DEFAULT_LANDING_COPY,
-  DEFAULT_EMAIL_COPY,
-  type LandingCopy,
-  type EmailCopy,
-} from "@/lib/theme-copy";
 import { eq } from "drizzle-orm";
 
 // ── Campaign Themes — the single resolution point (CT1) ──────────────
@@ -49,26 +42,19 @@ export interface EmailTheme {
    *  TalentStream funnel wordmark is rendered (default-theme fallback). */
   logo: { url: string; background: string; position: string } | null;
   showPoweredBy: boolean;
-  /** CT6: per-template bespoke email HTML carried on the theme. Present only for
-   *  custom (Premium) themes; gallery/default themes leave it null and fall back
-   *  to the generated email kit. Riding on EmailTheme means it flows into
-   *  theme_snapshot.email at freeze (RD-1 stability) with no call-site changes. */
-  emailTemplates?: EmailTemplateMap | null;
-  /** CT7: the @import URLs for the chosen display + body web fonts. The landing
-   *  page emits these so the REAL chosen font loads; emails include them
-   *  best-effort (most clients strip @import and fall back to the email-safe part
-   *  of the font stack). Resolved from the font-registry keys and frozen into the
-   *  snapshot for stability. Empty/absent → no web-font @import (system fonts). */
+  /** The bespoke email shell: one MSO-safe HTML document (carrying a BODY_MARKER)
+   *  whose chrome matches the bespoke landing. Present only for custom (Premium)
+   *  themes; gallery/default themes leave it null and use the in-code chrome. The
+   *  nine deterministic email bodies render INTO this shell. Riding on EmailTheme
+   *  means it flows into theme_snapshot.email at freeze (RD-1) with no call-site
+   *  changes. */
+  emailShell?: string | null;
+  /** The @import URLs for the chosen display + body web fonts. The landing page
+   *  emits these so the REAL chosen font loads; emails include them best-effort
+   *  (most clients strip @import and fall back to the email-safe part of the font
+   *  stack). Resolved from the font-registry keys and frozen into the snapshot for
+   *  stability. Empty/absent → no web-font @import (system fonts). */
   fontImports?: string[] | null;
-  /** CT7: structured landing copy (headline / intro / highlights / apply heading),
-   *  theme-level defaults the operator may override. Rides on EmailTheme so it
-   *  flows into theme_snapshot.email at freeze; makeLandingTemplate reads it,
-   *  falling back to DEFAULT_LANDING_COPY when null. */
-  landingCopy?: LandingCopy | null;
-  /** CT7: shared email copy (greeting / sign-off / footer) + per-template
-   *  subject/body overrides. Rides on EmailTheme so it freezes with the snapshot;
-   *  the email kit reads it, falling back to DEFAULT_EMAIL_COPY when null. */
-  emailCopy?: EmailCopy | null;
 }
 
 /** The snapshot frozen onto a campaign at activation (RD-1). Stored on
@@ -121,8 +107,6 @@ export const DEFAULT_EMAIL_THEME: EmailTheme = {
   // The default look uses the Instrument pairing; its @import URLs reproduce the
   // fonts the landing + email previously loaded from a hardcoded @import.
   fontImports: fontImportsFor(DEFAULT_DISPLAY_FONT_KEY, DEFAULT_BODY_FONT_KEY),
-  landingCopy: DEFAULT_LANDING_COPY,
-  emailCopy: DEFAULT_EMAIL_COPY,
 };
 
 /** The minimal client shape the resolver needs: the brand default theme id plus
@@ -184,21 +168,15 @@ export async function resolveCampaignTheme(
             }
           : brandLogo(campaign.client),
         showPoweredBy: row.show_powered_by,
-        // CT6: bespoke per-template email HTML (custom themes only; gallery rows
-        // carry null by write-side invariant).
-        emailTemplates: row.email_templates ?? null,
-        // CT7: resolve the chosen web-font @import URLs from the registry keys.
-        // Legacy rows (null keys) fall back to the default Instrument imports, so
-        // their rendered output is unchanged.
+        // The bespoke email shell (custom themes only; gallery rows carry null by
+        // write-side invariant). Null → the in-code default chrome.
+        emailShell: row.email_shell ?? null,
+        // Resolve the chosen web-font @import URLs from the registry keys. Legacy
+        // rows (null keys) fall back to the default Instrument imports, so their
+        // rendered output is unchanged.
         fontImports: fontImportsFor(row.font_display_key, row.font_body_key),
-        // CT7: structured landing copy + email copy overrides (null → renderer
-        // defaults). Ride on EmailTheme so they freeze into the snapshot.
-        landingCopy: row.landing_copy ?? null,
-        emailCopy: row.email_copy ?? null,
       };
-      // CT6: the theme's bespoke landing body (custom themes only). Distinct from
-      // a campaign's per-campaign html_template paste — precedence handled in
-      // resolveEffectiveLanding / freezeCampaignTheme.
+      // The theme's bespoke landing body (custom/Premium themes only).
       const landingHtml = row.landing_html?.trim() ? row.landing_html : null;
       return { email, landingHtml };
     }
@@ -325,37 +303,20 @@ export async function assertThemeAvailableForBrand(
 }
 
 /**
- * The effective landing-page paste override for a campaign, or null. An override
- * is honoured ONLY for Premium+ brands (a Standard brand never gets one) and only
- * when it is non-blank — a blank "" must fall through to the generated landing,
- * never render an empty page. Single source of truth for both render and freeze.
- */
-function landingOverride(
-  tier: string | null,
-  htmlTemplate: string | null
-): string | null {
-  if (!isPremiumTier(tier)) return null;
-  return htmlTemplate && htmlTemplate.trim() ? htmlTemplate : null;
-}
-
-/**
- * Resolve the landing HTML the public careers page should render for a campaign
- * (CT5/CT6). A campaign is NEVER landing-less. Precedence (highest first):
- *   1. the per-campaign html_template paste (Premium-only override),
- *   2. the theme's own bespoke landing body (CT6 — custom/Premium themes),
- *   3. the palette-generated landing via makeLandingTemplate.
+ * Resolve the landing HTML the public careers page should render for a campaign.
+ * A campaign is NEVER landing-less. Precedence (highest first):
+ *   1. the theme's own bespoke landing body (custom/Premium themes),
+ *   2. the palette-generated landing via makeLandingTemplate.
  *
- * - Active campaigns read the frozen snapshot: freezeCampaignTheme bakes rung 1
- *   OR rung 2 into snapshot.landingHtml at activation, so editing a theme never
- *   disturbs an in-flight campaign (RD-1); when neither was frozen the themed
- *   landing is regenerated from the FROZEN palette (snapshot.email).
- * - Drafts (no snapshot) resolve live through the full precedence chain.
+ * - Active campaigns read the frozen snapshot: freezeCampaignTheme bakes the
+ *   theme's bespoke landing into snapshot.landingHtml at activation, so editing a
+ *   theme never disturbs an in-flight campaign (RD-1); when none was frozen the
+ *   themed landing is regenerated from the FROZEN palette (snapshot.email).
+ * - Drafts (no snapshot) resolve live through the precedence chain.
  */
 export async function resolveEffectiveLanding(
   campaign: ResolverCampaign & {
-    html_template: string | null;
     theme_snapshot: ThemeSnapshot | null;
-    tier: string | null;
   }
 ): Promise<string> {
   if (campaign.theme_snapshot) {
@@ -365,35 +326,24 @@ export async function resolveEffectiveLanding(
       : makeLandingTemplate(campaign.theme_snapshot.email);
   }
   const { email, landingHtml } = await resolveCampaignTheme(campaign);
-  return (
-    landingOverride(campaign.tier, campaign.html_template) ??
-    landingHtml ??
-    makeLandingTemplate(email)
-  );
+  return landingHtml ?? makeLandingTemplate(email);
 }
 
 /**
  * Freeze the resolved look at activation (RD-1). Captures the live resolver's
- * email theme (which now carries the bespoke per-template email HTML, so active
- * campaigns send the frozen bespoke emails — CT6). For the landing it bakes the
- * effective body: a Premium-tier paste override wins, else the theme's own
- * bespoke landing (CT6), else null (the landing regenerates from `email` at
- * render). A Standard brand can never freeze a paste override and never carries a
- * custom theme, so its snapshot stays null → generated. Re-frozen on every
+ * email theme (which carries the bespoke email shell, so active campaigns send
+ * the frozen bespoke emails) and bakes the theme's bespoke landing body (or null
+ * → regenerated from `email` at render). A Standard brand never carries a custom
+ * theme, so its snapshot landing stays null → generated. Re-frozen on every
  * into-active transition; never re-frozen by an edit to an already-active campaign.
  */
 export async function freezeCampaignTheme(
-  campaign: ResolverCampaign & {
-    html_template: string | null;
-    tier: string | null;
-  }
+  campaign: ResolverCampaign
 ): Promise<ThemeSnapshot> {
   const resolved = await resolveCampaignTheme(campaign);
   return {
     email: resolved.email,
-    landingHtml:
-      landingOverride(campaign.tier, campaign.html_template) ??
-      resolved.landingHtml,
+    landingHtml: resolved.landingHtml,
     theme_id: campaign.theme_id ?? null,
     frozen_at: new Date().toISOString(),
   };

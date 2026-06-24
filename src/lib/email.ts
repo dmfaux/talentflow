@@ -6,6 +6,8 @@ import {
   type EmailSlotData,
   type EmailTemplateType,
 } from "@/lib/email-slots";
+import { BODY_MARKER } from "@/lib/email-shell";
+import { readableTextOn } from "@/lib/theme-colors";
 import { DEFAULT_EMAIL_COPY } from "@/lib/theme-copy";
 import { recordUsageEvent } from "@/lib/usage";
 import { eq } from "drizzle-orm";
@@ -223,6 +225,10 @@ function makeEmailKit(theme: EmailTheme) {
   const P = theme.palette;
   const FONT_DISPLAY = theme.fontDisplay;
   const FONT_SANS = theme.fontSans;
+  // Button label sits ON the primary colour — pick black/white by WCAG contrast
+  // so a light brand primary (e.g. a yellow) keeps a legible label. The default
+  // cobalt primary resolves to white, so this is byte-identical for that theme.
+  const onPrimary = readableTextOn(P.primary);
 
   function emailHeading(label: string, title: string): string {
     return `
@@ -244,7 +250,7 @@ function makeEmailKit(theme: EmailTheme) {
     return `
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 4px;">
       <tr><td style="background-color:${P.primary};border-radius:8px;">
-        <a href="${url}" style="display:inline-block;padding:14px 28px;color:#ffffff;text-decoration:none;font-family:${FONT_SANS};font-size:14px;font-weight:600;letter-spacing:0.01em;">${text}&ensp;&#8594;</a>
+        <a href="${url}" style="display:inline-block;padding:14px 28px;color:${onPrimary};text-decoration:none;font-family:${FONT_SANS};font-size:14px;font-weight:600;letter-spacing:0.01em;">${text}&ensp;&#8594;</a>
       </td></tr>
     </table>`;
   }
@@ -270,9 +276,14 @@ function makeEmailKit(theme: EmailTheme) {
   }
 
   function emailFallbackLink(url: string): string {
+    // The fallback URL is helper text, not a call to action, so it reads in muted
+    // ink rather than the brand primary. Carry the colour on BOTH the anchor and an
+    // inner <span>: the global `a { color: primary }` rule (and some clients' link
+    // auto-recolouring) can win over an anchor's own colour, but an inner span's
+    // colour is honoured — so the link stays muted everywhere.
     return `<p style="margin:14px 0 0;font-family:${FONT_SANS};font-size:12px;color:${P.inkMuted};line-height:1.55;">
     If the button doesn&rsquo;t work, copy this link into your browser:<br>
-    <a href="${url}" style="color:${P.primary};word-break:break-all;text-decoration:underline;">${url}</a>
+    <a href="${url}" style="color:${P.inkMuted};word-break:break-all;text-decoration:underline;"><span style="color:${P.inkMuted};">${url}</span></a>
   </p>`;
   }
 
@@ -355,7 +366,7 @@ function makeEmailKit(theme: EmailTheme) {
     // not the surrounding copy. The default copy ("Automated message — please do
     // not reply", real em dash U+2014) renders the same em-dash glyph the old
     // hard-coded "&mdash;" entity did — visually identical across clients.
-    const copy = theme.emailCopy ?? DEFAULT_EMAIL_COPY;
+    const copy = DEFAULT_EMAIL_COPY;
     const footerLine = copy.shared.footer;
     const footerText = theme.showPoweredBy
       ? `Sent by TalentStream&ensp;&middot;&ensp;AI-powered recruitment campaigns<br>
@@ -455,9 +466,8 @@ interface ThemedEmailSpec {
   data: EmailSlotData;
   /** The email's eyebrow + title (unchanged per email). */
   heading: { label: string; title: string };
-  /** The DEFAULT prose paragraph(s) — one or more emailP()s joined by the same
-   *  "\n    " separator the per-fn template literals used. Replaced wholesale by
-   *  a non-blank `emailCopy.perType[type].body` override. */
+  /** The prose paragraph(s) — one or more emailP()s joined by the same
+   *  "\n    " separator the per-fn template literals used. */
   defaultMessageHtml: string;
   /** Structural pieces that ALWAYS render regardless of a body override —
    *  emailInfoCard / emailBtn / emailFallbackLink / closing emailNote — already
@@ -467,48 +477,30 @@ interface ThemedEmailSpec {
 }
 
 /**
- * The SINGLE assembler every themed email flows through (CT7). It resolves the
- * theme's copy, builds the shared greeting + optional sign-off, swaps in a
- * per-type body override when present, then wraps the assembled card body in the
- * one shared wrapTemplate (palette / fonts / footer). Bespoke precedence: a
- * non-blank `theme.emailTemplates[type]` becomes the WHOLE body region (heading +
- * greeting + message + extras + sign-off) but still sits INSIDE the shared
- * wrapper — so bespoke bodies inherit the brand palette, fonts, and footer rather
- * than shipping as a standalone document. A blank/whitespace override is absent.
+ * The SINGLE assembler every themed email flows through. It builds the shared
+ * greeting + the email's default prose + optional sign-off, then renders the card
+ * body either INTO the theme's bespoke email shell (custom/Premium themes — the
+ * assembled body replaces the shell's BODY_MARKER, so it inherits the bespoke
+ * chrome) or INTO the in-code default chrome (wrapTemplate). Either way the body
+ * content is deterministic, so an action email never loses its button to
+ * free-form HTML.
  *
- * Byte-preservation: under DEFAULT_EMAIL_THEME the assembled pieces join to the
- * exact "\n    "-separated body the old per-fn template literals produced
- * (greeting = "Hi {{candidate.name}}," → "Hi Sam,"; empty sign-off → nothing).
+ * Byte-preservation: under DEFAULT_EMAIL_THEME (no shell) the assembled pieces
+ * join to the exact "\n    "-separated body the old per-fn template literals
+ * produced (greeting = "Hi {{candidate.name}}," → "Hi Sam,"; empty sign-off →
+ * nothing), wrapped by the unchanged default chrome.
  */
 function renderThemedEmail(spec: ThemedEmailSpec): string {
-  const { type, theme, data } = spec;
+  const { theme, data } = spec;
   const { wrapTemplate, emailHeading, emailP, emailNote } = makeEmailKit(theme);
 
-  // Bespoke override: the operator-authored HTML fills only the body region of
-  // the shared wrapper (not the whole document).
-  const bespoke = theme.emailTemplates?.[type];
-  if (typeof bespoke === "string" && bespoke.trim()) {
-    return wrapTemplate(replaceEmailSlots(bespoke, data));
-  }
-
-  const copy = theme.emailCopy ?? DEFAULT_EMAIL_COPY;
+  const copy = DEFAULT_EMAIL_COPY;
 
   // Shared greeting (default "Hi {{candidate.name}}," → "Hi Sam,").
   const greeting = emailP(replaceEmailSlots(copy.shared.greeting, data));
 
-  // Per-type body override replaces ONLY the prose message; blank lines split it
-  // into paragraphs, each slot-substituted and wrapped in emailP. Absent/blank →
-  // the email's own default prose.
-  const override = copy.perType[type]?.body;
-  const message =
-    typeof override === "string" && override.trim()
-      ? override
-          .split(/\n[ \t]*\n/)
-          .map((para) => para.trim())
-          .filter((para) => para.length > 0)
-          .map((para) => emailP(replaceEmailSlots(para, data)))
-          .join("\n    ")
-      : spec.defaultMessageHtml;
+  // The email's default prose message.
+  const message = spec.defaultMessageHtml;
 
   // Optional shared sign-off: rendered only when non-blank (default empty →
   // nothing, preserving every template's tailored close).
@@ -525,8 +517,19 @@ function renderThemedEmail(spec: ThemedEmailSpec): string {
     spec.extrasHtml,
   ];
   if (signOff) pieces.push(signOff);
+  const innerBody = `\n    ${pieces.join("\n    ")}\n  `;
 
-  return wrapTemplate(`\n    ${pieces.join("\n    ")}\n  `);
+  // A bespoke theme supplies its own MSO-safe email shell (chrome) with a
+  // BODY_MARKER; the assembled body is injected there (the shell's own {{slots}}
+  // — e.g. {{client.name}} in a header — resolve against the same data). Else the
+  // in-code default chrome wraps the body.
+  if (theme.emailShell && theme.emailShell.trim()) {
+    return replaceEmailSlots(theme.emailShell, data).replace(
+      BODY_MARKER,
+      innerBody
+    );
+  }
+  return wrapTemplate(innerBody);
 }
 
 /**
@@ -537,13 +540,10 @@ function renderThemedEmail(spec: ThemedEmailSpec): string {
  * a role title is byte-identical to today's inline "… — ${roleTitle}".
  */
 export function resolveEmailSubject(
-  theme: EmailTheme,
   type: EmailTemplateType,
   data: EmailSlotData
 ): string {
-  const copy = theme.emailCopy ?? DEFAULT_EMAIL_COPY;
-  const template =
-    copy.perType[type]?.subject ?? DEFAULT_EMAIL_COPY.perType[type]!.subject!;
+  const template = DEFAULT_EMAIL_COPY.perType[type]!.subject!;
   return substitutePlainSlots(template, data);
 }
 

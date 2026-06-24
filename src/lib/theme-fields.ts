@@ -8,12 +8,7 @@
 // palette-key list and validation the server enforces — one contract, no drift.
 
 import { validateHtmlTemplate } from "@/lib/slots";
-import {
-  EMAIL_TEMPLATE_TYPES,
-  type EmailTemplateMap,
-  isEmailTemplateType,
-  validateEmailTemplate,
-} from "@/lib/email-slots";
+import { validateEmailShell } from "@/lib/email-shell";
 import {
   isLogoBackground,
   isLogoPosition,
@@ -26,14 +21,6 @@ import {
   DEFAULT_DISPLAY_FONT_KEY,
   DEFAULT_BODY_FONT_KEY,
 } from "@/lib/theme-fonts";
-import {
-  normaliseLandingCopy,
-  normaliseEmailCopy,
-  DEFAULT_LANDING_COPY,
-  DEFAULT_EMAIL_COPY,
-  type LandingCopy,
-  type EmailCopy,
-} from "@/lib/theme-copy";
 
 // The 11 palette tokens that make up an EmailTheme.palette (see EmailTheme in
 // theme.ts). Order is the canonical authoring order used by the builder.
@@ -66,8 +53,6 @@ export const STARTER_THEME_DRAFT = {
   font_body_key: DEFAULT_BODY_FONT_KEY,
   font_display: resolveDisplayFont(DEFAULT_DISPLAY_FONT_KEY).stack,
   font_sans: resolveBodyFont(DEFAULT_BODY_FONT_KEY).stack,
-  landing_copy: DEFAULT_LANDING_COPY,
-  email_copy: DEFAULT_EMAIL_COPY,
 } as const;
 
 export const THEME_SCOPES = ["gallery", "custom"] as const;
@@ -107,45 +92,34 @@ export function normaliseThemePalette(
   return { ok: true, palette };
 }
 
+const THEME_PALETTE_KEY_SET = new Set<string>(THEME_PALETTE_KEYS);
+
 /**
- * Validate + normalise the bespoke per-template email map (CT6). Accepts a
- * sparse object keyed by EmailTemplateType; each non-blank value must pass the
- * per-type email contract (validateEmailTemplate). Blank/absent entries are
- * dropped. Returns the normalised map (or null when empty), or the first error.
+ * Validate + normalise a PARTIAL palette-override map: a subset of the 11 tokens
+ * the operator pinned by hand over the seed-derived palette. Every present key
+ * must be a known palette token and every value a valid hex colour; an empty
+ * object (or null) means "no overrides — pure derivation".
+ *
+ * Returns the normalised partial map, or the first offending key (`badKey`) /
+ * `null` for a non-object so the caller can return a precise 400.
  */
-export function normaliseEmailTemplates(
+export function normalisePaletteOverrides(
   input: unknown
 ):
-  | { ok: true; templates: EmailTemplateMap | null }
-  | { ok: false; message: string } {
-  if (input == null) return { ok: true, templates: null };
-  if (typeof input !== "object") {
-    return { ok: false, message: "email_templates must be an object or null" };
-  }
+  | { ok: true; overrides: Partial<Record<ThemePaletteKey, string>> }
+  | { ok: false; badKey: string | null } {
+  if (input == null) return { ok: true, overrides: {} };
+  if (typeof input !== "object") return { ok: false, badKey: null };
   const source = input as Record<string, unknown>;
-  const out: EmailTemplateMap = {};
-  for (const [key, value] of Object.entries(source)) {
-    if (!isEmailTemplateType(key)) {
-      return {
-        ok: false,
-        message: `Unknown email template "${key}". Allowed: ${EMAIL_TEMPLATE_TYPES.join(", ")}`,
-      };
-    }
-    if (value == null) continue;
-    if (typeof value !== "string") {
-      return { ok: false, message: `email_templates.${key} must be a string` };
-    }
-    if (!value.trim()) continue; // blank → no override for this type
-    const check = validateEmailTemplate(key, value);
-    if (!check.ok) {
-      return { ok: false, message: `${key}: ${check.errors.join("; ")}` };
-    }
-    out[key] = value;
+  const overrides: Partial<Record<ThemePaletteKey, string>> = {};
+  for (const key of Object.keys(source)) {
+    if (source[key] == null) continue; // an explicit null clears that override
+    if (!THEME_PALETTE_KEY_SET.has(key)) return { ok: false, badKey: key };
+    const normalised = normaliseHexColor(source[key]);
+    if (!normalised) return { ok: false, badKey: key };
+    overrides[key as ThemePaletteKey] = normalised;
   }
-  return {
-    ok: true,
-    templates: Object.keys(out).length ? out : null,
-  };
+  return { ok: true, overrides };
 }
 
 // The full set of theme columns a create/edit produces, already normalised.
@@ -161,6 +135,10 @@ export interface ThemeWriteValues {
   seed_accent: string | null;
   seed_bg: string | null;
   palette: Record<ThemePaletteKey, string>;
+  // The operator's per-token overrides merged into `palette` above (seed-based
+  // authoring only). Null on the legacy direct-palette path, where the whole
+  // palette is hand-authored and there is nothing to derive against.
+  palette_overrides: Partial<Record<ThemePaletteKey, string>> | null;
   // CT7: the chosen font-registry keys (null for legacy direct-stack authoring).
   // font_display/font_sans are the resolved CSS stacks the renderers read.
   font_display_key: string | null;
@@ -172,12 +150,8 @@ export interface ThemeWriteValues {
   logo_position: string;
   show_powered_by: boolean;
   landing_html: string | null;
-  email_templates: EmailTemplateMap | null;
-  // CT7: structured landing copy + shared/per-template email copy (null → renderer
-  // defaults). Unlike landing_html/email_templates these are NOT bespoke free-form
-  // HTML, so they are allowed on gallery themes too (the recolour-friendly layer).
-  landing_copy: LandingCopy | null;
-  email_copy: EmailCopy | null;
+  // The bespoke email shell (custom/Premium themes only; forced null for gallery).
+  email_shell: string | null;
   preview_image_url: string | null;
 }
 
@@ -209,6 +183,7 @@ export function normaliseThemeFields(input: {
   client_id?: unknown;
   seeds?: unknown;
   palette?: unknown;
+  palette_overrides?: unknown;
   font_display_key?: unknown;
   font_body_key?: unknown;
   font_display?: unknown;
@@ -218,9 +193,7 @@ export function normaliseThemeFields(input: {
   logo_position?: unknown;
   show_powered_by?: unknown;
   landing_html?: unknown;
-  email_templates?: unknown;
-  landing_copy?: unknown;
-  email_copy?: unknown;
+  email_shell?: unknown;
   preview_image_url?: unknown;
 }): ThemeFieldsResult {
   const fail = (message: string): ThemeFieldsResult => ({
@@ -244,6 +217,9 @@ export function normaliseThemeFields(input: {
   let seed_accent: string | null = null;
   let seed_bg: string | null = null;
   let palette: Record<ThemePaletteKey, string>;
+  // Per-token overrides only have meaning on the seed path (there is a derivation
+  // to override); the legacy direct-palette path leaves this null.
+  let palette_overrides: Partial<Record<ThemePaletteKey, string>> | null = null;
   if (input.seeds != null) {
     if (typeof input.seeds !== "object") {
       return fail("seeds must be an object with primary, accent and bg");
@@ -260,10 +236,25 @@ export function normaliseThemeFields(input: {
     seed_primary = p;
     seed_accent = a;
     seed_bg = b;
-    palette = derivePalette({ primary: p, accent: a, bg: b }) as Record<
+    const derived = derivePalette({ primary: p, accent: a, bg: b }) as Record<
       ThemePaletteKey,
       string
     >;
+    // Validate the operator's hand-pinned tokens and layer them over the derived
+    // map. `palette` (what renderers read) is the merged result; we persist the
+    // overrides separately so the builder can re-seed knowing WHICH tokens were
+    // pinned, and re-derive the rest live as seeds change.
+    const ov = normalisePaletteOverrides(input.palette_overrides);
+    if (!ov.ok) {
+      return fail(
+        ov.badKey
+          ? `palette_overrides.${ov.badKey} must be a known palette token with a valid hex colour`
+          : "palette_overrides must be an object of token → hex colour"
+      );
+    }
+    palette = { ...derived, ...ov.overrides };
+    palette_overrides =
+      Object.keys(ov.overrides).length > 0 ? ov.overrides : null;
   } else {
     const paletteResult = normaliseThemePalette(input.palette);
     if (!paletteResult.ok) {
@@ -328,15 +319,6 @@ export function normaliseThemeFields(input: {
     font_sans = fs;
   }
 
-  // Structured landing + email copy (CT7). Null → renderer defaults.
-  const landingCopyResult = normaliseLandingCopy(input.landing_copy);
-  if (!landingCopyResult.ok) return fail(landingCopyResult.message);
-  const landing_copy: LandingCopy | null = landingCopyResult.value;
-
-  const emailCopyResult = normaliseEmailCopy(input.email_copy);
-  if (!emailCopyResult.ok) return fail(emailCopyResult.message);
-  const email_copy: EmailCopy | null = emailCopyResult.value;
-
   // Logo surface/position reuse the brand validators; default like the brand route.
   const logo_background = input.logo_background == null ? "light" : input.logo_background;
   if (!isLogoBackground(logo_background)) {
@@ -372,11 +354,19 @@ export function normaliseThemeFields(input: {
     }
   }
 
-  // email_templates (CT6) — per-template bespoke email HTML. Validated against
-  // the per-type email contract; gallery themes are forced to null below.
-  const emailResult = normaliseEmailTemplates(input.email_templates);
-  if (!emailResult.ok) return fail(emailResult.message);
-  let email_templates: EmailTemplateMap | null = emailResult.templates;
+  // email_shell — the bespoke email wrapper (custom/Premium themes). A non-blank
+  // value must carry the BODY_MARKER; gallery themes are forced to null below.
+  let email_shell: string | null = null;
+  if (input.email_shell != null) {
+    if (typeof input.email_shell !== "string") {
+      return fail("email_shell must be a string or null");
+    }
+    if (input.email_shell.trim()) {
+      const check = validateEmailShell(input.email_shell);
+      if (!check.ok) return fail(check.errors.join("; "));
+      email_shell = input.email_shell;
+    }
+  }
 
   if (input.show_powered_by != null && typeof input.show_powered_by !== "boolean") {
     return fail("show_powered_by must be a boolean");
@@ -391,12 +381,11 @@ export function normaliseThemeFields(input: {
     org_id = null;
     client_id = null;
     show_powered_by = true;
-    // CT6: bespoke structure is custom/Premium-only. A gallery theme is the
-    // Standard "pick from the set" surface and must stay recolour-only, so the
-    // resolver can render landing_html / email_templates unconditionally knowing
-    // only custom themes ever carry them.
+    // Bespoke structure is custom/Premium-only. A gallery theme is the Standard
+    // "pick from the set" surface and stays recolour-only, so the resolver can
+    // render landing_html / email_shell knowing only custom themes carry them.
     landing_html = null;
-    email_templates = null;
+    email_shell = null;
   } else {
     org_id = trimmedOrNull(input.org_id);
     client_id = trimmedOrNull(input.client_id);
@@ -416,6 +405,7 @@ export function normaliseThemeFields(input: {
       seed_accent,
       seed_bg,
       palette,
+      palette_overrides,
       font_display_key,
       font_body_key,
       font_display,
@@ -425,9 +415,7 @@ export function normaliseThemeFields(input: {
       logo_position,
       show_powered_by,
       landing_html,
-      email_templates,
-      landing_copy,
-      email_copy,
+      email_shell,
       preview_image_url,
     },
   };

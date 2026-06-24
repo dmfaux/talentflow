@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
     // From display name changes; the verified envelope-from is retained.
     await sendCandidateEmail(
       trimmedEmail,
-      resolveEmailSubject(emailTheme, "chatAccess", {
+      resolveEmailSubject("chatAccess", {
         campaign: { role_title: candidate.role_title },
       }),
       chatAccessEmail(emailTheme, candidate.name, candidate.role_title, magicLinkUrl),

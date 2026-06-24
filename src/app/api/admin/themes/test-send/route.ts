@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     // CT7: subject is themed via the resolved theme's per-type subject override
     // (resolveEmailSubject), so the test send matches what a candidate receives;
     // kept under a [Test] prefix so it is unmistakably a self-send sample.
-    const themedSubject = resolveEmailSubject(email, "applicationReceived", {
+    const themedSubject = resolveEmailSubject("applicationReceived", {
       candidate: { name: user.first_name },
       campaign: { role_title: SAMPLE_ROLE },
       client: { name: brand.name },

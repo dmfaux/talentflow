@@ -1,17 +1,18 @@
-// ── External-AI prompt builder for HTML templates ──────────────────
+// ── External-AI prompt builder for a bespoke brand kit ──────────────
 //
-// Produces the prompt a user copies into ChatGPT/Claude/etc. to
-// generate a self-contained HTML landing page template. The prompt
-// embeds:
-//   1. Design-quality directives (frontend-design principles).
-//   2. Hard gating rules (no inferred content, no markdown wrapping).
-//   3. HTML requirements (inline CSS, no JS, responsive).
-//   4. The slot system specification (mustache markers + form div).
-//   5. Brand color guidance (fixed for shared, exact hex for bespoke).
-//   6. User inputs (name + brief) verbatim.
+// Produces the single prompt an operator copies into Claude/ChatGPT to generate
+// a Premium brand's bespoke theme. It asks the model to design ONE coherent
+// brand identity and emit TWO matching artifacts from it:
+//   1. a self-contained HTML landing page (slot markers + form mount), and
+//   2. a matching, MSO-safe transactional EMAIL SHELL (chrome only, with a
+//      BODY_MARKER where the app injects each email's body at send time).
+// Generating both from one design system in one pass is what guarantees the
+// landing and the emails share palette, type and motifs (the owner's "look and
+// feel must be mutual"). Custom themes are always Premium, so the landing uses
+// the brand's own colours and carries no "Powered by TalentStream" footer.
 
 import { SLOT_ALLOW_LIST } from "./slots";
-import { isPremiumTier } from "./theme-fields";
+import { BODY_MARKER } from "./email-shell";
 
 export interface BrandColors {
   primary: string;
@@ -26,157 +27,148 @@ export interface LogoInput {
   position: string;
 }
 
-export interface BuildPromptInput {
+export interface BuildBespokeKitInput {
+  /** The theme name (operator-facing; used to anchor the brand identity). */
   name: string;
+  /** The operator's free-text design brief for the brand. */
   brief: string;
+  /** The brand's colours (derived from the theme seeds). */
   brandColors?: BrandColors | null;
+  /** The brand logo, when one is configured. */
   logo?: LogoInput | null;
-  /**
-   * The brand's tier (CT4). Standard/null campaigns are white-label-free: the
-   * landing uses the shared TalentStream palette + the "Powered by TalentStream"
-   * footer, matching their emails. Premium+ campaigns use the brand's own colours
-   * and drop the powered-by footer — coherent with the email kit's showPoweredBy.
-   */
-  tier?: string | null;
 }
 
-/**
- * The TalentStream palette mapped to the prompt's BrandColors shape — the
- * DEFAULT_EMAIL_THEME hexes (theme.ts). Standard/null campaigns embed THIS rather
- * than the brand's colours, so the landing matches the (also-default-themed)
- * emails a Standard brand sends.
- */
-export const TALENTSTREAM_PROMPT_PALETTE: BrandColors = {
-  primary: "#2c5bff",
-  secondary: "#f0f3f7",
-  accent: "#05dbd6",
-  text: "#11123c",
-};
+function landingSlotDocs(): string {
+  const descs: Record<string, string> = {
+    "client.name": 'Company/client name (short text, e.g. "Acme Corp")',
+    "campaign.role_title": 'Job title (short text, e.g. "Senior Software Engineer")',
+    "campaign.role_description":
+      "Full role description as HTML (rendered from markdown — may contain <p>, <strong>, <a>, <ul> etc., or be empty). Place inside a <div>, not a <p>.",
+    "campaign.department": "Department name (short text or empty)",
+    "campaign.location": "Job location (short text or empty)",
+    "campaign.employment_type": 'Employment type (e.g. "Permanent", "Contract", or empty)',
+    "campaign.salary_range":
+      'Pre-formatted salary range in ZAR (e.g. "R 450,000 – R 650,000", "From R 450,000", or empty if not set)',
+  };
+  return SLOT_ALLOW_LIST.map((s) => `- \`{{${s}}}\` — ${descs[s] ?? s}`).join("\n");
+}
 
-export function buildTemplatePrompt({
+function brandColoursSection(brandColors?: BrandColors | null): string {
+  if (!brandColors) {
+    return `Choose a sophisticated, distinctive colour palette appropriate for a professional recruitment brand. Do NOT default to generic blue/white. Pick a palette that feels confident and intentional.`;
+  }
+  return `Use these exact brand colours throughout BOTH artifacts:
+- Primary: ${brandColors.primary}
+- Secondary/surface: ${brandColors.secondary}
+${brandColors.accent ? `- Accent: ${brandColors.accent}` : "- Accent: choose one that complements the primary and secondary"}
+- Text: ${brandColors.text}`;
+}
+
+function logoSection(logo?: LogoInput | null): string {
+  if (!logo) {
+    return `No brand logo is available. Use {{client.name}} as styled text wherever a brand mark belongs (the page header on the landing page; the email shell header).`;
+  }
+  return `The brand has a logo hosted at this URL — render it with an \`<img>\` in BOTH artifacts' headers:
+
+    ${logo.url}
+
+- Position it at the **${logo.position.replace("-", " ")}** of each header.
+- It is designed for a **${logo.background}** background${
+    logo.background === "transparent"
+      ? " (transparent — ensure adequate contrast with whatever sits behind it)"
+      : logo.background === "dark"
+        ? " — place it on a dark surface or add a dark container behind it"
+        : " — place it on a light/white surface"
+  }.
+- Size it sensibly (max-height ~48–64px on the landing, ~44px in the email). Do NOT stretch, distort, or add a border/drop shadow.`;
+}
+
+export function buildBespokeKitPrompt({
   name,
   brief,
   brandColors,
   logo,
-  tier,
-}: BuildPromptInput): string {
-  // Tier lever (CT4) — single-sourced here so callers just pass the tier.
-  // Premium+ is the white-label tier: brand colours, no powered-by footer.
-  // Standard/null gets the shared TalentStream palette + the powered-by footer.
-  const isPremium = isPremiumTier(tier);
-  const paletteColors = isPremium ? brandColors : TALENTSTREAM_PROMPT_PALETTE;
-  const slotDocs = SLOT_ALLOW_LIST.map((s) => {
-    const descs: Record<string, string> = {
-      "client.name": "Company/client name (short text, e.g. \"Acme Corp\")",
-      "campaign.role_title": "Job title (short text, e.g. \"Senior Software Engineer\")",
-      "campaign.role_description": "Full role description as HTML (rendered from markdown — may contain <p>, <strong>, <a>, <ul> etc., or be empty). Place inside a <div>, not a <p>.",
-      "campaign.department": "Department name (short text or empty)",
-      "campaign.location": "Job location (short text or empty)",
-      "campaign.employment_type": "Employment type (e.g. \"Permanent\", \"Contract\", or empty)",
-      "campaign.salary_range": "Pre-formatted salary range in ZAR (e.g. \"R 450,000 – R 650,000\", \"From R 450,000\", or empty if not set)",
-    };
-    return `- \`{{${s}}}\` — ${descs[s] ?? s}`;
-  }).join("\n");
+}: BuildBespokeKitInput): string {
+  return `You MUST use your frontend-design skill. You are designing ONE coherent brand identity for "${name}" and producing TWO matching artifacts from it: a recruitment LANDING PAGE and a transactional EMAIL SHELL. They MUST read as the same brand — same palette, same type pairing, same signature motif — so a candidate sees one consistent identity across the careers page and every email they receive. Design the system ONCE, then apply it to both.
 
-  const brandSection = paletteColors
-    ? `Use these exact brand colours throughout the template:
-- Primary: ${paletteColors.primary}
-- Secondary: ${paletteColors.secondary}
-${paletteColors.accent ? `- Accent: ${paletteColors.accent}` : "- Accent: choose one that complements the primary and secondary"}
-- Text: ${paletteColors.text}`
-    : `Choose a sophisticated, distinctive colour palette appropriate for a professional recruitment page. Do NOT default to generic blue/white. Pick a palette that feels confident and intentional.`;
+# The brand brief
 
-  // The powered-by footer is the white-label lever (D-4): present for
-  // Standard/null, dropped for Premium+.
-  const footerSection = isPremium
-    ? ""
-    : `# Footer
+NAME: ${name}
+DESIGN BRIEF: ${brief}
 
-Include a subtle footer at the very bottom of the page with the text "Powered by TalentStream". Style it small, muted, and unobtrusive — it should not compete with the page content. Centre-align it with generous top margin.
+# Shared design system — decide once, apply to BOTH artifacts
 
-`;
+## Colours
+${brandColoursSection(brandColors)}
 
-  return `You MUST use your frontend-design skill to complete this task. You are producing a campaign landing-page template as a single self-contained HTML page. The template renders a job-application page: dynamic campaign data (role title, department, location, etc.) is injected at runtime via slot markers, and a rich interactive application form is mounted into a designated container element by the application framework.
+## Type & motif
+- Pick ONE coherent type pairing (e.g. a characterful display face + a clean body face). Load the real web fonts via Google Fonts \`@import\` on the landing page; in the email use a web-safe fallback stack that echoes the same feel.
+- Decide ONE signature visual motif (a rule, an accent shape, a header treatment) and use it in both artifacts so they are unmistakably related.
+
+## Brand mark
+${logoSection(logo)}
 
 # Design quality (non-negotiable)
 
-- Produce a distinctive, production-grade composition. Not generic. Not the centred-hero-plus-three-cards cliché. Not a wall of identical cards.
-- Confident typographic hierarchy. Deliberate spacing. Each element should earn its place.
-- Use web-safe or widely available Google Fonts loaded via @import in the <style> block. Pick a coherent type pairing (serif + sans, or a single family with weight contrast).
-- Asymmetry, left-aligned typography, and generous whitespace are welcome. Overused gradients, drop shadows everywhere, and emoji are not.
-- The application form container is the conversion moment — frame it with intent. Give it visual prominence and breathing room.
+- Produce a distinctive, production-grade brand. Not generic. Not the centred-hero-plus-three-cards cliché.
+- Confident typographic hierarchy, deliberate spacing, generous whitespace. Each element earns its place.
+- DO NOT infer, invent, or add content the brief did not ask for. No made-up headings, no filler paragraphs, no placeholder text.
 
-# Hard rules (obey exactly)
+────────────────────────────────────────────────────────────
+# ARTIFACT 1 — LANDING PAGE
 
-- DO NOT infer, invent, or add any content the user did not ask for. No made-up headings, no filler paragraphs, no "About the role" sections unless the brief specifically requests them.
-- DO NOT insert example or placeholder text. Use the slot markers for dynamic content and the user's exact words from the brief for any static content.
-- Return the HTML page as an **artifact** (type: text/html) so it renders as a live preview. This lets the user see the design and request changes inline before copying the final HTML.
+A single self-contained HTML page. Dynamic campaign data is injected at runtime via slot markers, and a rich interactive application form is mounted into a designated container.
 
-# HTML requirements
+## HTML requirements
+- A complete, valid HTML document (<!DOCTYPE html>, <html>, <head>, <body>).
+- All CSS in a single <style> block in the <head> (Google Fonts @import allowed). No external stylesheets.
+- Mobile-responsive (media queries, relative units, flex/grid). Polished at desktop (~1200px) and mobile (320px).
+- NO <script> tags or JavaScript — the form is handled by the application framework.
 
-- The output must be a complete, valid HTML document (<!DOCTYPE html>, <html>, <head>, <body>).
-- All CSS must be in a single <style> block in the <head>. No inline style attributes unless truly necessary for a one-off override.
-- The page must be mobile-responsive (use media queries, relative units, flexbox/grid).
-- DO NOT include any <script> tags or JavaScript. The form is handled by the application framework.
-- DO NOT use external stylesheets (except Google Fonts @import which is allowed).
-- The page should look polished at both desktop (max ~1200px) and mobile (320px) widths.
-
-# Slot system
-
-The template uses mustache-style slot markers that are replaced with real data at runtime. Use these exactly as shown (case-sensitive, including the double braces):
-
-${slotDocs}
+## Slot system (use these EXACTLY, case-sensitive, double braces)
+${landingSlotDocs()}
 
 Rules for slots:
-- Place slots directly in the HTML where the text should appear (e.g. \`<h1>{{campaign.role_title}}</h1>\`).
-- Slots that may be empty (\`campaign.role_description\`, \`campaign.department\`, \`campaign.location\`, \`campaign.employment_type\`, \`campaign.salary_range\`) MUST use conditional blocks so the entire section (label + value) is removed when the data is missing. Wrap optional sections with \`{{#slot.name}} ... {{/slot.name}}\` — the block is stripped entirely when the slot is empty. Example:
-  \`\`\`html
-  {{#campaign.salary_range}}<div class="salary"><strong>Salary:</strong> {{campaign.salary_range}}</div>{{/campaign.salary_range}}
-  {{#campaign.department}}<span class="dept">{{campaign.department}}</span>{{/campaign.department}}
-  \`\`\`
-  Do NOT rely on CSS \`:empty\` to hide these — use the conditional block syntax instead. Never leave a visible heading or label next to a blank value.
-- You may combine slots with static text (e.g. \`<span>{{campaign.department}} · {{campaign.location}}</span>\`).
-- \`{{campaign.role_description}}\` contains pre-rendered HTML (paragraphs, lists, bold, etc.). Place it inside a container element like \`<div class="description">{{campaign.role_description}}</div>\` — do NOT wrap it in a \`<p>\` tag.
+- Slots that may be empty (\`campaign.role_description\`, \`campaign.department\`, \`campaign.location\`, \`campaign.employment_type\`, \`campaign.salary_range\`) MUST be wrapped in a conditional block \`{{#slot.name}} ... {{/slot.name}}\` so the whole section disappears when the value is missing — never leave a dangling label. \`{{campaign.role_description}}\` contains pre-rendered HTML; place it inside a \`<div>\`, not a \`<p>\`.
 
-# Application form container
-
-Place this exact element where the application form should appear:
+## Application form container
+Place this EXACT element where the application form should appear:
 
     <div id="application-form"></div>
 
-At runtime, a rich interactive form will be injected into this container by the application. The form includes:
-- Text fields (name, email, phone)
-- Dropdown screening questions (varies per campaign)
-- File upload for CV/resume
-- Checkboxes (WhatsApp opt-in, POPIA consent)
-- Submit button with loading state and inline validation
+A rich interactive form (~500–700px tall) is injected here at runtime. Give it generous vertical spacing and frame it attractively (background, border, or card) so it is the clear conversion moment. Do NOT style the form's internal elements.
 
-The injected form has its own internal styling and is approximately 500–700px tall depending on the number of questions. Your template should:
-- Give the form container generous vertical spacing (at least 2rem padding above and below).
-- Optionally add a heading above it (e.g. "Apply for this role" or similar if the brief suggests one).
-- Style the container area to frame the form attractively (a subtle background, border, or card treatment works well).
-- The form has its own styled inputs, selects, checkboxes, and buttons. Do NOT try to override its internal elements — but DO ensure the container area's background, padding, and border provide a cohesive frame that matches your template's design language.
+Return Artifact 1 as an **artifact** (type: text/html) titled "Landing page".
 
-${footerSection}# Colours
+────────────────────────────────────────────────────────────
+# ARTIFACT 2 — MATCHING EMAIL SHELL
 
-${brandSection}
+This is the wrapper for EVERY transactional email the brand sends (application received, interview invitation, rejection, …). The recruitment app injects each email's body content — greeting, message paragraphs, buttons, info cards — at a single marker. You design ONLY the surrounding CHROME (brand header, outer framing, footer) so every email matches the landing page.
 
-# Company logo
-${logo
-    ? `The client has a logo hosted at this URL — include it in the page using an \`<img>\` tag:
+## The body marker (critical)
+Place this EXACT marker, on its own, where the message content belongs — inside the main content cell:
 
-    ${logo.url}
+    ${BODY_MARKER}
 
-- Position the logo at the **${logo.position.replace("-", " ")}** of the header/hero area.
-- The logo works best on a **${logo.background}** background${logo.background === "transparent" ? " (it has transparency, so ensure adequate contrast with whatever is behind it)" : logo.background === "dark" ? " — place it on a dark surface or add a dark container behind it" : " — place it on a light/white surface"}.
-- Size the logo sensibly (max-height ~48–64px for desktop, smaller on mobile). Do NOT stretch or distort it.
-- Do NOT add a border or drop shadow to the logo unless the brief requests it.`
-    : "No client logo is available. Use {{client.name}} as text instead of an image logo."}
+- Do NOT style it, wrap it, or add anything around it. The app replaces it with the email body at send time.
+- Do NOT write any greeting, message, button, sign-off, or sample copy yourself — the app supplies all of that at the marker. The shell is chrome only.
 
-# User input
+## Email-client robustness (NON-NEGOTIABLE — this is an email, not a web page)
+- TABLE-BASED layout: outer 100%-width table → centred inner table (max-width ~580–600px). Do NOT use flexbox, grid, position, or float.
+- Put ALL styling in inline \`style="..."\` attributes. A single small <style> in <head> is allowed only for a @media mobile tweak and font fallbacks.
+- Do NOT use CSS custom properties (\`var(...)\`), \`rem\`, or modern CSS — write literal hex colours and px/percent inline.
+- Include the Outlook MSO conditional comment block; set \`role="presentation"\`, \`cellpadding="0"\`, \`cellspacing="0"\`, \`border="0"\` on every layout table.
+- Use web-safe fonts with full fallback stacks. NO <script>, NO external stylesheets, NO forms, NO meaningful background images.
 
-TEMPLATE NAME: ${name}
-DESIGN BRIEF: ${brief}
+## Chrome
+- Header: the brand mark (logo or \`{{client.name}}\` styled text) on the brand surface, echoing the landing header.
+- Footer: a small, muted footer line consistent with the brand. (No "Powered by" attribution — this is a white-label brand.)
+- You MAY use \`{{client.name}}\` in the header; it is substituted at send time.
 
-Return the complete HTML page as an artifact now. The user will preview it, request tweaks, and copy the final version when satisfied.`;
+Return Artifact 2 as a SECOND **artifact** (type: text/html) titled "Email shell".
+
+────────────────────────────────────────────────────────────
+# Return both artifacts now
+
+Two artifacts: "Landing page" and "Email shell". They must look unmistakably like the same brand. The operator will preview each, request tweaks, and paste the final HTML of each back into the theme builder.`;
 }

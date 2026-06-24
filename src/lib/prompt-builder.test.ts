@@ -1,17 +1,14 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildTemplatePrompt,
-  TALENTSTREAM_PROMPT_PALETTE,
-  type BrandColors,
-} from "@/lib/prompt-builder";
+import { buildBespokeKitPrompt, type BrandColors } from "@/lib/prompt-builder";
+import { BODY_MARKER } from "@/lib/email-shell";
 
-// ── CT4 · AI-prompt tier-flip ────────────────────────────────────────
+// ── Bespoke brand-kit prompt ─────────────────────────────────────────
 //
-// buildTemplatePrompt is the single source of the white-label lever: Standard/
-// null campaigns embed the shared TalentStream palette + the "Powered by
-// TalentStream" footer (matching their default-themed emails); Premium+ embed
-// the brand's own colours and drop the powered-by footer. Asserted on substrings
-// of the returned prompt so the contract is provable without an LLM.
+// buildBespokeKitPrompt produces the ONE prompt an operator runs to generate a
+// Premium brand's bespoke theme: a landing page AND a matching email shell, from
+// one design system, so their look and feel is guaranteed mutual. Asserted on
+// substrings so the contract is provable without an LLM. Custom themes are always
+// Premium, so the brand's own colours are always embedded.
 
 const BRAND: BrandColors = {
   primary: "#006341",
@@ -20,55 +17,54 @@ const BRAND: BrandColors = {
   text: "#222222",
 };
 
-const POWERED_BY = "Powered by TalentStream";
-
-function prompt(tier: string | null | undefined, brandColors: BrandColors | null = BRAND) {
-  return buildTemplatePrompt({
-    name: "Senior Engineer",
-    brief: "A clean recruitment landing page.",
+function prompt(brandColors: BrandColors | null = BRAND, logo = null) {
+  return buildBespokeKitPrompt({
+    name: "Northwind — Bespoke",
+    brief: "A confident, editorial recruitment brand.",
     brandColors,
-    logo: null,
-    tier,
+    logo,
   });
 }
 
-describe("buildTemplatePrompt — tier flip", () => {
-  it("Standard embeds the TalentStream palette and keeps the powered-by footer", () => {
-    const out = prompt("standard");
-    expect(out).toContain(TALENTSTREAM_PROMPT_PALETTE.primary);
-    expect(out).toContain(TALENTSTREAM_PROMPT_PALETTE.accent!);
-    expect(out).toContain(POWERED_BY);
-    // The brand's own colours are ignored on Standard.
-    expect(out).not.toContain(BRAND.primary);
+describe("buildBespokeKitPrompt", () => {
+  it("embeds the theme name and the operator's brief verbatim", () => {
+    const out = prompt();
+    expect(out).toContain("Northwind — Bespoke");
+    expect(out).toContain("A confident, editorial recruitment brand.");
   });
 
-  it("Premium embeds the brand colours and drops the powered-by footer", () => {
-    const out = prompt("premium");
+  it("asks for BOTH artifacts: the landing form mount and the email body marker", () => {
+    const out = prompt();
+    // Landing page: the exact application-form mount the renderer resolves.
+    expect(out).toContain('<div id="application-form"></div>');
+    // Email shell: the exact marker the app injects each email's body at.
+    expect(out).toContain(BODY_MARKER);
+    // It is one prompt producing two artifacts.
+    expect(out.toLowerCase()).toContain("landing page");
+    expect(out.toLowerCase()).toContain("email shell");
+  });
+
+  it("embeds the brand's exact colours (always Premium / white-label)", () => {
+    const out = prompt();
     expect(out).toContain(BRAND.primary);
     expect(out).toContain(BRAND.accent!);
-    expect(out).not.toContain(POWERED_BY);
-    // The TalentStream palette is not forced on a Premium brand.
-    expect(out).not.toContain(TALENTSTREAM_PROMPT_PALETTE.primary);
+    // No "Powered by TalentStream" attribution on a white-label brand kit.
+    expect(out).not.toContain("Powered by TalentStream");
   });
 
-  it("Enterprise is treated as Premium+ (brand colours, no powered-by)", () => {
-    const out = prompt("enterprise");
-    expect(out).toContain(BRAND.primary);
-    expect(out).not.toContain(POWERED_BY);
-  });
-
-  it("null / unknown tier is treated as Standard", () => {
-    for (const tier of [null, undefined, "", "free", "bogus"]) {
-      const out = prompt(tier);
-      expect(out, `tier=${String(tier)}`).toContain(TALENTSTREAM_PROMPT_PALETTE.primary);
-      expect(out, `tier=${String(tier)}`).toContain(POWERED_BY);
-      expect(out, `tier=${String(tier)}`).not.toContain(BRAND.primary);
-    }
-  });
-
-  it("Premium with no brand colours falls back to the choose-a-palette guidance", () => {
-    const out = prompt("premium", null);
+  it("falls back to choose-a-palette guidance when no brand colours are given", () => {
+    const out = prompt(null);
     expect(out).toContain("Choose a sophisticated, distinctive colour palette");
-    expect(out).not.toContain(POWERED_BY);
+  });
+
+  it("references the logo URL when a logo is supplied, else says there is none", () => {
+    const withLogo = buildBespokeKitPrompt({
+      name: "Northwind",
+      brief: "x",
+      brandColors: BRAND,
+      logo: { url: "https://cdn.test/logo.png", background: "light", position: "top-left" },
+    });
+    expect(withLogo).toContain("https://cdn.test/logo.png");
+    expect(prompt(BRAND, null)).toContain("No brand logo is available");
   });
 });

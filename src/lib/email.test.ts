@@ -14,7 +14,6 @@ import {
   resolveEmailSubject,
 } from "@/lib/email";
 import { DEFAULT_EMAIL_THEME, type EmailTheme } from "@/lib/theme";
-import { DEFAULT_EMAIL_COPY, type EmailCopy } from "@/lib/theme-copy";
 
 // ── Byte-identical regression guard (CT1) ────────────────────────────
 //
@@ -154,157 +153,45 @@ describe("email templates — branded theme render", () => {
   });
 });
 
-// ── CT7: shared copy (greeting / sign-off), per-type body, subjects ───
+// ── Subjects ─────────────────────────────────────────────────────────
 //
-// These lock the new emailCopy-driven behaviour added on top of the byte-
-// identical default render: the shared greeting is configurable, the sign-off is
-// opt-in, a per-type body override swaps ONLY the prose (structural pieces like
-// the action button survive), and subjects resolve plain-text from the theme.
-
-/** Build a theme from the default with a patched emailCopy. */
-function themeWithCopy(copy: EmailCopy): EmailTheme {
-  return { ...DEFAULT_EMAIL_THEME, emailCopy: copy };
-}
-
-describe("email copy — shared greeting", () => {
-  it("renders a custom shared greeting in place of the default", () => {
-    const copy: EmailCopy = {
-      ...DEFAULT_EMAIL_COPY,
-      shared: {
-        ...DEFAULT_EMAIL_COPY.shared,
-        greeting: "Dear {{candidate.name}}!",
-      },
-    };
-    const html = applicationReceivedEmail(themeWithCopy(copy), NAME, ROLE, CLIENT);
-    expect(html).toContain(`Dear ${NAME}!`);
-    // The default greeting is gone.
-    expect(html).not.toContain("Hi Thabo Mokoena,");
-    // Slot values are still HTML-escaped on the way in (the name has none here,
-    // but the company name does and must remain escaped elsewhere).
-  });
-
-  it("renders the default greeting byte-equivalently for the default copy", () => {
-    const html = applicationReceivedEmail(DEFAULT_EMAIL_THEME, NAME, ROLE, CLIENT);
-    expect(html).toContain(`Hi ${NAME},`);
-  });
-});
-
-describe("email copy — shared sign-off", () => {
-  it("renders a non-empty sign-off as a closing note", () => {
-    const copy: EmailCopy = {
-      ...DEFAULT_EMAIL_COPY,
-      shared: { ...DEFAULT_EMAIL_COPY.shared, signOff: "— The {{client.name}} team" },
-    };
-    const html = applicationReceivedEmail(themeWithCopy(copy), NAME, ROLE, CLIENT);
-    // Slot-substituted + escaped (Açme & Co <Pty> Ltd → &amp; / &lt; / &gt;).
-    expect(html).toContain("— The Açme &amp; Co &lt;Pty&gt; Ltd team");
-  });
-
-  it("renders NOTHING for an empty sign-off (the default)", () => {
-    const html = applicationReceivedEmail(DEFAULT_EMAIL_THEME, NAME, ROLE, CLIENT);
-    // The default sign-off is "" → no extra closing note beyond the email's own.
-    // The only emailNote in this template is its own "You'll hear from us…" line.
-    const noteCount = (html.match(/padding-top:18px;border-top/g) ?? []).length;
-    expect(noteCount).toBe(1);
-  });
-});
-
-describe("email copy — per-type body override", () => {
-  it("replaces the prose for chatInvitation but keeps the action button", () => {
-    const copy: EmailCopy = {
-      ...DEFAULT_EMAIL_COPY,
-      perType: {
-        ...DEFAULT_EMAIL_COPY.perType,
-        chatInvitation: {
-          ...DEFAULT_EMAIL_COPY.perType.chatInvitation,
-          body: "Quick chat for {{campaign.role_title}}?\n\nIt takes two minutes.",
-        },
-      },
-    };
-    const html = chatInvitationEmail(
-      themeWithCopy(copy),
-      NAME,
-      ROLE,
-      CLIENT,
-      CHAT_URL
-    );
-    // The override prose appears, split into two paragraphs on the blank line.
-    expect(html).toContain(`Quick chat for ${ROLE}?`);
-    expect(html).toContain("It takes two minutes.");
-    // The DEFAULT prose is gone.
-    expect(html).not.toContain("follow-up questions about your application");
-    // The structural pieces ALWAYS render — the action button + link survive.
-    expect(html).toContain(">Start chat&ensp;");
-    expect(html).toContain(`<a href="${CHAT_URL}"`);
-    expect(html).toContain(CHAT_URL);
-  });
-
-  it("uses the default prose when the override body is blank", () => {
-    const copy: EmailCopy = {
-      ...DEFAULT_EMAIL_COPY,
-      perType: {
-        ...DEFAULT_EMAIL_COPY.perType,
-        gatingPassed: { ...DEFAULT_EMAIL_COPY.perType.gatingPassed, body: "   \n  " },
-      },
-    };
-    const html = gatingPassedEmail(themeWithCopy(copy), NAME, ROLE, CLIENT);
-    expect(html).toContain("you meet the initial requirements");
-  });
-});
+// Subjects resolve plain-text (no HTML escaping) from the in-code
+// DEFAULT_EMAIL_COPY. The per-theme copy-override axis was removed.
 
 describe("resolveEmailSubject", () => {
   it("defaults match today's inline subjects byte-for-byte", () => {
     const data = { campaign: { role_title: ROLE } };
-    expect(resolveEmailSubject(DEFAULT_EMAIL_THEME, "applicationReceived", data)).toBe(
+    expect(resolveEmailSubject("applicationReceived", data)).toBe(
       `Application received — ${ROLE}`
     );
-    expect(resolveEmailSubject(DEFAULT_EMAIL_THEME, "gatingPassed", data)).toBe(
-      `Good news — ${ROLE}`
-    );
-    expect(resolveEmailSubject(DEFAULT_EMAIL_THEME, "gatingFailed", data)).toBe(
+    expect(resolveEmailSubject("gatingPassed", data)).toBe(`Good news — ${ROLE}`);
+    expect(resolveEmailSubject("gatingFailed", data)).toBe(
       `Application update — ${ROLE}`
     );
-    expect(resolveEmailSubject(DEFAULT_EMAIL_THEME, "rejection", data)).toBe(
+    expect(resolveEmailSubject("rejection", data)).toBe(
       `Application update — ${ROLE}`
     );
-    expect(resolveEmailSubject(DEFAULT_EMAIL_THEME, "chatInvitation", data)).toBe(
+    expect(resolveEmailSubject("chatInvitation", data)).toBe(
       `We'd like to chat about your application — ${ROLE}`
     );
-    expect(resolveEmailSubject(DEFAULT_EMAIL_THEME, "chatAccess", data)).toBe(
+    expect(resolveEmailSubject("chatAccess", data)).toBe(
       `Verify your identity — ${ROLE}`
     );
-    expect(resolveEmailSubject(DEFAULT_EMAIL_THEME, "chatNudge", data)).toBe(
-      `Reminder — ${ROLE}`
-    );
-    expect(resolveEmailSubject(DEFAULT_EMAIL_THEME, "noResponse", data)).toBe(
+    expect(resolveEmailSubject("chatNudge", data)).toBe(`Reminder — ${ROLE}`);
+    expect(resolveEmailSubject("noResponse", data)).toBe(
       `Application update — ${ROLE}`
     );
-    expect(
-      resolveEmailSubject(DEFAULT_EMAIL_THEME, "rejectionConfirmation", data)
-    ).toBe(`Application update — ${ROLE}`);
+    expect(resolveEmailSubject("rejectionConfirmation", data)).toBe(
+      `Application update — ${ROLE}`
+    );
   });
 
   it("does NOT HTML-escape the subject (plain text)", () => {
     // A role title with HTML-significant chars stays raw in the subject line.
     const data = { campaign: { role_title: "Dev & Ops <lead>" } };
-    expect(resolveEmailSubject(DEFAULT_EMAIL_THEME, "applicationReceived", data)).toBe(
+    expect(resolveEmailSubject("applicationReceived", data)).toBe(
       "Application received — Dev & Ops <lead>"
     );
-  });
-
-  it("honours a per-type subject override", () => {
-    const copy: EmailCopy = {
-      ...DEFAULT_EMAIL_COPY,
-      perType: {
-        ...DEFAULT_EMAIL_COPY.perType,
-        applicationReceived: { subject: "We got it — {{campaign.role_title}}" },
-      },
-    };
-    expect(
-      resolveEmailSubject(themeWithCopy(copy), "applicationReceived", {
-        campaign: { role_title: ROLE },
-      })
-    ).toBe(`We got it — ${ROLE}`);
   });
 });
 

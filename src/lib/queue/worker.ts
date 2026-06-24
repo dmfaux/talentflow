@@ -111,7 +111,7 @@ async function handleEmailJob(
     case "application_received":
       await sendCandidateEmail(
         email,
-        resolveEmailSubject(emailTheme, "applicationReceived", {
+        resolveEmailSubject("applicationReceived", {
           campaign: { role_title: roleTitle },
         }),
         applicationReceivedEmail(emailTheme, name, roleTitle, clientName),
@@ -122,7 +122,7 @@ async function handleEmailJob(
     case "gating_passed":
       await sendCandidateEmail(
         email,
-        resolveEmailSubject(emailTheme, "gatingPassed", {
+        resolveEmailSubject("gatingPassed", {
           campaign: { role_title: roleTitle },
         }),
         gatingPassedEmail(emailTheme, name, roleTitle, clientName),
@@ -133,7 +133,7 @@ async function handleEmailJob(
     case "gating_failed":
       await sendCandidateEmail(
         email,
-        resolveEmailSubject(emailTheme, "gatingFailed", {
+        resolveEmailSubject("gatingFailed", {
           campaign: { role_title: roleTitle },
         }),
         gatingFailedEmail(emailTheme, name, roleTitle, clientName),
@@ -144,7 +144,7 @@ async function handleEmailJob(
     case "rejected":
       await sendCandidateEmail(
         email,
-        resolveEmailSubject(emailTheme, "rejection", {
+        resolveEmailSubject("rejection", {
           campaign: { role_title: roleTitle },
         }),
         rejectionEmail(emailTheme, name, roleTitle, clientName),
@@ -164,7 +164,7 @@ async function handleEmailJob(
       }
       await sendCandidateEmail(
         email,
-        resolveEmailSubject(emailTheme, "rejectionConfirmation", {
+        resolveEmailSubject("rejectionConfirmation", {
           campaign: { role_title: roleTitle },
         }),
         rejectionConfirmationEmail(emailTheme, name, roleTitle, clientName, payload.adminReason),
@@ -183,7 +183,7 @@ async function handleEmailJob(
       }
       await sendCandidateEmail(
         email,
-        resolveEmailSubject(emailTheme, "noResponse", {
+        resolveEmailSubject("noResponse", {
           campaign: { role_title: roleTitle },
         }),
         noResponseEmail(emailTheme, name, roleTitle, clientName),
@@ -246,7 +246,7 @@ async function handleChatInvitation(
     (await resolveCampaignTheme(candidate.campaign)).email;
   await sendCandidateEmail(
     candidate.email,
-    resolveEmailSubject(emailTheme, "chatInvitation", {
+    resolveEmailSubject("chatInvitation", {
       campaign: { role_title: candidate.campaign.role_title },
     }),
     chatInvitationEmail(
@@ -366,7 +366,7 @@ async function handleChatNudge(
     (await resolveCampaignTheme(candidate.campaign)).email;
   await sendCandidateEmail(
     candidate.email,
-    resolveEmailSubject(emailTheme, "chatNudge", {
+    resolveEmailSubject("chatNudge", {
       campaign: { role_title: candidate.campaign.role_title },
     }),
     chatNudgeEmail(

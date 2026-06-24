@@ -2,11 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   isPremiumTier,
   isThemeScope,
-  normaliseEmailTemplates,
+  normalisePaletteOverrides,
   normaliseThemeFields,
   normaliseThemePalette,
   THEME_PALETTE_KEYS,
 } from "@/lib/theme-fields";
+import { derivePalette } from "@/lib/theme-colors";
+import { BODY_MARKER } from "@/lib/email-shell";
+
+// The 3 seeds the override tests derive against.
+const SEEDS = { primary: "#2c5bff", accent: "#05dbd6", bg: "#f0f3f7" };
 
 // A complete, valid palette (all 11 tokens) for building test inputs.
 const PALETTE = Object.fromEntries(
@@ -15,14 +20,8 @@ const PALETTE = Object.fromEntries(
 
 const VALID_LANDING = `<html><body><h1>Apply</h1><div id="application-form"></div></body></html>`;
 
-// A valid per-type bespoke email map (CT6). applicationReceived takes no
-// action.url; chatInvitation requires {{action.url}} or it fails validation.
-const VALID_EMAIL_TEMPLATES = {
-  applicationReceived:
-    "<p>Hi {{candidate.name}}, your application for {{campaign.role_title}} at {{client.name}} is received.</p>",
-  chatInvitation:
-    '<p>Hi {{candidate.name}}</p><a href="{{action.url}}">Start the chat</a>',
-};
+// A valid bespoke email shell: brand chrome carrying the body marker.
+const VALID_EMAIL_SHELL = `<!DOCTYPE html><html><body><table role="presentation"><tr><td>${BODY_MARKER}</td></tr></table></body></html>`;
 
 function base(overrides: Record<string, unknown> = {}) {
   return {
@@ -65,6 +64,50 @@ describe("normaliseThemePalette", () => {
 
   it("rejects a non-object", () => {
     expect(normaliseThemePalette(null)).toEqual({ ok: false, key: null });
+  });
+});
+
+describe("normalisePaletteOverrides", () => {
+  it("accepts a partial map of known tokens, normalising each hex", () => {
+    const r = normalisePaletteOverrides({ ink: "#123ABC", bg: "FFF" });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.overrides).toEqual({ ink: "#123abc", bg: "#fff" });
+  });
+
+  it("treats null / undefined as no overrides", () => {
+    expect(normalisePaletteOverrides(null)).toEqual({ ok: true, overrides: {} });
+    expect(normalisePaletteOverrides(undefined)).toEqual({
+      ok: true,
+      overrides: {},
+    });
+  });
+
+  it("skips an explicit null value (that token clears back to derived)", () => {
+    expect(normalisePaletteOverrides({ ink: null, bg: "#fff" })).toEqual({
+      ok: true,
+      overrides: { bg: "#fff" },
+    });
+  });
+
+  it("rejects an unknown token key", () => {
+    expect(normalisePaletteOverrides({ notAToken: "#fff" })).toEqual({
+      ok: false,
+      badKey: "notAToken",
+    });
+  });
+
+  it("rejects an invalid hex on a known key", () => {
+    expect(normalisePaletteOverrides({ ink: "nope" })).toEqual({
+      ok: false,
+      badKey: "ink",
+    });
+  });
+
+  it("rejects a non-object", () => {
+    expect(normalisePaletteOverrides("nope")).toEqual({
+      ok: false,
+      badKey: null,
+    });
   });
 });
 
@@ -203,102 +246,80 @@ describe("normaliseThemeFields — landing_html (CT4 mount contract)", () => {
   });
 });
 
-describe("normaliseEmailTemplates (CT6)", () => {
-  it("accepts a valid per-type map and returns it", () => {
-    const result = normaliseEmailTemplates(VALID_EMAIL_TEMPLATES);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.templates).toEqual(VALID_EMAIL_TEMPLATES);
-    }
-  });
-
-  it("returns null for an absent / blank-only map (no overrides)", () => {
-    expect(normaliseEmailTemplates(null)).toEqual({ ok: true, templates: null });
-    // Blank string values are dropped, leaving no overrides → null.
-    expect(normaliseEmailTemplates({ rejection: "   " })).toEqual({
-      ok: true,
-      templates: null,
-    });
-  });
-
-  it("rejects an unknown template key", () => {
-    const result = normaliseEmailTemplates({ welcomeAboard: "<p>hi</p>" });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.message).toMatch(/welcomeAboard/);
-  });
-
-  it("propagates a validateEmailTemplate failure (missing required action.url)", () => {
-    // chatInvitation requires {{action.url}}; omitting it must surface the error.
-    const result = normaliseEmailTemplates({
-      chatInvitation: "<p>Hi {{candidate.name}}, please continue.</p>",
-    });
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.message).toMatch(/chatInvitation/);
-      expect(result.message).toMatch(/action\.url/);
-    }
-  });
-});
-
-describe("normaliseThemeFields — email_templates (CT6)", () => {
-  it("forces email_templates to null for a gallery theme even when supplied", () => {
+describe("normaliseThemeFields — email_shell", () => {
+  it("accepts an email_shell carrying the body marker (custom scope)", () => {
     const result = normaliseThemeFields(
-      base({ scope: "gallery", email_templates: VALID_EMAIL_TEMPLATES })
+      base({
+        scope: "custom",
+        org_id: "org-1",
+        client_id: "brand-1",
+        email_shell: VALID_EMAIL_SHELL,
+      })
     );
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.values.email_templates).toBeNull();
-      expect(result.values.landing_html).toBeNull();
-    }
+    if (result.ok) expect(result.values.email_shell).toBe(VALID_EMAIL_SHELL);
   });
 
-  it("forces landing_html AND email_templates to null for gallery (custom-only structure)", () => {
+  it("rejects a non-blank email_shell missing the body marker", () => {
+    const result = normaliseThemeFields(
+      base({
+        scope: "custom",
+        org_id: "org-1",
+        client_id: "brand-1",
+        email_shell: "<html><body>no marker here</body></html>",
+      })
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain(BODY_MARKER);
+  });
+
+  it("treats a blank email_shell as 'no shell' (null, not an error)", () => {
+    const result = normaliseThemeFields(
+      base({
+        scope: "custom",
+        org_id: "org-1",
+        client_id: "brand-1",
+        email_shell: "   ",
+      })
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.values.email_shell).toBeNull();
+  });
+
+  it("forces landing_html AND email_shell to null for a gallery theme (custom-only structure)", () => {
     const result = normaliseThemeFields(
       base({
         scope: "gallery",
         landing_html: VALID_LANDING,
-        email_templates: VALID_EMAIL_TEMPLATES,
+        email_shell: VALID_EMAIL_SHELL,
       })
     );
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.values.landing_html).toBeNull();
-      expect(result.values.email_templates).toBeNull();
+      expect(result.values.email_shell).toBeNull();
     }
   });
 
-  it("preserves landing_html + email_templates for a complete custom theme", () => {
+  it("preserves landing_html + email_shell for a complete custom theme", () => {
     const result = normaliseThemeFields(
       base({
         scope: "custom",
         org_id: "org-1",
         client_id: "brand-1",
         landing_html: VALID_LANDING,
-        email_templates: VALID_EMAIL_TEMPLATES,
+        email_shell: VALID_EMAIL_SHELL,
       })
     );
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.values.landing_html).toBe(VALID_LANDING);
-      expect(result.values.email_templates).toEqual(VALID_EMAIL_TEMPLATES);
+      expect(result.values.email_shell).toBe(VALID_EMAIL_SHELL);
     }
-  });
-
-  it("rejects a custom theme whose email_templates fail the per-type contract", () => {
-    const result = normaliseThemeFields(
-      base({
-        scope: "custom",
-        org_id: "org-1",
-        client_id: "brand-1",
-        email_templates: { chatNudge: "<p>{{candidate.name}}, please reply.</p>" },
-      })
-    );
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.message).toMatch(/action\.url/);
   });
 });
 
-describe("normaliseThemeFields — CT7 seeds, font keys, copy", () => {
+describe("normaliseThemeFields — seeds + font keys", () => {
   it("derives the 11-token palette from 3 seeds", () => {
     const result = normaliseThemeFields(
       base({
@@ -349,28 +370,66 @@ describe("normaliseThemeFields — CT7 seeds, font keys, copy", () => {
     expect(badBody.ok).toBe(false);
     if (!badBody.ok) expect(badBody.message).toMatch(/font_body_key/);
   });
+});
 
-  it("accepts gallery themes carrying landing_copy and email_copy", () => {
+describe("normaliseThemeFields — palette overrides", () => {
+  it("layers overrides over the derived palette and stores the partial map", () => {
+    const derived = derivePalette(SEEDS);
     const result = normaliseThemeFields(
       base({
-        landing_copy: { headline: "Join {{client.name}}", highlights: ["a", "b"] },
-        email_copy: { shared: { greeting: "Hi {{candidate.name}}," } },
+        palette: undefined,
+        seeds: SEEDS,
+        palette_overrides: { ink: "#101010", bg: "#fafafa" },
       })
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.values.landing_copy?.headline).toBe("Join {{client.name}}");
-    expect(result.values.email_copy?.shared.greeting).toBe("Hi {{candidate.name}},");
+    // Pinned tokens win; every other token keeps its derived value.
+    expect(result.values.palette.ink).toBe("#101010");
+    expect(result.values.palette.bg).toBe("#fafafa");
+    expect(result.values.palette.card).toBe(derived.card);
+    expect(result.values.palette_overrides).toEqual({
+      ink: "#101010",
+      bg: "#fafafa",
+    });
   });
 
-  it("rejects landing_copy / email_copy that reference disallowed slots", () => {
-    expect(
-      normaliseThemeFields(base({ landing_copy: { headline: "Hi {{candidate.name}}" } })).ok
-    ).toBe(false);
-    expect(
-      normaliseThemeFields(
-        base({ email_copy: { perType: { applicationReceived: { body: "{{action.url}}" } } } })
-      ).ok
-    ).toBe(false);
+  it("stores null overrides for an empty map (pure derivation)", () => {
+    const derived = derivePalette(SEEDS);
+    const result = normaliseThemeFields(
+      base({ palette: undefined, seeds: SEEDS, palette_overrides: {} })
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.values.palette_overrides).toBeNull();
+    expect(result.values.palette).toEqual({ ...derived });
+  });
+
+  it("rejects an unknown override token with a precise 400", () => {
+    const result = normaliseThemeFields(
+      base({ palette: undefined, seeds: SEEDS, palette_overrides: { bogus: "#fff" } })
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toMatch(/palette_overrides\.bogus/);
+  });
+
+  it("rejects an invalid override hex with a precise 400", () => {
+    const result = normaliseThemeFields(
+      base({ palette: undefined, seeds: SEEDS, palette_overrides: { ink: "nope" } })
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toMatch(/palette_overrides\.ink/);
+  });
+
+  it("ignores overrides on the legacy direct-palette path (no seeds)", () => {
+    const result = normaliseThemeFields(
+      base({ palette: PALETTE, palette_overrides: { ink: "#101010" } })
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // Off the seed path there is nothing to derive against, so overrides are
+    // dropped to null and the hand-authored palette is used verbatim.
+    expect(result.values.palette_overrides).toBeNull();
+    expect(result.values.palette.ink).toBe(PALETTE.ink);
   });
 });

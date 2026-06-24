@@ -146,33 +146,42 @@ function ThemesConsole() {
     load();
   }, [load]);
 
-  // Resolve the brand's configured colours + logo for the bespoke AI prompts.
-  // The brand's own theme rows expose its logo (logo_url/background/position);
-  // the brand's palette colours aren't on the operator theme feed, so the builder
-  // falls back to the theme palette when brandColors stays null (see ThemeBuilder).
-  // No synchronous reset on brand change: the kit is tagged with its clientId and
-  // a non-matching tag is ignored at read time, so the effect only setState()s
-  // asynchronously once the fetch resolves.
+  // Resolve the brand's CORPORATE colours + logo for the bespoke AI prompt and
+  // the new-theme seed defaults. Loaded from the brand record
+  // (clients.brand_*_color + branding_logo_url) so a Premium brand's bespoke
+  // landing + matching email use its REAL corporate identity; the builder falls
+  // back to the theme's own seed palette only when the brand has no defined
+  // colours. Tagged with its clientId so a stale kit from a previous brand is
+  // ignored at read time (the effect only setState()s once the fetch resolves).
   useEffect(() => {
     if (!clientId) return;
     const controller = new AbortController();
-    fetch(`/api/operator/themes?client_id=${clientId}`, {
-      signal: controller.signal,
-    })
-      .then((r) => (r.ok ? r.json() : { data: [] }))
+    fetch(`/api/operator/clients/${clientId}`, { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : { data: null }))
       .then((res) => {
-        const rows: OperatorThemeRow[] = res.data ?? [];
-        const branded = rows.find(
-          (t) => t.scope === "custom" && t.client_id === clientId && t.logo_url
-        );
-        const logo: LogoInput | null = branded?.logo_url
+        const b = res.data;
+        if (!b) {
+          setBrandKit({ clientId, brandColors: null, logo: null });
+          return;
+        }
+        // Only claim brand colours when a primary is actually set, so a brand
+        // with no defined palette falls through to the theme's own seeds.
+        const brandColors: BrandColors | null = b.brand_primary_color
           ? {
-              url: branded.logo_url,
-              background: branded.logo_background || "light",
-              position: branded.logo_position || "top-left",
+              primary: b.brand_primary_color,
+              secondary: b.brand_secondary_color ?? "#f0f3f7",
+              accent: b.brand_accent_color,
+              text: b.brand_text_color ?? "#11123c",
             }
           : null;
-        setBrandKit({ clientId, brandColors: null, logo });
+        const logo: LogoInput | null = b.branding_logo_url
+          ? {
+              url: b.branding_logo_url,
+              background: b.logo_background || "light",
+              position: b.logo_position || "top-left",
+            }
+          : null;
+        setBrandKit({ clientId, brandColors, logo });
       })
       .catch((err) => {
         if (err.name !== "AbortError") setBrandKit(null);
@@ -200,8 +209,19 @@ function ThemesConsole() {
         orgId={builder.orgId}
         clientId={builder.clientId}
         brandName={builder.brandName}
-        brandColors={builder.brandColors}
-        logo={builder.logo}
+        // Pass the brand kit LIVE (not the click-time snapshot) so a builder
+        // opened before the async fetch resolved still receives the brand's
+        // corporate colours once they load; the builder re-seeds reactively.
+        brandColors={
+          builder.scope === "custom"
+            ? activeKit?.brandColors ?? builder.brandColors ?? null
+            : null
+        }
+        logo={
+          builder.scope === "custom"
+            ? activeKit?.logo ?? builder.logo ?? null
+            : null
+        }
         initial={builder.initial}
         onDone={closeBuilder}
       />
