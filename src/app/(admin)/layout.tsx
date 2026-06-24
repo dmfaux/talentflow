@@ -13,6 +13,7 @@ import { Logo } from "@/components/brand/logo";
 // provider — a server component cannot invoke a client-module export.
 import { canManageOrg, type TenantBrand } from "@/components/admin/tenant-shared";
 import { getBrandMemberships, requireTenant } from "@/lib/tenant";
+import { getActAsClaim } from "@/lib/auth";
 import { db } from "@/db";
 import { clients, organizations } from "@/db/schema";
 
@@ -36,6 +37,12 @@ export default async function AdminLayout({
         where: eq(organizations.id, ctx.actingOrgId),
         columns: { name: true, status: true },
       })
+    : null;
+
+  // The act-as time-box end (epoch ms) for the banner countdown. Read from the
+  // same signed claim the seam already validated; the cookie is the enforcer.
+  const actExpiresAt = ctx.actingOrgId
+    ? (await getActAsClaim())?.expiresAt ?? null
     : null;
 
   // Resolve the client-visible tenant context (S8): org name + the caller's
@@ -84,7 +91,11 @@ export default async function AdminLayout({
     <TenantProvider value={tenantValue}>
       <div className="min-h-screen bg-canvas font-sans">
         {actingOrg && (
-          <ActingAsBanner orgName={actingOrg.name} status={actingOrg.status} />
+          <ActingAsBanner
+            orgName={actingOrg.name}
+            status={actingOrg.status}
+            expiresAt={actExpiresAt}
+          />
         )}
         {/* Top bar */}
         <header className="sticky top-[var(--dev-banner-h,0px)] z-30 flex h-14 items-center justify-between border-b border-rule bg-paper/85 px-6 backdrop-blur-md">

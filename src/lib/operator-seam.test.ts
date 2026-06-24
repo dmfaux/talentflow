@@ -72,9 +72,23 @@ describe("getActAsClaim", () => {
     expect(await getActAsClaim()).toBeNull();
   });
 
-  it("valid act_as claim → returns operatorUserId + actingOrgId", async () => {
+  it("valid act_as claim → returns operatorUserId + actingOrgId (no exp → expiresAt null)", async () => {
     setCookie({ kind: "act_as", operatorUserId: "op-1", actingOrgId: "org-x" });
-    expect(await getActAsClaim()).toEqual({ operatorUserId: "op-1", actingOrgId: "org-x" });
+    expect(await getActAsClaim()).toEqual({
+      operatorUserId: "op-1",
+      actingOrgId: "org-x",
+      expiresAt: null,
+    });
+  });
+
+  it("exp claim → surfaced as expiresAt in epoch ms (banner countdown source)", async () => {
+    const exp = 1_700_000_000; // seconds
+    setCookie({ kind: "act_as", operatorUserId: "op-1", actingOrgId: "org-x", exp });
+    expect(await getActAsClaim()).toEqual({
+      operatorUserId: "op-1",
+      actingOrgId: "org-x",
+      expiresAt: exp * 1000,
+    });
   });
 
   it("wrong kind → null", async () => {

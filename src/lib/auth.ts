@@ -100,6 +100,9 @@ export async function signActAsToken(
 export async function getActAsClaim(): Promise<{
   operatorUserId: string;
   actingOrgId: string;
+  /** Absolute time-box end (epoch ms), from the JWT `exp`. Drives the banner
+   *  countdown; the server stays the real enforcer (an expired token → null). */
+  expiresAt: number | null;
 } | null> {
   const token = (await cookies()).get(ACT_AS_COOKIE)?.value;
   if (!token) return null;
@@ -108,7 +111,11 @@ export async function getActAsClaim(): Promise<{
   if (typeof p.operatorUserId !== "string" || typeof p.actingOrgId !== "string") {
     return null;
   }
-  return { operatorUserId: p.operatorUserId, actingOrgId: p.actingOrgId };
+  return {
+    operatorUserId: p.operatorUserId,
+    actingOrgId: p.actingOrgId,
+    expiresAt: typeof p.exp === "number" ? p.exp * 1000 : null,
+  };
 }
 
 // ── Active-brand cookie (S8) ─────────────────────────────────────────

@@ -1,3 +1,4 @@
+import { ActExpiryCountdown } from "./act-expiry-countdown";
 import { ExitActAsButton } from "./exit-act-as-button";
 
 // The global "Acting as <Org> — Exit" banner, rendered in the (admin) shell
@@ -21,9 +22,12 @@ const TREATMENT: Record<
 export function ActingAsBanner({
   orgName,
   status,
+  expiresAt,
 }: {
   orgName: string;
   status: string;
+  /** Epoch ms when the act-as time-box ends; omitted/null hides the countdown. */
+  expiresAt?: number | null;
 }) {
   const t = TREATMENT[status] ?? TREATMENT.active;
   const isActive = status === "active";
@@ -44,6 +48,7 @@ export function ActingAsBanner({
         Acting as <strong className="font-semibold">{orgName}</strong>
         {!isActive && <span className="font-semibold"> ({status})</span>}
       </span>
+      {expiresAt != null && <ActExpiryCountdown expiresAt={expiresAt} pill={t.pill} />}
       <ExitActAsButton tone={t.tone} />
     </div>
   );
