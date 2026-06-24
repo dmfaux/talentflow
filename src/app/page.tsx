@@ -191,7 +191,7 @@ function Hero() {
               <span className="load-reveal load-2 block">not a <span className="font-display-italic text-vermillion">headache</span>.</span>
             </h1>
             <p className="load-fade load-3 mt-8 sm:mt-10 text-ink-soft text-[1.05rem] sm:text-[1.18rem] leading-[1.55] max-w-[560px]">
-              We run AI-powered hiring campaigns for South African corporates. You give us the role spec. We deliver a rated, qualified shortlist — in two weeks, for a flat fee.
+              TalentStream is where South African corporates run AI-powered hiring. Launch a branded campaign, let the AI screen and score every applicant, and get a ranked shortlist — paying only for the analysis you run, never a slice of anyone&rsquo;s salary.
             </p>
             <div className="load-fade load-4 mt-10 sm:mt-12 flex flex-wrap items-center gap-3 sm:gap-4">
               <a
@@ -364,7 +364,7 @@ function Problem() {
               Modern hiring needs a new <span className="font-display-italic text-vermillion">co-pilot</span>.
             </h2>
             <p className="animate-on-scroll stagger-2 mt-6 text-ink-muted text-[0.98rem] leading-[1.6] max-w-md">
-              Three realities every hiring team faces — and how our SaaS-plus-service model lightens the load.
+              Three realities every hiring team faces — and how an AI co-pilot in your corner lightens the load.
             </p>
           </div>
 
@@ -411,26 +411,26 @@ function Method() {
   const steps = [
     {
       num: "01",
-      title: "You brief us",
-      body: "Share your role spec, must-haves, and dealbreakers. We configure a branded campaign in under an hour.",
+      title: "Launch a campaign",
+      body: "Add your role spec, must-haves, and dealbreakers. Your branded campaign page goes live in minutes.",
       tag: "Day 0",
     },
     {
       num: "02",
       title: "Candidates apply",
-      body: "We drive qualified applicants to a branded landing page with smart screening that filters mismatches instantly.",
+      body: "Applicants come in through your branded page, where smart screening filters out mismatches instantly.",
       tag: "Days 1–7",
     },
     {
       num: "03",
       title: "AI evaluates",
-      body: "Every CV parsed and scored by AI against your specific criteria. Ambiguities resolved via WhatsApp follow-ups.",
+      body: "Every CV is parsed and scored against your criteria — at the intelligence tier you choose. Gaps are resolved with in-app candidate chat.",
       tag: "Days 7–12",
     },
     {
       num: "04",
       title: "You get a shortlist",
-      body: "A rated, ranked shortlist with confidence scores and plain-language rationale for every candidate.",
+      body: "A rated, ranked shortlist with confidence scores and a plain-language rationale for every candidate.",
       tag: "Day 14",
     },
   ];
@@ -482,8 +482,8 @@ function Benefits() {
 
   const items = [
     {
-      title: "Fraction of the cost",
-      body: "A flat campaign fee — not a percentage of salary. Predictable cost, regardless of the role.",
+      title: "Pay for what you screen",
+      body: "A monthly plan with an included allowance, then usage-based pricing — never a percentage of salary. Spend caps mean no surprises.",
       tone: "cobalt" as const,
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -502,8 +502,8 @@ function Benefits() {
       ),
     },
     {
-      title: "AI-scored, human-reviewed",
-      body: "Every candidate assessed by AI and quality-checked by our team. No black-box decisions.",
+      title: "AI scores, you decide",
+      body: "AI does the heavy lifting; the call is always yours. Review, override, or shortlist every candidate — no decisions made behind your back.",
       tone: "moss" as const,
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -657,43 +657,43 @@ function Pricing() {
   const tiers = [
     {
       name: "Standard",
-      price: "R25,000",
-      priceRange: "– R35,000",
-      desc: "Roles up to R500k CTC",
+      price: "R7,500",
+      priceRange: "/ month",
+      desc: "For focused, steady hiring",
       features: [
-        "Branded campaign page",
-        "3–5 gating questions",
-        "AI scoring & rationale",
-        "WhatsApp follow-ups",
-        "Up to 10 candidates shortlisted",
+        "6,000 AI credits / month",
+        "≈ 850 candidates analysed",
+        "Usage-based beyond your allowance",
+        "Spend caps, alerts & live spend view",
+        "All three intelligence tiers",
       ],
       featured: false,
     },
     {
-      name: "Senior",
-      price: "R40,000",
-      priceRange: "– R55,000",
-      desc: "Roles R500k – R800k CTC",
+      name: "Premium",
+      price: "R18,000",
+      priceRange: "/ month",
+      desc: "For high-volume, multi-team hiring",
       features: [
-        "Everything in Standard",
-        "Extended campaign duration",
-        "Deeper scoring rubric",
+        "18,000 AI credits / month",
+        "≈ 2,570 candidates analysed",
+        "10% lower usage rates",
+        "Bespoke branding & email themes",
         "Priority support",
-        "Bespoke BEE reporting",
       ],
       featured: true,
     },
     {
-      name: "Executive",
-      price: "R60,000",
-      priceRange: "– R80,000",
-      desc: "Roles above R800k CTC",
+      name: "Enterprise",
+      price: "R36,000",
+      priceRange: "/ month",
+      desc: "For organisation-wide hiring",
       features: [
-        "Everything in Senior",
-        "Dedicated campaign manager",
-        "Enhanced BEE reporting",
-        "90-day replacement guarantee",
-        "Director-level briefings",
+        "45,000 AI credits / month",
+        "≈ 6,400 candidates analysed",
+        "25% lower usage rates",
+        "Dedicated success manager",
+        "Custom caps & invoicing terms",
       ],
       featured: false,
     },
@@ -708,10 +708,10 @@ function Pricing() {
             <span className="eyebrow text-vermillion">Pricing</span>
           </div>
           <h2 className="animate-on-scroll stagger-1 font-display text-ink text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] tracking-[-0.02em] leading-[1.02]">
-            Flat fees. <span className="font-display-italic">Simple</span> pricing.
+            A floor you can <span className="font-display-italic">plan around</span>.
           </h2>
           <p className="animate-on-scroll stagger-2 mt-6 text-ink-muted text-[1rem] leading-[1.6] max-w-[520px]">
-            One campaign price, paid upfront. Ad spend passed through at cost. Predictable from brief to shortlist.
+            A monthly plan with an included allowance of AI analysis. Go beyond it and you pay only for what you use — with caps and alerts so the bill never surprises you.
           </p>
         </div>
 
@@ -784,8 +784,112 @@ function Pricing() {
           ))}
         </div>
         <p className="animate-on-scroll mt-8 font-mono text-[0.72rem] text-ink-faint text-center tracking-wide">
-          AD SPEND PASSED THROUGH AT COST · ALL PRICES EXCLUDE VAT
+          INCLUDED ALLOWANCE RENEWS MONTHLY · USAGE BILLED IN ZAR · EXCLUDES 15% VAT
         </p>
+
+        {/* Model-intelligence tiers — the signature: choose the brain per campaign */}
+        <div className="mt-24 sm:mt-28">
+          <div className="animate-on-scroll flex items-center gap-3 mb-5">
+            <span className="inline-block w-5 h-px bg-saffron" aria-hidden />
+            <span className="eyebrow text-saffron-deep">Choose the intelligence</span>
+          </div>
+          <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-end mb-12">
+            <h3 className="animate-on-scroll stagger-1 lg:col-span-7 font-display text-ink text-[1.85rem] sm:text-[2.35rem] lg:text-[2.75rem] tracking-[-0.02em] leading-[1.04]">
+              Pick the AI mind for each campaign. Pay for the <span className="font-display-italic text-saffron-deep">brilliance</span> the role deserves.
+            </h3>
+            <p className="animate-on-scroll stagger-2 lg:col-span-5 text-ink-muted text-[0.95rem] leading-[1.6]">
+              A graduate intake and an executive search don&rsquo;t need the same firepower. Pick a tier per campaign — each candidate draws credits from your monthly allowance at that tier&rsquo;s rate, and you&rsquo;re only billed once it&rsquo;s used up. Lock the ceiling to keep spend in check.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-4">
+            {/* Essential */}
+            <div className="animate-on-scroll stagger-2 relative flex flex-col rounded-2xl border border-rule bg-paper p-7 transition-all lift hover:border-ink/20">
+              <div className="flex items-center justify-between mb-5">
+                <span className="eyebrow text-moss text-[0.64rem]">Essential</span>
+                <span className="font-mono text-[0.7rem] text-ink-faint">tier 01</span>
+              </div>
+              <h4 className="font-display text-ink text-[1.3rem] leading-[1.15] tracking-[-0.01em] mb-2.5">
+                Fast &amp; efficient
+              </h4>
+              <p className="text-ink-muted text-[0.88rem] leading-[1.55] mb-6">
+                Quick, capable screening for high-volume intakes where speed wins.
+              </p>
+              <div className="mt-auto pt-5 border-t border-rule">
+                <p className="text-[0.68rem] text-ink-faint mb-1.5">Draws from your allowance</p>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="font-mono text-[1.4rem] text-ink font-medium tracking-tight">≈ 3</span>
+                  <span className="font-mono text-[0.76rem] text-ink-faint">credits / candidate</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Professional — the default */}
+            <div className="animate-on-scroll stagger-3 relative flex flex-col rounded-2xl border border-cobalt/40 bg-paper p-7 transition-all lift">
+              <div className="absolute -top-3 left-7">
+                <span className="inline-flex items-center gap-1.5 bg-cobalt text-white text-[0.62rem] font-semibold uppercase tracking-[0.12em] px-3 py-1.5 rounded-full">
+                  Default
+                </span>
+              </div>
+              <div className="flex items-center justify-between mb-5">
+                <span className="eyebrow text-cobalt text-[0.64rem]">Professional</span>
+                <span className="font-mono text-[0.7rem] text-ink-faint">tier 02</span>
+              </div>
+              <h4 className="font-display text-ink text-[1.3rem] leading-[1.15] tracking-[-0.01em] mb-2.5">
+                Balanced judgement
+              </h4>
+              <p className="text-ink-muted text-[0.88rem] leading-[1.55] mb-6">
+                The everyday workhorse — sharp reasoning at a sensible price. Set as your default.
+              </p>
+              <div className="mt-auto pt-5 border-t border-rule">
+                <p className="text-[0.68rem] text-ink-faint mb-1.5">Draws from your allowance</p>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="font-mono text-[1.4rem] text-ink font-medium tracking-tight">≈ 7</span>
+                  <span className="font-mono text-[0.76rem] text-ink-faint">credits / candidate</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Executive — flagship */}
+            <div className="animate-on-scroll stagger-4 relative flex flex-col rounded-2xl border border-ink bg-ink text-canvas p-7 transition-all lift shadow-[0_12px_48px_-12px_rgba(11,15,28,0.3)]">
+              <div
+                className="pointer-events-none absolute inset-0 rounded-2xl"
+                style={{
+                  background:
+                    "radial-gradient(ellipse 70% 60% at 85% 0%, rgba(255,200,0,0.16) 0%, transparent 60%)",
+                }}
+                aria-hidden
+              />
+              <div className="absolute -top-3 left-7">
+                <span className="inline-flex items-center gap-1.5 bg-saffron text-ink text-[0.62rem] font-semibold uppercase tracking-[0.12em] px-3 py-1.5 rounded-full">
+                  <span className="w-1 h-1 rounded-full bg-ink pulse-dot" />
+                  Flagship
+                </span>
+              </div>
+              <div className="relative flex items-center justify-between mb-5">
+                <span className="eyebrow text-saffron text-[0.64rem]">Executive</span>
+                <span className="font-mono text-[0.7rem] text-canvas/45">tier 03</span>
+              </div>
+              <h4 className="relative font-display text-canvas text-[1.3rem] leading-[1.15] tracking-[-0.01em] mb-2.5">
+                Our sharpest mind
+              </h4>
+              <p className="relative text-canvas/65 text-[0.88rem] leading-[1.55] mb-6">
+                The deepest reasoning we offer, for your most senior and highest-stakes hires. Worth every cent when the seat truly matters.
+              </p>
+              <div className="relative mt-auto pt-5 border-t border-canvas/15">
+                <p className="text-[0.68rem] text-canvas/45 mb-1.5">Draws from your allowance</p>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="font-mono text-[1.4rem] text-saffron font-medium tracking-tight">≈ 18</span>
+                  <span className="font-mono text-[0.76rem] text-canvas/45">credits / candidate</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p className="animate-on-scroll mt-7 font-mono text-[0.72rem] text-ink-faint text-center tracking-wide">
+            EACH CANDIDATE DRAWS FROM YOUR MONTHLY ALLOWANCE FIRST · BILLED ONLY BEYOND IT · CHATS ALWAYS RUN ON ESSENTIAL
+          </p>
+        </div>
       </div>
     </section>
   );
@@ -816,12 +920,12 @@ function FinalCTA() {
             <span className="eyebrow text-[0.66rem] text-ink-muted">Currently onboarding founding clients</span>
           </div>
           <h2 className="animate-on-scroll stagger-1 font-display text-ink text-[2.5rem] sm:text-[3.5rem] lg:text-[4.5rem] tracking-[-0.025em] leading-[1.0]">
-            Tell us about the role.
+            Launch your first campaign.
             <br />
-            <span className="font-display-italic text-cobalt">We&rsquo;ll do the rest.</span>
+            <span className="font-display-italic text-cobalt">See a shortlist in days.</span>
           </h2>
           <p className="animate-on-scroll stagger-2 mt-8 text-ink-muted text-[1.05rem] sm:text-[1.15rem] leading-[1.55] max-w-[520px] mx-auto">
-            We&rsquo;ll have your campaign live within 24 hours of the brief. Shortlist in your inbox, in two weeks.
+            Set up a branded campaign in minutes, let the AI handle the screening, and watch a ranked shortlist build as candidates apply.
           </p>
           <form
             onSubmit={(e) => e.preventDefault()}

@@ -42,7 +42,8 @@ export type Action =
   | "manage_brand" // clients POST/PATCH/logo (org_admin+)
   | "manage_member" // users / memberships (org_admin+)
   | "manage_org_settings" // org profile (org_admin+; tier stays operator-only)
-  | "run_popia_purge"; // tenant POPIA purge/deletion (org_admin+)
+  | "run_popia_purge" // tenant POPIA purge/deletion (org_admin+)
+  | "view_spend"; // usage & spend view + spend-alert subscription (org_admin+)
 
 const ACTION_MIN_ROLE: Record<Action, Role> = {
   view: "viewer",
@@ -53,6 +54,7 @@ const ACTION_MIN_ROLE: Record<Action, Role> = {
   manage_member: "org_admin",
   manage_org_settings: "org_admin",
   run_popia_purge: "org_admin",
+  view_spend: "org_admin",
 };
 
 /** May `role` perform `action`? Linear-rank model, faithful to the plan's

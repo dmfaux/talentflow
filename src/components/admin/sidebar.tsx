@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { label: "Brands", href: "/clients", icon: "client", orgOnly: true },
   { label: "Members", href: "/users", icon: "users", orgOnly: true },
   { label: "Settings", href: "/settings", icon: "settings", orgOnly: true },
+  { label: "Usage & Spend", href: "/usage", icon: "usage", orgOnly: true },
 ] as const;
 
 const ICONS: Record<string, React.ReactNode> = {
@@ -54,6 +55,14 @@ const ICONS: Record<string, React.ReactNode> = {
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="8" cy="8" r="2" />
       <path d="M8 2v2M8 12v2M2 8h2M12 8h2M3.75 3.75l1.5 1.5M10.75 10.75l1.5 1.5M3.75 12.25l1.5-1.5M10.75 5.25l1.5-1.5" />
+    </svg>
+  ),
+  usage: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 14h12" />
+      <rect x="3" y="8" width="2.5" height="4" rx="0.5" />
+      <rect x="6.75" y="5" width="2.5" height="7" rx="0.5" />
+      <rect x="10.5" y="2.5" width="2.5" height="9.5" rx="0.5" />
     </svg>
   ),
 };

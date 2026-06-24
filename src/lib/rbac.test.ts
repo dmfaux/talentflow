@@ -29,16 +29,17 @@ const ACTIONS: Action[] = [
   "manage_member",
   "manage_org_settings",
   "run_popia_purge",
+  "view_spend",
 ];
 
 // rows = role, columns = action (same order as ACTIONS above).
 const EXPECTED: Record<Role, boolean[]> = {
-  //                view  cand   camp  publish brand  member settings purge
-  owner: /*    */ [true, true, true, true, true, true, true, true],
-  org_admin: /**/ [true, true, true, true, true, true, true, true],
-  brand_admin: /**/ [true, true, true, true, false, false, false, false],
-  recruiter: /**/ [true, true, true, true, false, false, false, false],
-  viewer: /*   */ [true, false, false, false, false, false, false, false],
+  //                view  cand   camp  publish brand  member settings purge  spend
+  owner: /*    */ [true, true, true, true, true, true, true, true, true],
+  org_admin: /**/ [true, true, true, true, true, true, true, true, true],
+  brand_admin: /**/ [true, true, true, true, false, false, false, false, false],
+  recruiter: /**/ [true, true, true, true, false, false, false, false, false],
+  viewer: /*   */ [true, false, false, false, false, false, false, false, false],
 };
 
 describe("can — the full Action × Role matrix", () => {
