@@ -93,9 +93,18 @@ function useInView<T extends HTMLElement>() {
    NAVIGATION
    ───────────────────────────────────────────── */
 
+const NAV_LINKS = [
+  { href: "#method", label: "Method" },
+  { href: "#why", label: "Why us" },
+  { href: "#pricing", label: "Pricing" },
+] as const;
+
 function Navbar() {
   const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const progress = useScrollProgress();
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
@@ -104,11 +113,62 @@ function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Mobile-menu lifecycle: while open, lock body scroll, trap focus inside the
+  // panel, close on Escape / resize-to-desktop, and return focus to the toggle
+  // on close. Skipped entirely while closed (the panel is also `inert` then, so
+  // its links stay out of the tab order and the a11y tree).
+  useEffect(() => {
+    if (!menuOpen) return;
+    const panel = panelRef.current;
+    const focusables = () =>
+      panel
+        ? Array.from(
+            panel.querySelectorAll<HTMLElement>('a[href],button:not([disabled])')
+          )
+        : [];
+
+    focusables()[0]?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        return;
+      }
+      if (e.key === "Tab") {
+        const f = focusables();
+        if (!f.length) return;
+        const first = f[0];
+        const last = f[f.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    const onResize = () => {
+      if (window.innerWidth >= 768) setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onResize);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onResize);
+      document.body.style.overflow = prevOverflow;
+      toggleRef.current?.focus();
+    };
+  }, [menuOpen]);
+
   return (
     <>
       <nav
         className={`fixed top-[var(--dev-banner-h,0px)] left-0 right-0 z-50 transition-all duration-300 ${
-          scrolled
+          scrolled || menuOpen
             ? "bg-canvas/92 backdrop-blur-md border-b border-rule"
             : "bg-transparent border-b border-transparent"
         }`}
@@ -119,15 +179,15 @@ function Navbar() {
           </a>
 
           <div className="hidden md:flex items-center gap-10">
-            <a href="#method" className="text-[0.82rem] font-medium text-ink-muted hover:text-ink link-underline transition-colors">
-              Method
-            </a>
-            <a href="#why" className="text-[0.82rem] font-medium text-ink-muted hover:text-ink link-underline transition-colors">
-              Why us
-            </a>
-            <a href="#pricing" className="text-[0.82rem] font-medium text-ink-muted hover:text-ink link-underline transition-colors">
-              Pricing
-            </a>
+            {NAV_LINKS.map((l) => (
+              <a
+                key={l.href}
+                href={l.href}
+                className="text-[0.82rem] font-medium text-ink-muted hover:text-ink link-underline transition-colors"
+              >
+                {l.label}
+              </a>
+            ))}
           </div>
 
           <div className="flex items-center gap-3 sm:gap-5">
@@ -144,11 +204,90 @@ function Navbar() {
               Start a campaign
               <span className="arrow-slide">→</span>
             </a>
+            {/* Mobile toggle — 44px target, becomes an X while open */}
+            <button
+              ref={toggleRef}
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-menu"
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              className="md:hidden inline-flex h-11 w-11 -mr-2.5 items-center justify-center rounded-full text-ink transition-colors hover:bg-ink/5 cursor-pointer"
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                {menuOpen ? (
+                  <path d="M6 6l12 12M18 6L6 18" />
+                ) : (
+                  <>
+                    <path d="M3 7h18" />
+                    <path d="M3 12h18" />
+                    <path d="M3 17h18" />
+                  </>
+                )}
+              </svg>
+            </button>
           </div>
         </div>
         {/* scroll progress line */}
         <div className="absolute bottom-0 left-0 h-[2px] bg-cobalt transition-[width] duration-75" style={{ width: `${progress}%` }} />
       </nav>
+
+      {/* Mobile menu overlay — sits below the bar (z-40 < nav z-50) so the bar's
+          logo + X stay visible above it. `inert` while closed keeps its links out
+          of the tab order and the a11y tree. */}
+      <div
+        id="mobile-menu"
+        className={`md:hidden fixed inset-0 z-40 transition-opacity duration-300 ${
+          menuOpen ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        inert={!menuOpen}
+      >
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label="Close menu"
+          onClick={() => setMenuOpen(false)}
+          className="absolute inset-0 h-full w-full bg-ink/30 backdrop-blur-sm cursor-default"
+        />
+        <div
+          ref={panelRef}
+          style={{ paddingTop: "calc(var(--dev-banner-h, 0px) + 5rem)" }}
+          className={`absolute inset-x-0 top-0 bg-canvas border-b border-rule shadow-xl px-6 pb-8 transition-transform duration-300 ease-out ${
+            menuOpen ? "translate-y-0" : "-translate-y-4"
+          }`}
+        >
+          <nav className="flex flex-col" aria-label="Primary">
+            {NAV_LINKS.map((l) => (
+              <a
+                key={l.href}
+                href={l.href}
+                onClick={() => setMenuOpen(false)}
+                className="flex h-14 items-center justify-between border-b border-rule/70 text-[1.05rem] font-medium text-ink transition-colors hover:text-cobalt"
+              >
+                {l.label}
+                <span className="arrow-slide text-ink-faint" aria-hidden>→</span>
+              </a>
+            ))}
+          </nav>
+          <div className="mt-6 flex flex-col gap-3">
+            <a
+              href="#start"
+              onClick={() => setMenuOpen(false)}
+              className="arrow-parent group inline-flex h-12 items-center justify-center gap-2.5 rounded-full bg-cobalt text-white text-[0.95rem] font-medium transition-colors hover:bg-cobalt-deep"
+            >
+              Start a campaign
+              <span className="arrow-slide">→</span>
+            </a>
+            <a
+              href="/login"
+              onClick={() => setMenuOpen(false)}
+              className="inline-flex h-12 items-center justify-center rounded-full border border-ink/15 text-ink text-[0.95rem] font-medium transition-colors hover:bg-ink hover:text-canvas"
+            >
+              Log in
+            </a>
+          </div>
+        </div>
+      </div>
     </>
   );
 }
