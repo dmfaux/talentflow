@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-25",
+  "title": "Design System: TalentStream",
+  "extensions": {
+    "colorMeta": {
+      "cobalt": {
+        "role": "primary",
+        "displayName": "Cobalt Signal",
+        "canonical": "#2c5bff",
+        "tonalRamp": ["#0b1430", "#13235e", "#1a45d4", "#2c5bff", "#5d80ff", "#92a8ff", "#c6d2ff", "#e8eeff"]
+      },
+      "electric-teal": {
+        "role": "secondary",
+        "displayName": "Electric Teal",
+        "canonical": "#05dbd6",
+        "tonalRamp": ["#01302f", "#035450", "#04b0ac", "#05dbd6", "#3ae8e4", "#78f0ee", "#b6f6f5", "#d4f7f6"]
+      },
+      "midnight-indigo": {
+        "role": "neutral",
+        "displayName": "Midnight Indigo",
+        "canonical": "#11123c",
+        "tonalRamp": ["#070819", "#0c0d2b", "#11123c", "#26285e", "#3f4280", "#6e72a6", "#a7aacb", "#dadbe9"]
+      },
+      "cool-slate": {
+        "role": "neutral",
+        "displayName": "Cool Slate",
+        "canonical": "#f0f3f7",
+        "tonalRamp": ["#3a4654", "#5a6b7a", "#7e93a3", "#9fb5c4", "#c2d0dc", "#d1dce6", "#e1e7ef", "#f0f3f7"]
+      },
+      "moss": {
+        "role": "tertiary",
+        "displayName": "Moss (Success)",
+        "canonical": "#0a8a5a",
+        "tonalRamp": ["#022417", "#044428", "#066b44", "#0a8a5a", "#2bae79", "#6fcaa0", "#a8e0c6", "#d0f0de"]
+      },
+      "saffron": {
+        "role": "tertiary",
+        "displayName": "Saffron (Warning)",
+        "canonical": "#d68a0b",
+        "tonalRamp": ["#3a2400", "#6b4400", "#a86a00", "#d68a0b", "#e8a838", "#f2c474", "#f9deab", "#fff0cc"]
+      },
+      "red": {
+        "role": "tertiary",
+        "displayName": "Red (Error)",
+        "canonical": "#c02616",
+        "tonalRamp": ["#360a05", "#67150c", "#9a1d10", "#c02616", "#d9533f", "#e98778", "#f4b8ac", "#ffe0da"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface White",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#5a6b7a", "#7e93a3", "#9fb5c4", "#c2d0dc", "#d1dce6", "#e1e7ef", "#f0f3f7", "#ffffff"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Instrument Serif. Marketing & candidate-landing hero headlines only; fluid clamp permitted on brand surfaces." },
+      "headline": { "displayName": "Headline", "purpose": "Instrument Sans 600. Product page titles and section openers; fixed rem." },
+      "title": { "displayName": "Title", "purpose": "Instrument Sans 600. Card titles, panel headers, table-group labels." },
+      "body": { "displayName": "Body", "purpose": "Instrument Sans 400 with ss01/ss02. Default reading text; cap prose 65-75ch." },
+      "label": { "displayName": "Label / Eyebrow", "purpose": "Instrument Sans 600, tracked uppercase. Occasional kickers, badges, column heads - never above every section." },
+      "mono": { "displayName": "Mono", "purpose": "JetBrains Mono 500. Numerics, money, IDs, credit balances, timestamps, code." }
+    },
+    "shadows": [
+      { "name": "overlay", "value": "0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)", "purpose": "Modals, dialogs, popovers - content that has left the page plane (Tailwind shadow-xl)." },
+      { "name": "nav-active-lift", "value": "0 4px 12px -4px rgba(0,0,0,0.3)", "purpose": "The selected sidebar item on the navy frame - a quiet pressed-in cue." },
+      { "name": "subtle", "value": "0 1px 2px 0 rgba(17,18,60,0.05)", "purpose": "Sparingly, on a small set of raised cards that need more separation than a border (Tailwind shadow-sm)." }
+    ],
+    "motion": [
+      { "name": "ease-out-quart", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Signature easing - button lift, fades (fadeInUp), link underline, arrow slide, scroll reveals." },
+      { "name": "ease-mask", "value": "cubic-bezier(0.76, 0, 0.24, 1)", "purpose": "Mask/clip-path reveals (load-reveal, mask-reveal) on brand surfaces." },
+      { "name": "state-200", "value": "200ms (transition-colors)", "purpose": "Default duration for state transitions (hover/focus colour shifts) across the product UI." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" },
+      { "name": "2xl", "value": "1536px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single primary action. Solid Cobalt, tactile lift on hover.",
+      "html": "<button class=\"ds-btn-primary\">Create campaign</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; height: 36px; padding: 0 16px; border: none; border-radius: 8px; background: #2c5bff; color: #fff; font-family: 'Instrument Sans', sans-serif; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background 0.2s cubic-bezier(0.22,1,0.36,1), transform 0.4s cubic-bezier(0.22,1,0.36,1); } .ds-btn-primary:hover { background: #1a45d4; transform: translateY(-2px); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(44,91,255,0.35); } .ds-btn-primary:active { transform: translateY(0); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Low-emphasis / Cancel action. Transparent, fills with Cool Slate on hover.",
+      "html": "<button class=\"ds-btn-ghost\">Cancel</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; height: 36px; padding: 0 16px; border: none; border-radius: 8px; background: transparent; color: #2f3941; font-family: 'Instrument Sans', sans-serif; font-size: 0.78rem; font-weight: 500; cursor: pointer; transition: background 0.2s, color 0.2s; } .ds-btn-ghost:hover { background: #f0f3f7; color: #11123c; } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(44,91,255,0.25); }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Destructive confirmation only. Solid Red.",
+      "html": "<button class=\"ds-btn-danger\">Delete</button>",
+      "css": ".ds-btn-danger { display: inline-flex; align-items: center; height: 36px; padding: 0 16px; border: none; border-radius: 8px; background: #c02616; color: #fff; font-family: 'Instrument Sans', sans-serif; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: background 0.2s; } .ds-btn-danger:hover { background: rgba(192,38,22,0.9); } .ds-btn-danger:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(192,38,22,0.3); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Standard field. Faint Cool-Slate fill, hairline border, Cobalt focus ring.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Search candidates\" />",
+      "css": ".ds-input { width: 260px; padding: 8px 12px; border: 1px solid #d1dce6; border-radius: 8px; background: rgba(240,243,247,0.4); color: #11123c; font-family: 'Instrument Sans', sans-serif; font-size: 0.875rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s, background 0.2s; } .ds-input::placeholder { color: #9fb5c4; } .ds-input:focus { border-color: #2c5bff; box-shadow: 0 0 0 1px rgba(44,91,255,0.2); background: #fff; }"
+    },
+    {
+      "name": "Tier Badge",
+      "kind": "chip",
+      "refersTo": "badge-tier",
+      "description": "Soft-tint pill: tinted bg + matching deep text. Shown as the Premium variant.",
+      "html": "<span class=\"ds-badge ds-badge-premium\">PREMIUM</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; border-radius: 9999px; padding: 4px 12px; font-family: 'Instrument Sans', sans-serif; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; } .ds-badge-premium { background: #e8eeff; color: #1a45d4; }"
+    },
+    {
+      "name": "Soft-Tint Callout",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Status message pattern: tinted background + matching deep text + thin matching-hue border. Never a side-stripe. Shown as success.",
+      "html": "<div class=\"ds-callout ds-callout-success\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"#066b44\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 8.5l3 3 7-7\"/></svg><span>Candidate shortlisted and moved to review.</span></div>",
+      "css": ".ds-callout { display: flex; align-items: center; gap: 8px; border-radius: 8px; padding: 12px 16px; font-family: 'Instrument Sans', sans-serif; font-size: 0.82rem; } .ds-callout-success { background: #d0f0de; color: #066b44; border: 1px solid rgba(10,138,90,0.25); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "White surface on the Cool-Slate canvas. Flat at rest; hairline border carries separation.",
+      "html": "<div class=\"ds-card\"><h3 class=\"ds-card-title\">Senior Backend Engineer</h3><p class=\"ds-card-body\">42 applicants &middot; 6 shortlisted &middot; closes in 4 days</p></div>",
+      "css": ".ds-card { background: #fff; border: 1px solid #d1dce6; border-radius: 12px; padding: 24px; max-width: 320px; } .ds-card-title { margin: 0; font-family: 'Instrument Sans', sans-serif; font-size: 1rem; font-weight: 600; letter-spacing: -0.01em; color: #11123c; } .ds-card-body { margin: 6px 0 0; font-family: 'Instrument Sans', sans-serif; font-size: 0.875rem; line-height: 1.6; color: #5a6b7a; }"
+    },
+    {
+      "name": "Sidebar Nav Item (active)",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "Drenched navy app frame. Active item lifts faintly with an Electric-Teal dot pinned right.",
+      "html": "<div class=\"ds-nav\"><a class=\"ds-nav-item ds-nav-item-active\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"2\" y=\"2\" width=\"5\" height=\"5\" rx=\"1\"/><rect x=\"9\" y=\"2\" width=\"5\" height=\"3\" rx=\"1\"/><rect x=\"2\" y=\"9\" width=\"5\" height=\"5\" rx=\"1\"/><rect x=\"9\" y=\"7\" width=\"5\" height=\"7\" rx=\"1\"/></svg>Dashboard<span class=\"ds-nav-dot\"></span></a><a class=\"ds-nav-item\">Campaigns</a></div>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 2px; width: 208px; padding: 12px; background: #11123c; border-radius: 12px; } .ds-nav-item { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; font-family: 'Instrument Sans', sans-serif; font-size: 0.8rem; font-weight: 500; color: rgba(255,255,255,0.55); text-decoration: none; cursor: pointer; transition: background 0.2s, color 0.2s; } .ds-nav-item:hover { background: rgba(255,255,255,0.1); color: #fff; } .ds-nav-item-active { background: rgba(255,255,255,0.15); color: #fff; box-shadow: 0 4px 12px -4px rgba(0,0,0,0.3); } .ds-nav-dot { position: absolute; right: 12px; width: 4px; height: 4px; border-radius: 9999px; background: #05dbd6; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Signal Desk",
+    "overview": "TalentStream is a precision recruiting instrument laid out on a calm, cool field. The working surface is a quiet blue-grey canvas - never white, never warm - and against that calm, two saturated colours appear rarely and on purpose: Cobalt Signal for the one action that matters, Electric Teal for the one thing worth noticing. This mirrors the logo (a funnel of muted bars narrowing to a single bright signal dot) and the product's first principle: decisions, not data dumps. The personality is confident, warm, and precise - a senior recruiter who knows hiring cold but speaks plainly and treats people, not rows, as the subject. Components are tactile and confident - primary actions are solid and present, they lift on hover, arrows slide, links draw their own underline - but the restraint is in where that energy is spent, never on decoration. It rejects generic AI SaaS, legacy enterprise HR, and the cold clinical ATS.",
+    "keyCharacteristics": [
+      "Cool blue-grey canvas (#f0f3f7), never white or warm - the calm field that makes signals read.",
+      "Two rationed accents: Cobalt Signal (action/brand) + Electric Teal (the one thing to notice).",
+      "Deep Midnight Indigo ink (#11123c) and a navy app frame; depth from tone, not shadow.",
+      "Instrument Serif display against Instrument Sans body - editorial authority, humanist warmth.",
+      "Flat by default; shadow is a response to state. Tactile, lifting components.",
+      "Semantic status vocabulary (moss/saffron/red) as soft-tint callouts, never side-stripes."
+    ],
+    "rules": [
+      { "name": "The Two-Signal Rule", "body": "Only two saturated colours exist - Cobalt and Electric Teal - and together they cover well under 10% of any screen. Status hues are functional, not part of the brand palette. If a screen looks colourful, signals have stopped being signals; pull back.", "section": "colors" },
+      { "name": "The Cool-Field Rule", "body": "The body background is Cool Slate (#f0f3f7), never white and never warm-tinted. Warmth lives in the status set and the serif, not the canvas. A warm or cream background is forbidden - it breaks the instrument.", "section": "colors" },
+      { "name": "The Fixed-Scale Rule", "body": "Inside the product app, type sizes are fixed rem, not fluid. clamp() headings belong on brand surfaces only - a fluid h1 that shrinks inside a sidebar looks worse, not designed.", "section": "typography" },
+      { "name": "The Serif-Is-For-Voice Rule", "body": "Instrument Serif is for display and editorial voice. Never set UI labels, buttons, inputs, or table data in the serif - that's the product-register tell to avoid.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat at rest. If you reach for a shadow on a resting card, reach for a border or a tonal step first. Shadow appears only when something is genuinely above the page (overlay) or responding to state.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the body background Cool Slate (#f0f3f7) - never white, never warm/cream.",
+      "Do ration the two signals: Cobalt for the primary action, Electric Teal for the one thing to notice. Together under ~10% of a screen.",
+      "Do render status as soft-tint callouts: tinted background + matching deep text + a thin matching-hue border (e.g. bg-moss-soft + text-moss-deep + border-moss/25).",
+      "Do keep depth tonal (navy frame -> slate canvas -> white surface). Reserve shadow for overlays and state.",
+      "Do let primary actions feel tactile - solid fill, hover-deepen, .lift and arrow-slide on confident CTAs - within a single consistent button shape.",
+      "Do set Instrument Serif for display/editorial voice and Instrument Sans for all UI text and data.",
+      "Do pair every status hue with an icon or label, not colour alone (WCAG 2.2 AA; candidates are a broad public audience).",
+      "Do keep body text at Ink Muted (#5a6b7a) or darker for >=4.5:1 contrast."
+    ],
+    "donts": [
+      "Don't ship generic AI SaaS: no indigo-on-white sameness, no identical rounded-card grids, no gradient blobs, no hero-metric template.",
+      "Don't stamp a tracked uppercase eyebrow above every section - the .eyebrow is an occasional device, not section scaffolding. No 01/02/03 numbered markers unless the content truly is an ordered sequence.",
+      "Don't drift toward legacy enterprise HR (Workday/Taleo/SAP) form-soup or joyless corporate grey, or a cold clinical ATS that renders candidates as faceless rows.",
+      "Don't use border-left/border-right > 1px as a coloured accent stripe on cards, callouts, or alerts - use the soft-tint formula instead.",
+      "Don't use gradient text (background-clip: text), decorative glassmorphism, or neon/crypto theatrics.",
+      "Don't set UI labels, buttons, or table data in Instrument Serif. Serif is voice, not chrome.",
+      "Don't put body text in Ink Faint (#9fb5c4) - it fails contrast. It's for placeholders, disabled, and decorative strokes only.",
+      "Don't gate content visibility on a scroll/class-triggered reveal (e.g. .animate-on-scroll { opacity: 0 }) - it ships blank in headless renderers and background tabs. Reveals must enhance an already-visible default.",
+      "Don't scatter ambient shadows on resting cards - that's the dated-app tell."
+    ]
+  }
+}
