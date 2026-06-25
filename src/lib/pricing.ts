@@ -272,9 +272,12 @@ export interface SpendProjection {
   projectedCredits: number;
   projectedInclVat: number;
   includedCredits: number; // plan monthly allowance
+  overageCredits: number; // credits used beyond the allowance so far (0 within it)
+  creditPriceInclVat: number; // R per credit once over allowance — the only "extra" rate
   hardCeilingCredits: number | null;
   inFlightCount: number; // candidates still drawing credits
   costToFinishInclVat: number; // ≈ R to finish the in-flight pipeline
+  costToFinishCredits: number; // ≈ credits to finish the in-flight pipeline (from allowance)
   paused: boolean; // ceiling reached → new scoring intake is held (Phase 4)
   heldCount: number; // candidates parked at gating_passed (held backlog)
 }
@@ -384,9 +387,12 @@ export async function getSpendProjection(ctx: TenantContext): Promise<SpendProje
     projectedCredits: mtd.totalCredits * runRate,
     projectedInclVat: mtd.totalInclVat * runRate,
     includedCredits,
+    overageCredits: includedCredits > 0 ? Math.max(0, mtd.totalCredits - includedCredits) : 0,
+    creditPriceInclVat: CREDIT_PRICE_ZAR * (1 + VAT_RATE),
     hardCeilingCredits,
     inFlightCount,
     costToFinishInclVat: costToFinishExVat * (1 + VAT_RATE),
+    costToFinishCredits: costToFinishExVat / CREDIT_PRICE_ZAR,
     paused: hardCeilingCredits != null && mtd.totalCredits >= hardCeilingCredits,
     heldCount: held?.n ?? 0,
   };
