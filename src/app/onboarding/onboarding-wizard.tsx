@@ -1,12 +1,35 @@
 "use client";
 
+import {
+  BrandingSection,
+  type BrandingValues,
+} from "@/components/admin/branding-section";
 import { Logo } from "@/components/brand/logo";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
-type Screen = "welcome" | "brand" | "done";
+type Screen = "welcome" | "brand" | "branding" | "done";
 
-const SCREEN_INDEX: Record<Screen, number> = { welcome: 0, brand: 1, done: 2 };
+const SCREEN_INDEX: Record<Screen, number> = {
+  welcome: 0,
+  brand: 1,
+  branding: 2,
+  done: 3,
+};
+
+// A fresh brand starts with no logo and unset colours — we deliberately don't
+// pre-fill TalentStream's palette, so skipping leaves the brand on the
+// inherited look rather than silently baking in our defaults. brand_text_color
+// mirrors the column default so campaign body copy always has a usable value.
+const DEFAULT_BRANDING: BrandingValues = {
+  logo_url: null,
+  logo_background: "light",
+  logo_position: "top-left",
+  brand_primary_color: "",
+  brand_secondary_color: "",
+  brand_accent_color: "",
+  brand_text_color: "#11123c",
+};
 
 // Local mirror of lib/slug's slugify — keeps this a pure client module. The
 // server re-derives and validates the slug authoritatively on POST; this is
@@ -36,8 +59,12 @@ export function OnboardingWizard({
   const [screen, setScreen] = useState<Screen>("welcome");
   const [name, setName] = useState("");
   const [createdName, setCreatedName] = useState("");
+  const [createdId, setCreatedId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [branding, setBranding] = useState<BrandingValues>(DEFAULT_BRANDING);
+  const [savingBranding, setSavingBranding] = useState(false);
+  const [brandingError, setBrandingError] = useState("");
 
   const slug = slugify(name);
 
@@ -76,11 +103,58 @@ export function OnboardingWizard({
       }
       const { data } = await res.json();
       setCreatedName((data && data.name) || trimmed);
-      setScreen("done");
+      setCreatedId((data && data.id) || "");
+      // The brand exists now (we have its id) — offer the optional branding
+      // step before the finish screen.
+      setScreen("branding");
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  function patchBranding(patch: Partial<BrandingValues>) {
+    setBranding((prev) => ({ ...prev, ...patch }));
+  }
+
+  async function handleSaveBranding() {
+    // The branding screen is only reachable after a successful create, so we
+    // always have an id — fall through to finish if somehow we don't.
+    if (!createdId) {
+      setScreen("done");
+      return;
+    }
+    setSavingBranding(true);
+    setBrandingError("");
+    try {
+      const res = await fetch(`/api/admin/clients/${createdId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          branding_logo_url: branding.logo_url,
+          logo_background: branding.logo_background,
+          logo_position: branding.logo_position,
+          // Empty → null so an untouched colour clears to "inherit" rather than
+          // tripping the server's hex validation.
+          brand_primary_color: branding.brand_primary_color || null,
+          brand_secondary_color: branding.brand_secondary_color || null,
+          brand_accent_color: branding.brand_accent_color || null,
+          brand_text_color: branding.brand_text_color || null,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setBrandingError(
+          data.error || "Couldn’t save your branding. Please try again.",
+        );
+        return;
+      }
+      setScreen("done");
+    } catch {
+      setBrandingError("Couldn’t save your branding. Please try again.");
+    } finally {
+      setSavingBranding(false);
     }
   }
 
@@ -126,6 +200,19 @@ export function OnboardingWizard({
                 setScreen("welcome");
                 setError("");
               }}
+              onSkip={leave}
+            />
+          )}
+          {screen === "branding" && (
+            <BrandingStep
+              key="branding"
+              clientId={createdId}
+              brandName={createdName}
+              values={branding}
+              onChange={patchBranding}
+              error={brandingError}
+              saving={savingBranding}
+              onSave={handleSaveBranding}
               onSkip={leave}
             />
           )}
@@ -257,8 +344,8 @@ function BrandStep({
         )}
 
         <p className="mx-auto mt-6 max-w-sm text-center text-[0.78rem] leading-relaxed text-ink-faint">
-          You can add a logo, brand colours, and contact details anytime from
-          settings.
+          Next you can add a logo and brand colours — or skip straight to your
+          dashboard.
         </p>
 
         <div className="mt-8 flex items-center justify-center gap-2">
@@ -282,6 +369,72 @@ function BrandStep({
       <div className="mt-7 text-center">
         <button onClick={onSkip} className={skipBtn}>
           I’ll do this later
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function BrandingStep({
+  clientId,
+  brandName,
+  values,
+  onChange,
+  error,
+  saving,
+  onSave,
+  onSkip,
+}: {
+  clientId: string;
+  brandName: string;
+  values: BrandingValues;
+  onChange: (patch: Partial<BrandingValues>) => void;
+  error: string;
+  saving: boolean;
+  onSave: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <div className="w-full max-w-xl py-4">
+      <div className="text-center">
+        <p className="eyebrow load-fade load-1 text-cobalt">Make it yours</p>
+        <h2 className="load-fade load-2 mt-4 font-display text-[2.3rem] font-medium leading-tight tracking-[-0.02em] sm:text-[2.7rem]">
+          Give{" "}
+          <span className="font-display-italic text-cobalt">{brandName}</span> a
+          look.
+        </h2>
+        <p className="load-fade load-3 mx-auto mt-4 max-w-md text-[0.95rem] leading-relaxed text-ink-muted">
+          Add a logo and brand colours — they shape your careers page and the
+          emails candidates receive. Everything stays editable later.
+        </p>
+      </div>
+
+      <div className="load-fade load-4 mt-8 rounded-2xl border border-border bg-surface p-6 text-left sm:p-7">
+        <BrandingSection clientId={clientId} values={values} onChange={onChange} />
+      </div>
+
+      {error && (
+        <p className="mt-5 rounded-lg bg-red-light px-4 py-2.5 text-center text-[0.82rem] text-red">
+          {error}
+        </p>
+      )}
+
+      <div className="load-fade load-5 mt-8 flex items-center justify-center">
+        <button onClick={onSave} disabled={saving} className={primaryBtn}>
+          {saving ? (
+            <>
+              <Spinner /> Saving…
+            </>
+          ) : (
+            <>
+              Save &amp; continue <Arrow />
+            </>
+          )}
+        </button>
+      </div>
+      <div className="mt-6 text-center">
+        <button onClick={onSkip} className={`load-fade load-6 ${skipBtn}`}>
+          Skip for now
         </button>
       </div>
     </div>
@@ -322,8 +475,8 @@ function Done({
         ready.
       </h2>
       <p className="load-fade load-4 mx-auto mt-5 max-w-md text-[0.98rem] leading-relaxed text-ink-muted">
-        Your brand is live. Add a logo, brand colours, and contact details
-        whenever you like — then launch your first campaign.
+        Your brand is live. Launch your first campaign whenever you’re ready —
+        every detail stays editable from settings.
       </p>
       <div className="load-fade load-5 mt-10 flex items-center justify-center">
         <button onClick={onEnter} className={primaryBtn}>
@@ -359,7 +512,7 @@ function Feature({
 function Progress({ index }: { index: number }) {
   return (
     <div className="flex items-center gap-1.5" aria-hidden>
-      {[0, 1, 2].map((i) => (
+      {[0, 1, 2, 3].map((i) => (
         <span
           key={i}
           className={`h-1 rounded-full transition-all duration-500 ${
