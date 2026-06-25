@@ -7,6 +7,7 @@ import {
   type EmailTemplateType,
 } from "@/lib/email-slots";
 import { BODY_MARKER } from "@/lib/email-shell";
+import { appHostOrigin } from "@/lib/host";
 import { readableTextOn } from "@/lib/theme-colors";
 import { DEFAULT_EMAIL_COPY } from "@/lib/theme-copy";
 import { recordUsageEvent } from "@/lib/usage";
@@ -656,6 +657,150 @@ export function invitationEmail(
     ${emailBtn("Accept invitation", acceptUrl)}
     ${emailFallbackLink(acceptUrl)}
     ${emailNote("If you weren&rsquo;t expecting this invitation, you can safely ignore this email.")}
+  `);
+}
+
+export type SpendAlertVariant = "threshold" | "summary" | "hardcap";
+
+/** Spend-alert email (usage-based pricing, Phase 5). Org-level, non-campaign →
+ *  always the default theme, sent unmetered via sendTransactionalEmail. orgName
+ *  is DB free text → HTML-escaped. The unsubscribe link is token-only/public. */
+export function spendAlertEmail(input: {
+  variant: SpendAlertVariant;
+  orgName: string;
+  period: string; // 'YYYY-MM'
+  usedCredits: number;
+  includedCredits: number;
+  pctUsed: number;
+  spendInclVat: number;
+  usageUrl: string;
+  unsubscribeUrl: string;
+}): string {
+  const org = escapeHtml(input.orgName);
+  const credits = (n: number) =>
+    n.toLocaleString("en-ZA", { maximumFractionDigits: 0 });
+  const zar = (n: number) =>
+    `R${n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const copy: Record<
+    SpendAlertVariant,
+    { label: string; title: string; lead: string }
+  > = {
+    threshold: {
+      label: "Spend alert",
+      title: "Approaching your credit allowance",
+      lead: `<strong>${org}</strong> has used <strong>${input.pctUsed}%</strong> of its monthly AI-credit allowance for ${input.period}.`,
+    },
+    hardcap: {
+      label: "Spend ceiling reached",
+      title: "New scoring is paused",
+      lead: `<strong>${org}</strong> has reached its spend ceiling for ${input.period}. New candidate scoring is paused; work already in progress will finish. Raise the ceiling to resume intake.`,
+    },
+    summary: {
+      label: "Spend summary",
+      title: `Your spend for ${input.period}`,
+      lead: `Here&rsquo;s the AI-spend summary for <strong>${org}</strong>.`,
+    },
+  };
+  const c = copy[input.variant];
+
+  const { wrapTemplate, emailHeading, emailP, emailInfoCard, emailBtn, emailFallbackLink, emailNote } =
+    makeEmailKit(DEFAULT_EMAIL_THEME);
+  return wrapTemplate(`
+    ${emailHeading(c.label, c.title)}
+    ${emailP(c.lead)}
+    ${emailInfoCard([
+      ["Period", input.period],
+      ["Credits used", `${credits(input.usedCredits)} of ${credits(input.includedCredits)}`],
+      ["Used", `${input.pctUsed}%`],
+      ["Spend (incl. VAT)", zar(input.spendInclVat)],
+    ])}
+    ${emailBtn("View Usage & Spend", input.usageUrl)}
+    ${emailFallbackLink(input.usageUrl)}
+    ${emailNote(`You&rsquo;re receiving this because you subscribed to spend alerts. <a href="${input.unsubscribeUrl}">Unsubscribe</a>.`)}
+  `);
+}
+
+/** South African EFT tax invoice email (usage-based pricing, Phase 6). Org-level
+ *  → always the default theme, sent unmetered. The `issued` variant lists the
+ *  priced lines; `overdue` is a payment reminder. VAT number + EFT banking
+ *  details come from env (BILLING_VAT_NUMBER / BILLING_BANK_DETAILS). */
+export function invoiceEmail(input: {
+  variant: "issued" | "overdue";
+  orgName: string;
+  invoice: {
+    invoice_no: string;
+    period: string;
+    subtotal_ex_vat: number;
+    vat_amount: number;
+    total_incl_vat: number;
+    issued_at: Date | null;
+    due_at: Date | null;
+    status: string;
+  };
+  priced?: import("@/lib/pricing").PricedInvoice;
+}): string {
+  const org = escapeHtml(input.orgName);
+  const inv = input.invoice;
+  const zar = (n: number) =>
+    `R${n.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const date = (d: Date | null) =>
+    d
+      ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })
+      : "—";
+
+  const vatNumber = process.env.BILLING_VAT_NUMBER;
+  const bankDetails = process.env.BILLING_BANK_DETAILS;
+  const statementUrl = `${appHostOrigin()}/billing`;
+
+  const { wrapTemplate, emailHeading, emailP, emailInfoCard, emailBtn, emailNote } =
+    makeEmailKit(DEFAULT_EMAIL_THEME);
+
+  // Line breakdown (issued only). priced.lines already ends with the VAT line.
+  const lineRows: [string, string][] = (input.priced?.lines ?? []).map((l) => [
+    l.description,
+    zar(l.amountZar),
+  ]);
+
+  const summary: [string, string][] = [
+    ["Invoice no.", inv.invoice_no],
+    ["Billing period", inv.period],
+    ["Issued", date(inv.issued_at)],
+    ["Due", date(inv.due_at)],
+    ["Total (incl. VAT)", zar(inv.total_incl_vat)],
+  ];
+
+  const eftBlock = bankDetails
+    ? emailInfoCard([
+        ["Pay by EFT to", escapeHtml(bankDetails)],
+        ["Reference", inv.invoice_no],
+      ])
+    : emailNote(`Please use <strong>${inv.invoice_no}</strong> as your payment reference.`);
+
+  const vatNote = vatNumber
+    ? emailNote(`Tax invoice. VAT registration no. ${escapeHtml(vatNumber)}. VAT charged at 15%.`)
+    : emailNote("Tax invoice. VAT charged at 15%.");
+
+  if (input.variant === "overdue") {
+    return wrapTemplate(`
+      ${emailHeading("Payment overdue", "Your invoice is past due")}
+      ${emailP(`Invoice <strong>${inv.invoice_no}</strong> for <strong>${org}</strong> was due on ${date(inv.due_at)} and is now overdue.`)}
+      ${emailInfoCard(summary)}
+      ${eftBlock}
+      ${emailBtn("View statement", statementUrl)}
+      ${emailNote("If you&rsquo;ve already paid, please disregard this reminder.")}
+      ${vatNote}
+    `);
+  }
+
+  return wrapTemplate(`
+    ${emailHeading("Tax invoice", `Invoice ${escapeHtml(inv.invoice_no)}`)}
+    ${emailP(`Here&rsquo;s your TalentStream tax invoice for <strong>${org}</strong>, billing period ${inv.period}.`)}
+    ${emailInfoCard(summary)}
+    ${lineRows.length ? emailInfoCard(lineRows) : ""}
+    ${eftBlock}
+    ${emailBtn("View statement", statementUrl)}
+    ${vatNote}
   `);
 }
 

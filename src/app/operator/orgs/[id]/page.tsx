@@ -3,6 +3,7 @@
 import { TierBadge, type Tier } from "@/components/admin/tier-badge";
 import { ImpersonateButton } from "@/components/operator/impersonate-button";
 import { LifecycleActions } from "@/components/operator/lifecycle-actions";
+import { OperatorInvoicesCard } from "@/components/operator/invoices-card";
 import { ThemesCard, type ThemeBrand } from "@/components/operator/themes-card";
 import { useToast } from "@/components/ui/toast-provider";
 import Link from "next/link";
@@ -501,6 +502,11 @@ export default function OperatorOrgDetailPage() {
             </p>
           )}
         </div>
+      </div>
+
+      {/* Invoices — operator-reconciled EFT tax invoices (usage-based pricing) */}
+      <div className="mt-6">
+        <OperatorInvoicesCard orgId={org.id} />
       </div>
 
       {/* Themes — per-brand default campaign theme + bespoke builds (CT2) */}

@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { OrgSettingsCard } from "@/components/admin/org-settings-card";
 import { ActiveBrandCard } from "@/components/admin/active-brand-card";
+import { SpendAlertCard } from "@/components/admin/spend-alert-card";
 
 interface AccessRecord {
   candidate_id: string;
@@ -103,6 +104,9 @@ export default function SettingsPage() {
       {/* ── Organization + Active brand (S9) ─────────────────── */}
       <OrgSettingsCard />
       <ActiveBrandCard />
+
+      {/* ── Spend alerts (usage-based pricing, Phase 5) ───────── */}
+      <SpendAlertCard />
 
       {/* ── POPIA Data Requests ─────────────────────────────── */}
       <div className="mb-6 rounded-xl border border-border bg-surface p-6">

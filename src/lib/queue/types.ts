@@ -44,7 +44,10 @@ export type JobPayload =
   | { type: "send-chat-invitation"; candidateId: string }
   | { type: "rescore-after-chat"; candidateId: string; conversationId: string }
   | { type: "chat-nudge"; candidateId: string }
-  | { type: "chat-expire"; candidateId: string };
+  | { type: "chat-expire"; candidateId: string }
+  // Usage-based pricing (Phase 6). The first ORG-scoped variant: it carries no
+  // candidateId, so the worker's org-active gate resolves the org from orgId.
+  | { type: "billing-close"; orgId: string; period: string };
 
 export interface JobQueue {
   enqueue(payload: JobPayload, options?: EnqueueOptions): Promise<void>;

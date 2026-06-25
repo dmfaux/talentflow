@@ -684,6 +684,13 @@ export async function seed(db: Db): Promise<SeedSummary> {
   ]);
   console.log("Plans: 3 (standard, premium, enterprise)");
 
+  // ── Invoice counter (gapless invoice_no) ──
+  // Singleton row id=1. The billing-close txn SELECT … FOR UPDATEs it. Reset to 1
+  // on re-seed (the delete+insert below also clears any invoices in a fresh DB).
+  await db.delete(schema.invoiceCounters);
+  await db.insert(schema.invoiceCounters).values({ id: 1, next_seq: 1 });
+  console.log("Invoice counter: initialised (next_seq=1)");
+
   // ── Brands (clients) — globally-distinct slugs (S12 contract) ──
   const brandRows: { id: string; slug: string; name: string; orgId: string }[] = [];
   for (const o of DEMO_ORGS) {

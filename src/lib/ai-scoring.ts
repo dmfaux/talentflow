@@ -173,6 +173,10 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
 
   // Meter the AI spend (best-effort; never blocks scoring). SDK token counts,
   // never estimates — see usage.ts.
+  // Phase 7 (durability): billing reads the FROZEN usage_rollups / invoice_line_items
+  // (see src/lib/billing.ts), which tolerate small fire-and-forget leakage from this
+  // write. A transactional upgrade (alongside the scoring_logs insert) is deferred
+  // until leakage is measured and shown to matter.
   recordUsageEvent({
     orgId: candidate.org_id,
     brandId: candidate.campaign.client_id,

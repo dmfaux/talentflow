@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { label: "Members", href: "/users", icon: "users", orgOnly: true },
   { label: "Settings", href: "/settings", icon: "settings", orgOnly: true },
   { label: "Usage & Spend", href: "/usage", icon: "usage", orgOnly: true },
+  { label: "Invoices", href: "/billing", icon: "invoice", orgOnly: true },
 ] as const;
 
 const ICONS: Record<string, React.ReactNode> = {
@@ -63,6 +64,12 @@ const ICONS: Record<string, React.ReactNode> = {
       <rect x="3" y="8" width="2.5" height="4" rx="0.5" />
       <rect x="6.75" y="5" width="2.5" height="7" rx="0.5" />
       <rect x="10.5" y="2.5" width="2.5" height="9.5" rx="0.5" />
+    </svg>
+  ),
+  invoice: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 1.5h6l2.5 2.5v10.5l-1.5-1-1.5 1-1.5-1-1.5 1-1.5-1-1.5 1V1.5z" />
+      <path d="M6 5.5h4M6 8h4M6 10.5h2.5" />
     </svg>
   ),
 };

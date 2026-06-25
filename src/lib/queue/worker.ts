@@ -17,20 +17,25 @@ import {
 import { generateChatToken } from "../chat-auth";
 import { createConversation, getActiveConversation } from "../chat";
 import { rescoreWithChatContext } from "../ai-scoring";
+import { closeOrgPeriod } from "../billing";
 import { processNewCandidate } from "../process-candidate";
 import { getOrgStatus } from "../org-status";
 import { resolveCampaignTheme } from "../theme";
 import { getQueue } from "./index";
 import type { JobPayload } from "./types";
 
-/** Resolve a job's owning org via its candidate and report whether it is active
- *  (S11). Every JobPayload variant carries a candidateId, so this is the single
- *  org resolver for the universal handleJob gate. A missing candidate → true:
- *  don't mask a genuinely-absent candidate as an org-status skip; let the
- *  handler log its own not-found. A purged org (getOrgStatus → null) → false. */
-async function jobOrgIsActive(candidateId: string): Promise<boolean> {
+/** Resolve a job's owning org and report whether it is active (S11) — the single
+ *  org resolver for the universal handleJob gate. Org-scoped variants (e.g.
+ *  billing-close) carry orgId directly; candidate-scoped variants resolve via the
+ *  candidate. A missing candidate → true: don't mask a genuinely-absent candidate
+ *  as an org-status skip; let the handler log its own not-found. A purged org
+ *  (getOrgStatus → null) → false. */
+async function jobOrgIsActive(payload: JobPayload): Promise<boolean> {
+  if ("orgId" in payload) {
+    return (await getOrgStatus(payload.orgId)) === "active";
+  }
   const candidate = await db.query.candidates.findFirst({
-    where: eq(candidates.id, candidateId),
+    where: eq(candidates.id, payload.candidateId),
     columns: { org_id: true },
   });
   if (!candidate) return true;
@@ -45,16 +50,18 @@ export async function handleJob(payload: JobPayload): Promise<void> {
   // requeue) and acks the Service Bus message, so a dead tenant's work never
   // piles up or regenerates. On restore, the jobs/process backstop re-recovers
   // candidate-processing; chat nudges/expiries are best-effort.
-  if (!(await jobOrgIsActive(payload.candidateId))) {
-    console.log(
-      `handleJob: skipping ${payload.type} for candidate ${payload.candidateId} — org not active`
-    );
+  if (!(await jobOrgIsActive(payload))) {
+    const ref = "candidateId" in payload ? payload.candidateId : payload.orgId;
+    console.log(`handleJob: skipping ${payload.type} for ${ref} — org not active`);
     return;
   }
 
   switch (payload.type) {
     case "candidate-processing":
       await processNewCandidate(payload.candidateId);
+      break;
+    case "billing-close":
+      await closeOrgPeriod(payload.orgId, payload.period);
       break;
     case "send-email":
       await handleEmailJob(payload);

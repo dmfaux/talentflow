@@ -22,7 +22,7 @@ import {
   usageEvents,
 } from "@/db/schema";
 import { orgScope, type TenantContext } from "@/lib/tenant";
-import { and, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, lt, sql } from "drizzle-orm";
 
 export const OUTPUT_WEIGHT = 5;
 /** Sell price of one AI credit, ex VAT (ZAR). The single pricing knob. */
@@ -447,5 +447,217 @@ export async function getOrgMargin(orgId: string, days = 30): Promise<OrgMargin>
     rawCostZar,
     marginZar,
     marginPct: billedExVat > 0 ? marginZar / billedExVat : 0,
+  };
+}
+
+// ── Invoicing: calendar-period close (Phase 6) ───────────────────────
+//
+// The spend reads above price a ROLLING `days` window for live dashboards. An
+// invoice prices a CLOSED calendar month and actually applies the plan allowance
+// + overage discount. These helpers are pure / raw-orgId (the close runs in a
+// scheduled job, never a tenant request) and feed src/lib/billing.ts.
+
+/** 'YYYY-MM' label for a date (local time, matching startOfCurrentMonth). */
+export function periodLabel(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** The just-ended calendar month relative to `now` — what a 1st-of-month close
+ *  invoices. */
+export function previousPeriodLabel(now: Date): string {
+  return periodLabel(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+}
+
+/** [start, end) instants for a 'YYYY-MM' label; end is the first instant of the
+ *  next month (exclusive), so the window is half-open. */
+export function periodBounds(period: string): { start: Date; end: Date } {
+  const [y, m] = period.split("-").map(Number);
+  return { start: new Date(y, m - 1, 1), end: new Date(y, m, 1) };
+}
+
+export interface TierUsage {
+  credits: number; // billed value-credits (essential INCLUDES chat)
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface PeriodUsage {
+  byTier: Record<ModelTier, TierUsage>; // freezes into usage_rollups
+  chatCredits: number; // the chat slice of essential (campaign_id IS NULL)
+  totalCredits: number;
+}
+
+interface PeriodUsageRow extends SpendRow {
+  isChat: boolean;
+}
+
+/**
+ * Aggregate an org's ai_tokens usage over [start, end) into per-tier credits +
+ * tokens (for the rollup freeze) plus the chat slice. Chat ai_tokens are the
+ * only ai_tokens rows with a NULL campaign_id (scoring + re-score + job-spec
+ * parse all stamp campaign_id), and are hard-pinned to Essential — so they fold
+ * into byTier.essential AND are tracked separately for the invoice's chat line.
+ * Raw orgId (NOT orgScope) — only ever called from the scheduled close.
+ */
+export async function getOrgUsageForPeriod(
+  orgId: string,
+  start: Date,
+  end: Date,
+): Promise<PeriodUsage> {
+  const isChatExpr = sql<boolean>`${usageEvents.campaign_id} is null`;
+  const rows = await db
+    .select({ ...SPEND_COLUMNS, isChat: isChatExpr })
+    .from(usageEvents)
+    .where(
+      and(
+        eq(usageEvents.org_id, orgId),
+        eq(usageEvents.kind, "ai_tokens"),
+        gte(usageEvents.created_at, start),
+        lt(usageEvents.created_at, end),
+      ),
+    )
+    .groupBy(usageEvents.model_tier, usageEvents.model, isChatExpr);
+
+  const byTier: Record<ModelTier, TierUsage> = {
+    essential: { credits: 0, inputTokens: 0, outputTokens: 0 },
+    professional: { credits: 0, inputTokens: 0, outputTokens: 0 },
+    executive: { credits: 0, inputTokens: 0, outputTokens: 0 },
+  };
+  let chatCredits = 0;
+  for (const r of rows as PeriodUsageRow[]) {
+    const tier = rowTier(r);
+    const credits = billedCredits(baseUnits(r.inputTokens ?? 0, r.outputTokens ?? 0), tier);
+    byTier[tier].credits += credits;
+    byTier[tier].inputTokens += r.inputTokens ?? 0;
+    byTier[tier].outputTokens += r.outputTokens ?? 0;
+    if (r.isChat) chatCredits += credits;
+  }
+  const totalCredits = TIER_ORDER.reduce((s, t) => s + byTier[t].credits, 0);
+  return { byTier, chatCredits, totalCredits };
+}
+
+/** The plan fields invoicing needs (a `plans` row). */
+export interface PlanRates {
+  base_fee_zar: number;
+  included_credits: number;
+  overage_discount_pct: number;
+}
+
+export interface InvoiceLine {
+  lineType: "base" | "overage" | "chat" | "vat";
+  modelTier: ModelTier | null; // set on per-tier overage lines; null otherwise
+  description: string;
+  quantityCredits: number | null;
+  unitRateZar: number | null;
+  amountZar: number;
+}
+
+export interface PricedInvoice {
+  lines: InvoiceLine[];
+  totalCredits: number;
+  includedCredits: number;
+  overageCredits: number;
+  subtotalExVat: number;
+  vat: number;
+  totalInclVat: number;
+}
+
+/**
+ * Price a closed period into invoice lines. The base fee covers the plan's
+ * included-credit allowance; usage beyond it is overage, sold at CREDIT_PRICE_ZAR
+ * less the plan's overage discount. The overage is attributed across four buckets
+ * — the three scoring tiers + chat — proportionally to each bucket's share of
+ * total usage. Every credit sells at one rate, so the per-bucket ZAR sums exactly
+ * to the overage total (the split is presentational, not a different price). VAT
+ * (15%) is a final line on the subtotal. Pure — the close txn just persists this.
+ */
+export function priceInvoice(
+  plan: PlanRates,
+  byTier: Record<ModelTier, number>,
+  chatCredits: number,
+): PricedInvoice {
+  const totalCredits = TIER_ORDER.reduce((s, t) => s + (byTier[t] ?? 0), 0);
+  const includedCredits = plan.included_credits;
+  const overageCredits = Math.max(0, totalCredits - includedCredits);
+  const effRate = CREDIT_PRICE_ZAR * (1 - (plan.overage_discount_pct ?? 0) / 100);
+
+  const lines: InvoiceLine[] = [
+    {
+      lineType: "base",
+      modelTier: null,
+      description: `Monthly plan fee (includes ${includedCredits.toLocaleString("en-ZA")} credits)`,
+      quantityCredits: null,
+      unitRateZar: null,
+      amountZar: plan.base_fee_zar,
+    },
+  ];
+
+  if (overageCredits > 0 && totalCredits > 0) {
+    // Four overage buckets: Essential-scoring, Professional, Executive, and chat
+    // (pulled out of Essential so it gets its own line without double-counting).
+    const buckets: Array<{
+      lineType: "overage" | "chat";
+      tier: ModelTier | null;
+      credits: number;
+      label: string;
+    }> = [
+      {
+        lineType: "overage",
+        tier: "essential",
+        credits: (byTier.essential ?? 0) - chatCredits,
+        label: "Essential scoring — overage credits",
+      },
+      {
+        lineType: "overage",
+        tier: "professional",
+        credits: byTier.professional ?? 0,
+        label: "Professional scoring — overage credits",
+      },
+      {
+        lineType: "overage",
+        tier: "executive",
+        credits: byTier.executive ?? 0,
+        label: "Executive scoring — overage credits",
+      },
+      {
+        lineType: "chat",
+        tier: null,
+        credits: chatCredits,
+        label: "Candidate chat (Essential) — overage credits",
+      },
+    ];
+    for (const b of buckets) {
+      if (b.credits <= 1e-9) continue;
+      const bucketOverage = overageCredits * (b.credits / totalCredits);
+      lines.push({
+        lineType: b.lineType,
+        modelTier: b.tier,
+        description: b.label,
+        quantityCredits: bucketOverage,
+        unitRateZar: effRate,
+        amountZar: bucketOverage * effRate,
+      });
+    }
+  }
+
+  const subtotalExVat = lines.reduce((s, l) => s + l.amountZar, 0);
+  const vat = subtotalExVat * VAT_RATE;
+  lines.push({
+    lineType: "vat",
+    modelTier: null,
+    description: `VAT @ ${Math.round(VAT_RATE * 100)}%`,
+    quantityCredits: null,
+    unitRateZar: null,
+    amountZar: vat,
+  });
+
+  return {
+    lines,
+    totalCredits,
+    includedCredits,
+    overageCredits,
+    subtotalExVat,
+    vat,
+    totalInclVat: subtotalExVat + vat,
   };
 }

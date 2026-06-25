@@ -29,6 +29,11 @@ export const OPERATOR_AUDIT_ACTIONS = [
   // Usage-based pricing — operator sets the org's model-tier cap and/or spend
   // ceiling. metadata.field distinguishes the two; both carry {from, to}.
   "set_org_caps",
+  // Usage-based pricing invoicing — operator reconciles an EFT tax invoice.
+  // mark_invoice_paid carries {invoiceId, invoiceNo, eftRef, total}; void_invoice
+  // carries {invoiceId, invoiceNo, reason}.
+  "mark_invoice_paid",
+  "void_invoice",
 ] as const;
 
 export type OperatorAuditAction = (typeof OPERATOR_AUDIT_ACTIONS)[number];

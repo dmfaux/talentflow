@@ -911,3 +911,161 @@ export const operatorAuditRelations = relations(operatorAudit, ({ one }) => ({
     references: [organizations.id],
   }),
 }));
+
+// ── Usage rollups (usage-based pricing, Phase 6/7) ──────────────────
+//
+// The DURABLE, frozen billing basis. recordUsageEvent is fire-and-forget, so the
+// billed number must never be a live SELECT SUM over usage_events — the monthly
+// billing-close folds a period's usage into one row per (org, period, model_tier)
+// here, and invoices price off this. CASCADE on org so a purged org's rollups die
+// with it; period is the 'YYYY-MM' calendar month label.
+export const usageRollups = pgTable(
+  "usage_rollups",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    org_id: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    period: text("period").notNull(), // 'YYYY-MM'
+    model_tier: text("model_tier").notNull(), // essential | professional | executive
+    credits: real("credits").notNull(), // billed value-credits, frozen
+    input_tokens: integer("input_tokens").notNull().default(0),
+    output_tokens: integer("output_tokens").notNull().default(0),
+    frozen_at: timestamp("frozen_at").defaultNow().notNull(),
+  },
+  (table) => [
+    unique("usage_rollups_org_period_tier_key").on(
+      table.org_id,
+      table.period,
+      table.model_tier
+    ),
+    index("usage_rollups_org_period_idx").on(table.org_id, table.period),
+  ]
+);
+
+// ── Invoices (usage-based pricing, Phase 6) ──────────────────────────
+//
+// A South African EFT tax invoice, one per (org, period) — the unique constraint
+// makes the monthly close idempotent. There is no payment processor: status moves
+// draft→issued (auto on close) →paid (operator marks, with eft_ref) ; overdue is
+// flagged by the sweep, void by an operator. Amounts are ZAR; subtotal is ex-VAT,
+// vat_amount is the 15% line, total is incl-VAT. invoice_no is gapless (see
+// invoiceCounters). CASCADE on org.
+export const invoices = pgTable(
+  "invoices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    org_id: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    invoice_no: text("invoice_no").notNull(), // gapless, e.g. INV-2026-000123
+    period: text("period").notNull(), // 'YYYY-MM'
+    period_start: timestamp("period_start").notNull(),
+    period_end: timestamp("period_end").notNull(),
+    currency: text("currency").notNull().default("ZAR"),
+    subtotal_ex_vat: real("subtotal_ex_vat").notNull(),
+    vat_amount: real("vat_amount").notNull(),
+    total_incl_vat: real("total_incl_vat").notNull(),
+    status: text("status").notNull().default("draft"), // draft | issued | paid | overdue | void
+    issued_at: timestamp("issued_at"),
+    due_at: timestamp("due_at"),
+    paid_at: timestamp("paid_at"),
+    eft_ref: text("eft_ref"), // operator-entered bank reference on mark-paid
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("invoices_invoice_no_idx").on(table.invoice_no),
+    unique("invoices_org_period_key").on(table.org_id, table.period),
+    index("invoices_org_status_idx").on(table.org_id, table.status),
+  ]
+);
+
+// One priced line of an invoice. base covers the plan allowance; one overage line
+// per model tier; a separate chat line (chat is always billed at the Essential
+// rate); a vat line. quantity_credits/unit_rate_zar are null for the base + vat
+// lines. CASCADE on invoice.
+export const invoiceLineItems = pgTable(
+  "invoice_line_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    invoice_id: uuid("invoice_id")
+      .notNull()
+      .references(() => invoices.id, { onDelete: "cascade" }),
+    line_type: text("line_type").notNull(), // base | overage | chat | vat
+    model_tier: text("model_tier"), // set for overage lines; null otherwise
+    description: text("description").notNull(),
+    quantity_credits: real("quantity_credits"),
+    unit_rate_zar: real("unit_rate_zar"),
+    amount_zar: real("amount_zar").notNull(),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("invoice_line_items_invoice_idx").on(table.invoice_id)]
+);
+
+// Singleton counter (id = 1) backing gapless invoice_no. The billing-close txn
+// does SELECT … FOR UPDATE on this row, formats next_seq, then increments — so
+// concurrent closes never collide or skip a number.
+export const invoiceCounters = pgTable("invoice_counters", {
+  id: integer("id").primaryKey(), // fixed singleton: always 1
+  next_seq: integer("next_seq").notNull().default(1),
+});
+
+// ── Spend alert subscriptions (usage-based pricing, Phase 5) ─────────
+//
+// Per-user, per-org opt-in to spend emails. One row per (user, org). The
+// threshold alert fires once per period (last_alerted_period guards re-fire);
+// summaries are cadence-driven (last_summary_sent_at); the hard-cap alert fires
+// when the ceiling trips. unsubscribe_token powers the public one-click
+// unsubscribe (token-only, no session). CASCADE on both user and org.
+export const spendAlertSubscriptions = pgTable(
+  "spend_alert_subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    user_id: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    org_id: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    alert_on_threshold: boolean("alert_on_threshold").notNull().default(false),
+    threshold_pct: integer("threshold_pct"), // % of included allowance, e.g. 80
+    alert_on_summary: boolean("alert_on_summary").notNull().default(false),
+    summary_cadence: text("summary_cadence"), // weekly | monthly
+    alert_on_hardcap: boolean("alert_on_hardcap").notNull().default(false),
+    enabled: boolean("enabled").notNull().default(true),
+    unsubscribe_token: text("unsubscribe_token").notNull(),
+    last_alerted_period: text("last_alerted_period"), // 'YYYY-MM' the threshold last fired
+    last_summary_sent_at: timestamp("last_summary_sent_at"),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    unique("spend_alert_subscriptions_user_org_key").on(
+      table.user_id,
+      table.org_id
+    ),
+    uniqueIndex("spend_alert_subscriptions_token_idx").on(
+      table.unsubscribe_token
+    ),
+    index("spend_alert_subscriptions_org_idx").on(table.org_id),
+  ]
+);
+
+export const invoicesRelations = relations(invoices, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [invoices.org_id],
+    references: [organizations.id],
+  }),
+  lineItems: many(invoiceLineItems),
+}));
+
+export const invoiceLineItemsRelations = relations(
+  invoiceLineItems,
+  ({ one }) => ({
+    invoice: one(invoices, {
+      fields: [invoiceLineItems.invoice_id],
+      references: [invoices.id],
+    }),
+  })
+);
