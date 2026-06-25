@@ -3,6 +3,7 @@ import { candidates, chatMessages, scoringLogs } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { getQueue } from "./queue";
 import { recordUsageEvent } from "./usage";
+import { recordRejectionRecommended } from "./rejection";
 import {
   callWithFallback,
   resolveModelForTier,
@@ -196,20 +197,23 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
   //   - max_auto_advance_score (ceiling, default 8): strong candidates skip
   //     the chat entirely and go directly to `scored`, even if flags exist.
   //   - min_score (floor, default 5): weak candidates with no flags are
-  //     auto-rejected. Weak candidates WITH flags still get a chat, since
-  //     the chat might resolve the concerns and lift the score.
+  //     RECOMMENDED for rejection — parked in `pending_rejection` for a human to
+  //     accept or dismiss. The AI never rejects on its own (no default reject).
+  //     Weak candidates WITH flags still get a chat, since the chat might
+  //     resolve the concerns and lift the score.
   //   - Otherwise: flags → follow_up chat, no flags → scored.
   const hasFlags = Array.isArray(result.flags) && result.flags.length > 0;
   const minScore = rubric.min_score ?? 5;
   const maxAutoAdvance = rubric.max_auto_advance_score ?? 8;
   const aboveMaxScore = result.overall_score >= maxAutoAdvance;
   const belowMinScore = result.overall_score < minScore;
+  const priorStatus = candidate.status;
 
-  const status: "scored" | "follow_up" | "rejected" =
+  const status: "scored" | "follow_up" | "pending_rejection" =
     aboveMaxScore
       ? "scored"
       : belowMinScore && !hasFlags
-        ? "rejected"
+        ? "pending_rejection"
         : hasFlags
           ? "follow_up"
           : "scored";
@@ -224,8 +228,9 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
       ai_confidence: result.confidence,
       ai_flags: result.flags,
       status,
-      ...(status === "rejected" && {
-        rejection_reason: `Auto-rejected: score ${result.overall_score.toFixed(1)} is below the minimum threshold of ${minScore}`,
+      ...(status === "pending_rejection" && {
+        rejection_reason: `Recommended for rejection: score ${result.overall_score.toFixed(1)} is below the minimum threshold of ${minScore}. Awaiting reviewer decision.`,
+        rejection_recommended_at: new Date(),
       }),
       updated_at: new Date(),
     })
@@ -251,20 +256,26 @@ export async function scoreCandidate(candidateId: string): Promise<void> {
     recommendation: result.recommendation,
   });
 
-  // Auto-rejected — send rejection email after 24 hours
-  if (status === "rejected") {
-    const deliverAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    getQueue()
-      .enqueue(
-        { type: "send-email", candidateId, emailKind: "rejected" },
-        { orgId: candidate.org_id, deliverAt, deduplicationId: `rejection-${candidateId}` }
+  // Recommended for rejection — park in pending_rejection and record the
+  // recommendation in the audit trail. NO email and NO status change to
+  // `rejected` happen until a human accepts (handled by src/lib/rejection.ts).
+  if (status === "pending_rejection") {
+    await recordRejectionRecommended({
+      orgId: candidate.org_id,
+      candidateId,
+      fromStatus: priorStatus,
+      snapshot: {
+        ai_score: result.overall_score,
+        recommendation: result.recommendation ?? null,
+        min_score: minScore,
+        ai_rationale: result.rationale,
+      },
+    }).catch((err) =>
+      console.error(
+        `scoreCandidate: recommendation audit failed for ${candidateId}:`,
+        err
       )
-      .catch((err) =>
-        console.error(
-          `scoreCandidate: rejection email failed for ${candidateId}:`,
-          err
-        )
-      );
+    );
     return;
   }
 
@@ -586,10 +597,23 @@ export async function rescoreWithChatContext(
     candidateId: candidate.id,
   });
 
-  // Check minimum score threshold after follow-up
+  // Check minimum score threshold after follow-up.
+  //
+  // A still-below-min re-score splits by who is driving the rejection:
+  //   - adminInitiated (the admin already rejected this candidate mid-chat):
+  //     a human already decided, so honour it — stay `rejected` and keep the
+  //     existing delayed-confirmation flow below.
+  //   - otherwise (a follow_up candidate finished the chat and the AI still
+  //     scores them out): that's an AI recommendation, so park in
+  //     `pending_rejection` for a human — never a default reject.
   const minScore = rubric.min_score ?? 5;
   const belowMinScore = result.overall_score < minScore;
-  const newStatus = belowMinScore ? "rejected" : "scored";
+  const adminInitiated = pendingRejection;
+  const newStatus: "scored" | "rejected" | "pending_rejection" = !belowMinScore
+    ? "scored"
+    : adminInitiated
+      ? "rejected"
+      : "pending_rejection";
 
   // Write updated scores to candidate. Clearing pending_rejection_at
   // cancels any in-flight admin rejection — the queued rejection email
@@ -606,6 +630,10 @@ export async function rescoreWithChatContext(
       pending_rejection_at: null,
       ...(newStatus === "rejected" && {
         rejection_reason: `Auto-rejected: score ${result.overall_score.toFixed(1)} remained below the minimum threshold of ${minScore} after follow-up`,
+      }),
+      ...(newStatus === "pending_rejection" && {
+        rejection_reason: `Recommended for rejection: score ${result.overall_score.toFixed(1)} remained below the minimum threshold of ${minScore} after follow-up. Awaiting reviewer decision.`,
+        rejection_recommended_at: new Date(),
       }),
       updated_at: new Date(),
     })
@@ -632,6 +660,7 @@ export async function rescoreWithChatContext(
   });
 
   // Send rejection email after 24 hours if auto-rejected after follow-up
+  // (admin-initiated path only — the human already decided).
   if (newStatus === "rejected") {
     const deliverAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     getQueue()
@@ -645,5 +674,25 @@ export async function rescoreWithChatContext(
           err
         )
       );
+  }
+
+  // Recommended for rejection after follow-up — park for a human, no email.
+  if (newStatus === "pending_rejection") {
+    await recordRejectionRecommended({
+      orgId: candidate.org_id,
+      candidateId,
+      fromStatus: "follow_up",
+      snapshot: {
+        ai_score: result.overall_score,
+        recommendation: result.recommendation ?? null,
+        min_score: minScore,
+        ai_rationale: result.rationale,
+      },
+    }).catch((err) =>
+      console.error(
+        `rescoreWithChatContext: recommendation audit failed for ${candidateId}:`,
+        err
+      )
+    );
   }
 }

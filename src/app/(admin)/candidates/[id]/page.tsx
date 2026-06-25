@@ -7,7 +7,9 @@ import { CandidateActions } from "@/components/admin/candidate-actions";
 import { CandidateNotes } from "@/components/admin/candidate-notes";
 import { AuditLog } from "@/components/admin/audit-log";
 import { AssessmentHistory } from "@/components/admin/assessment-history";
+import { DecisionHistory } from "@/components/admin/decision-history";
 import { canAccessBrand, orgScope, requireTenant } from "@/lib/tenant";
+import { getCandidateAuditTrail } from "@/lib/rejection";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -20,6 +22,7 @@ const STATUS_STYLES: Record<string, string> = {
   scoring: "bg-warning-light text-warning",
   scored: "bg-green-light text-accent",
   follow_up: "bg-warning-light text-warning",
+  pending_rejection: "bg-warning-light text-warning",
   shortlisted: "bg-[#fef3c7] text-gold",
   rejected: "bg-red-light text-red",
   withdrawn: "bg-cream text-txt-muted",
@@ -75,6 +78,9 @@ export default async function CandidateDetailPage({ params }: Props) {
     candidate.campaign.client_id,
     "recruiter"
   );
+
+  // Human-in-the-loop rejection trail (who accepted/dismissed, when, why).
+  const decisionTrail = await getCandidateAuditTrail(candidate.id);
 
   const dims = (candidate.ai_dimensions ?? {}) as Record<string, number>;
   const flags = (candidate.ai_flags ?? []) as (string | { type?: string; message?: string })[];
@@ -157,6 +163,21 @@ export default async function CandidateDetailPage({ params }: Props) {
               <div>
                 <p className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-red">Rejection Reason</p>
                 <p className="mt-0.5 text-sm text-charcoal">{candidate.rejection_reason}</p>
+              </div>
+            </div>
+          )}
+          {candidate.status === "pending_rejection" && (
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning-light px-3.5 py-2.5">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="mt-0.5 shrink-0 text-warning">
+                <path d="M8 1.5L15 14H1z" />
+                <path d="M8 6.5v3M8 11.5v.5" />
+              </svg>
+              <div>
+                <p className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-warning">Rejection recommended — awaiting your decision</p>
+                <p className="mt-0.5 text-sm text-charcoal">
+                  {candidate.rejection_reason ??
+                    "The AI recommended rejecting this candidate. No rejection happens until you accept it."}
+                </p>
               </div>
             </div>
           )}
@@ -465,6 +486,19 @@ export default async function CandidateDetailPage({ params }: Props) {
           <CandidateNotes
             candidateId={candidate.id}
             initialShortlistNotes={candidate.shortlist_notes ?? ""}
+          />
+
+          {/* Decision History — human-in-the-loop rejection trail */}
+          <DecisionHistory
+            entries={decisionTrail.map((e) => ({
+              id: e.id,
+              action: e.action,
+              reason: e.reason,
+              reason_sent_to_candidate: e.reason_sent_to_candidate,
+              actor_name: e.actor_name,
+              actor_email: e.actor_email,
+              created_at: e.created_at.toISOString(),
+            }))}
           />
 
           {/* Audit Log */}

@@ -149,12 +149,14 @@ async function handleEmailJob(
       );
       break;
     case "rejected":
+      // payload.adminReason is present only when the reviewer opted to share
+      // their note with the candidate (off by default); it's appended verbatim.
       await sendCandidateEmail(
         email,
         resolveEmailSubject("rejection", {
           campaign: { role_title: roleTitle },
         }),
-        rejectionEmail(emailTheme, name, roleTitle, clientName),
+        rejectionEmail(emailTheme, name, roleTitle, clientName, payload.adminReason),
         candidateId,
         identity
       );

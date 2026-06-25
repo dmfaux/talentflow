@@ -99,6 +99,7 @@ const STATUS_LABELS: Record<string, string> = {
   scoring: "SCORING",
   scored: "SCORED",
   follow_up: "FOLLOW-UP",
+  pending_rejection: "AWAITING DECISION",
   shortlisted: "SHORTLISTED",
   rejected: "REJECTED",
   withdrawn: "WITHDRAWN",

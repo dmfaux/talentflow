@@ -327,6 +327,14 @@ export const candidates = pgTable(
      *  the chat and triggers a re-score before the job fires, this is cleared
      *  and the queued email self-checks and no-ops. */
     pending_rejection_at: timestamp("pending_rejection_at"),
+    /** Set when the AI parks a candidate in `pending_rejection` (recommended for
+     *  rejection, awaiting a human decision). Anchors the stale-pending reminder
+     *  sweep — never overwritten by unrelated edits, unlike updated_at. Cleared
+     *  when a human accepts or dismisses the recommendation. */
+    rejection_recommended_at: timestamp("rejection_recommended_at"),
+    /** Last time a stale-pending reminder was emailed to the brand's recruiters.
+     *  Gates the reminder cadence (first after N days, then weekly). */
+    rejection_reminded_at: timestamp("rejection_reminded_at"),
     /** Set when the chat-nudge job has fired for a ghosting candidate, so the
      *  nudge isn't sent twice. */
     nudge_sent_at: timestamp("nudge_sent_at"),
@@ -731,6 +739,7 @@ export const candidatesRelations = relations(candidates, ({ one, many }) => ({
   messages: many(messages),
   conversations: many(conversations),
   chatTokens: many(chatTokens),
+  actionAudit: many(candidateActionAudit),
 }));
 
 export const scoringLogsRelations = relations(scoringLogs, ({ one }) => ({
@@ -911,6 +920,73 @@ export const operatorAuditRelations = relations(operatorAudit, ({ one }) => ({
     references: [organizations.id],
   }),
 }));
+
+// ── Candidate action audit (human-in-the-loop rejection) ────────────
+//
+// The ORG-SCOPED, append-only accountability trail for human decisions on a
+// candidate's lifecycle — born from the rule that the AI may RECOMMEND a
+// rejection but a human must ACCEPT it. Distinct from operator_audit (which is
+// operator-keyed and tenant-LESS): this is tenant-readable, keyed by org_id.
+//
+// FK lifecycle: org_id CASCADE (the trail is tenant data and dies with the org).
+// candidate_id SET NULL so a POPIA candidate purge (S11) keeps the action record
+// without resurrecting the candidate. actor_user_id SET NULL so the row outlives
+// the actor — and is NULLABLE on purpose: a null actor marks a SYSTEM/AI event
+// (e.g. the AI parking a candidate in pending_rejection), which has no human.
+// `action` is free-text validated against an in-code allow-list so new actions
+// extend it without a migration. metadata holds the non-PII AI snapshot
+// (ai_score, recommendation, min_score) — never candidate PII, so it survives a
+// POPIA purge cleanly.
+export const candidateActionAudit = pgTable(
+  "candidate_action_audit",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    org_id: uuid("org_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    candidate_id: uuid("candidate_id").references(() => candidates.id, {
+      onDelete: "set null", // keep the action record after a POPIA candidate purge
+    }),
+    actor_user_id: uuid("actor_user_id").references(() => users.id, {
+      onDelete: "set null", // audit outlives the actor; NULL = system/AI action
+    }),
+    action: text("action").notNull(), // reject_recommended | reject_accepted | reject_dismissed
+    from_status: text("from_status"),
+    to_status: text("to_status"),
+    reason: text("reason"), // human's optional note (internal + optionally emailed)
+    reason_sent_to_candidate: boolean("reason_sent_to_candidate")
+      .notNull()
+      .default(false),
+    metadata: jsonb("metadata"), // non-PII AI snapshot: {ai_score, recommendation, min_score, ai_rationale}
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("candidate_action_audit_candidate_idx").on(table.candidate_id),
+    index("candidate_action_audit_org_created_idx").on(
+      table.org_id,
+      table.created_at
+    ),
+    index("candidate_action_audit_action_idx").on(table.action),
+  ]
+);
+
+export const candidateActionAuditRelations = relations(
+  candidateActionAudit,
+  ({ one }) => ({
+    candidate: one(candidates, {
+      fields: [candidateActionAudit.candidate_id],
+      references: [candidates.id],
+    }),
+    actor: one(users, {
+      fields: [candidateActionAudit.actor_user_id],
+      references: [users.id],
+    }),
+    org: one(organizations, {
+      fields: [candidateActionAudit.org_id],
+      references: [organizations.id],
+    }),
+  })
+);
 
 // ── Usage rollups (usage-based pricing, Phase 6/7) ──────────────────
 //

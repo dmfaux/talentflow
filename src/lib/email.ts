@@ -721,6 +721,39 @@ export function spendAlertEmail(input: {
   `);
 }
 
+/** Internal staff reminder that candidates are sitting in `pending_rejection`
+ *  awaiting a human accept/dismiss decision (human-in-the-loop rejection). Sent
+ *  to a brand's recruiters/admins when items go stale — first after a few days,
+ *  then weekly. Org/brand-level, non-campaign → always the default theme, sent
+ *  unmetered via sendTransactionalEmail. brandName + recipientName are DB free
+ *  text → HTML-escaped. */
+export function pendingRejectionReminderEmail(input: {
+  recipientName: string;
+  brandName: string;
+  count: number;
+  oldestDays: number;
+  reviewUrl: string;
+}): string {
+  const brand = escapeHtml(input.brandName);
+  const name = escapeHtml(input.recipientName.trim() || "there");
+  const verb = input.count === 1 ? "candidate is" : "candidates are";
+  const days = `${input.oldestDays} day${input.oldestDays === 1 ? "" : "s"}`;
+  const { wrapTemplate, emailHeading, emailP, emailInfoCard, emailBtn, emailFallbackLink, emailNote } =
+    makeEmailKit(DEFAULT_EMAIL_THEME);
+  return wrapTemplate(`
+    ${emailHeading("Action needed", "Candidates awaiting your decision")}
+    ${emailP(`Hi ${name},`)}
+    ${emailP(`<strong>${input.count}</strong> ${verb} recommended for rejection on <strong>${brand}</strong> and waiting for someone to accept or dismiss the recommendation. No candidate is rejected automatically &mdash; these stay open until a person decides.`)}
+    ${emailInfoCard([
+      ["Awaiting decision", String(input.count)],
+      ["Oldest waiting", days],
+    ])}
+    ${emailBtn("Review candidates", input.reviewUrl)}
+    ${emailFallbackLink(input.reviewUrl)}
+    ${emailNote("You&rsquo;re receiving this because you manage candidates for this brand.")}
+  `);
+}
+
 /** South African EFT tax invoice email (usage-based pricing, Phase 6). Org-level
  *  → always the default theme, sent unmetered. The `issued` variant lists the
  *  priced lines; `overdue` is a payment reminder. VAT number + EFT banking
@@ -833,9 +866,19 @@ export function rejectionEmail(
   theme: EmailTheme,
   candidateName: string,
   roleTitle: string,
-  clientName: string
+  clientName: string,
+  /** Optional reviewer feedback, shown to the candidate ONLY when the reviewer
+   *  opted in. Rendered verbatim (HTML-escaped) as a feedback paragraph before
+   *  the standard closing note. */
+  reviewerFeedback?: string
 ): string {
   const { emailP, emailNote } = makeEmailKit(theme);
+  const cleaned = reviewerFeedback?.trim();
+  const feedbackBlock = cleaned
+    ? emailP(
+        `The reviewer shared the following feedback: &ldquo;${escapeHtml(cleaned)}&rdquo;`
+      )
+    : "";
   return renderThemedEmail({
     type: "rejection",
     theme,
@@ -851,9 +894,9 @@ export function rejectionEmail(
     defaultMessageHtml: emailP(
       `Thank you for your interest in the <strong>${roleTitle}</strong> position at <strong>${clientName}</strong>. After careful consideration, we&rsquo;ve decided not to move forward with your application at this time.`
     ),
-    extrasHtml: emailNote(
+    extrasHtml: `${feedbackBlock ? `${feedbackBlock}\n    ` : ""}${emailNote(
       "We appreciate the time you invested and encourage you to keep an eye out for future opportunities. We wish you all the best in your career."
-    ),
+    )}`,
   });
 }
 

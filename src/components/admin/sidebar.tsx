@@ -9,6 +9,7 @@ import { canManageOrg, useTenant } from "./tenant-provider";
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: "dashboard", orgOnly: false },
   { label: "Campaigns", href: "/campaigns", icon: "campaign", orgOnly: false },
+  { label: "Rejection review", href: "/candidates", icon: "review", orgOnly: false },
   { label: "Brands", href: "/clients", icon: "client", orgOnly: true },
   { label: "Members", href: "/users", icon: "users", orgOnly: true },
   { label: "Settings", href: "/settings", icon: "settings", orgOnly: true },
@@ -42,6 +43,13 @@ const ICONS: Record<string, React.ReactNode> = {
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="8" cy="5.5" r="2.5" />
       <path d="M3 13.5c0-2.5 2.2-4 5-4s5 1.5 5 4" />
+    </svg>
+  ),
+  review: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="6.5" cy="5.5" r="2.5" />
+      <path d="M2 13c0-2.4 2-3.75 4.5-3.75" />
+      <path d="M9.5 11.5l1.75 1.75L14 9.5" />
     </svg>
   ),
   users: (

@@ -9,6 +9,7 @@ import {
   invitationEmail,
   noResponseEmail,
   passwordResetEmail,
+  pendingRejectionReminderEmail,
   rejectionConfirmationEmail,
   rejectionEmail,
   resolveEmailSubject,
@@ -65,6 +66,29 @@ describe("email templates — byte-identical default render", () => {
   it("rejectionEmail", () => {
     expect(
       rejectionEmail(DEFAULT_EMAIL_THEME, NAME, ROLE, CLIENT)
+    ).toMatchSnapshot();
+  });
+
+  // Human-in-the-loop rejection: when the reviewer opts to share their note, it
+  // renders as a verbatim (escaped) feedback paragraph. ADMIN_REASON carries
+  // quotes/apostrophes so the escape path is locked.
+  it("rejectionEmail with reviewer feedback", () => {
+    expect(
+      rejectionEmail(DEFAULT_EMAIL_THEME, NAME, ROLE, CLIENT, ADMIN_REASON)
+    ).toMatchSnapshot();
+  });
+
+  // Internal staff reminder for stale pending_rejection items; brandName carries
+  // & and angle brackets so escaping is verified.
+  it("pendingRejectionReminderEmail", () => {
+    expect(
+      pendingRejectionReminderEmail({
+        recipientName: NAME,
+        brandName: CLIENT,
+        count: 4,
+        oldestDays: 9,
+        reviewUrl: "https://app.talentstream.co.za/candidates?status=pending_rejection",
+      })
     ).toMatchSnapshot();
   });
 

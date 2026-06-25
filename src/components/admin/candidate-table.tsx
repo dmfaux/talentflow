@@ -29,6 +29,9 @@ const STATUS_STYLES: Record<string, string> = {
   scoring: "text-warning",
   scored: "text-accent",
   follow_up: "text-warning",
+  // Recommended for rejection by the AI but awaiting a human accept/dismiss —
+  // amber, never red, because no rejection decision has been made yet.
+  pending_rejection: "text-warning",
   shortlisted: "text-gold",
   rejected: "text-red",
   withdrawn: "text-txt-muted",
@@ -43,7 +46,7 @@ const CONFIDENCE_STYLES: Record<string, string> = {
   low: "bg-red-light text-red",
 };
 
-const STATUSES = ["all", "gating_passed", "scored", "follow_up", "shortlisted", "rejected", "no_response"] as const;
+const STATUSES = ["all", "gating_passed", "scored", "follow_up", "pending_rejection", "shortlisted", "rejected", "no_response"] as const;
 const SORT_OPTIONS = [
   { value: "score_desc", label: "Score (high to low)" },
   { value: "score_asc", label: "Score (low to high)" },
