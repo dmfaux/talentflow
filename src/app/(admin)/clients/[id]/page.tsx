@@ -1,6 +1,7 @@
 "use client";
 
 import { TierBadge } from "@/components/admin/tier-badge";
+import { useTenant } from "@/components/admin/tenant-provider";
 import Link from "next/link";
 import { useEffect, useState, FormEvent } from "react";
 import { useParams } from "next/navigation";
@@ -16,7 +17,6 @@ interface Campaign {
 interface Client {
   id: string;
   name: string;
-  tier: string | null;
   contact_name: string | null;
   contact_email: string | null;
   contact_phone: string | null;
@@ -45,6 +45,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function ClientDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const tenant = useTenant();
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -151,7 +152,7 @@ export default function ClientDetailPage() {
               <h1 className="text-lg font-semibold text-charcoal">
                 {client.name}
               </h1>
-              <TierBadge tier={client.tier ?? "standard"} size="md" />
+              <TierBadge tier={tenant.orgTier} size="md" />
             </div>
             <div className="mt-1 flex items-center gap-2 text-xs">
               <span

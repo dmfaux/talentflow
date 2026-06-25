@@ -4,17 +4,15 @@ import { BrandingSection, type BrandingValues } from "@/components/admin/brandin
 import { LiveCampaignPreview } from "@/components/admin/live-campaign-preview";
 import { ThemeCard, type Theme } from "@/components/admin/theme-card";
 import { TierBadge } from "@/components/admin/tier-badge";
+import { useTenant } from "@/components/admin/tenant-provider";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-
-type Tier = "standard" | "premium" | "enterprise";
 
 interface Client {
   id: string;
   name: string;
   slug: string;
-  tier: string | null;
   contact_name: string | null;
   contact_email: string | null;
   contact_phone: string | null;
@@ -30,13 +28,6 @@ interface Client {
   default_theme_id: string | null;
 }
 
-function normaliseTier(value: string | null | undefined): Tier {
-  if (value === "premium" || value === "enterprise" || value === "standard") {
-    return value;
-  }
-  return "standard";
-}
-
 const DEFAULT_BRANDING: BrandingValues = {
   logo_url: null,
   logo_background: "light",
@@ -50,6 +41,10 @@ const DEFAULT_BRANDING: BrandingValues = {
 export default function EditClientPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const tenant = useTenant();
+  // Tier is org-level (clients.tier is a dead mirror); read it from the tenant
+  // context so the badge + custom-theme gate reflect the org's real plan.
+  const tier = tenant.orgTier;
   const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -57,7 +52,6 @@ export default function EditClientPage() {
   const [saveError, setSaveError] = useState("");
   const [name, setName] = useState("");
   const [branding, setBranding] = useState<BrandingValues>(DEFAULT_BRANDING);
-  const [tier, setTier] = useState<Tier>("standard");
   const [themes, setThemes] = useState<Theme[]>([]);
   const [defaultThemeId, setDefaultThemeId] = useState<string | null>(null);
 
@@ -70,7 +64,6 @@ export default function EditClientPage() {
       .then(({ data }: { data: Client }) => {
         setClient(data);
         setName(data.name);
-        setTier(normaliseTier(data.tier));
         setDefaultThemeId(data.default_theme_id);
         setBranding({
           logo_url: data.branding_logo_url,

@@ -3,45 +3,10 @@
 import { BrandingSection, type BrandingValues } from "@/components/admin/branding-section";
 import { LiveCampaignPreview } from "@/components/admin/live-campaign-preview";
 import { canManageOrg, useTenant } from "@/components/admin/tenant-provider";
+import { TierBadge } from "@/components/admin/tier-badge";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
-
-type Tier = "standard" | "premium" | "enterprise";
-
-const TIER_OPTIONS: Array<{
-  value: Tier;
-  label: string;
-  tagline: string;
-  helper: string;
-  badgeClass: string;
-  badgeStyle?: React.CSSProperties;
-}> = [
-  {
-    value: "standard",
-    label: "Standard",
-    tagline: "Shared templates",
-    helper: "Pay per campaign. Access to the shared template library.",
-    badgeClass: "bg-canvas-2 text-ink-muted",
-  },
-  {
-    value: "premium",
-    label: "Premium",
-    tagline: "One bespoke template",
-    helper:
-      "Includes one bespoke template. Pay per campaign at a reduced rate.",
-    badgeClass: "",
-    badgeStyle: { backgroundColor: "#e8eeff", color: "#1a45d4" },
-  },
-  {
-    value: "enterprise",
-    label: "Enterprise",
-    tagline: "Unlimited & bespoke",
-    helper:
-      "Monthly retainer. Unlimited campaigns, multiple bespoke templates, dedicated support.",
-    badgeClass: "bg-vermillion-soft text-vermillion-deep",
-  },
-];
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -68,7 +33,6 @@ export default function NewClientPage() {
   const [slugManual, setSlugManual] = useState(false);
   const [slugChecking, setSlugChecking] = useState(false);
   const [branding, setBranding] = useState<BrandingValues>(INITIAL_BRANDING);
-  const [tier, setTier] = useState<Tier>("standard");
 
   // Stable UUID for this draft client — used as the logo upload path prefix
   // and then passed to POST so the server stores the same id.
@@ -124,7 +88,8 @@ export default function NewClientPage() {
           id: draftId,
           name: trimmedName,
           slug,
-          tier,
+          // tier is operator-set on the org (the server ignores any value sent
+          // here); new brands inherit the org's plan.
           contact_name: (form.get("contact_name") as string) || null,
           contact_email: (form.get("contact_email") as string) || null,
           contact_phone: (form.get("contact_phone") as string) || null,
@@ -279,43 +244,20 @@ export default function NewClientPage() {
           </div>
         </div>
 
-        {/* ── Subscription Tier ─────────────────────────────────── */}
+        {/* ── Subscription Tier (inherited — operator-set) ──────── */}
         <div className="rounded-xl border border-border bg-surface p-8">
           <h2 className="font-display mb-2 text-base font-medium text-charcoal">
             Subscription Tier
           </h2>
           <p className="mb-5 text-[0.75rem] text-txt-muted">
-            Choose the plan that best fits this brand&apos;s needs.
+            New brands inherit your organisation&apos;s plan, which is set by
+            TalentStream and applies across every brand.
           </p>
-          <div className="grid grid-cols-3 gap-2">
-            {TIER_OPTIONS.map((opt) => {
-              const selected = tier === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setTier(opt.value)}
-                  className={`flex flex-col gap-1.5 rounded-lg border px-3 py-2.5 text-left transition-colors cursor-pointer ${
-                    selected
-                      ? "border-cobalt bg-cobalt-tint"
-                      : "border-border bg-paper hover:border-border-strong"
-                  }`}
-                >
-                  <span
-                    className={`inline-flex w-fit items-center rounded px-1.5 py-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.14em] ${opt.badgeClass}`}
-                    style={opt.badgeStyle}
-                  >
-                    {opt.label}
-                  </span>
-                  <span className="text-[0.8rem] font-medium text-charcoal">
-                    {opt.tagline}
-                  </span>
-                  <span className="text-[0.7rem] leading-snug text-txt-muted">
-                    {opt.helper}
-                  </span>
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-3 rounded-lg bg-cream/60 px-4 py-3">
+            <TierBadge tier={tenant.orgTier} size="md" />
+            <span className="text-[0.75rem] text-txt-muted">
+              Contact TalentStream to change your plan.
+            </span>
           </div>
         </div>
 

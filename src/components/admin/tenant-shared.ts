@@ -21,6 +21,10 @@ export interface TenantValue {
   actingOrgId: string | null;
   activeBrandId: string | null;
   orgName: string | null;
+  // The org's authoritative subscription tier (organizations.tier). Brands
+  // inherit it — clients.tier is a never-written legacy mirror that always
+  // reads "standard", so brand-tier UI must source the tier from here.
+  orgTier: string;
   brands: TenantBrand[];
 }
 

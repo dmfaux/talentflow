@@ -10,15 +10,11 @@ import { useEffect, useMemo, useState } from "react";
 interface Client {
   id: string;
   name: string;
-  tier: string | null;
   contact_name: string | null;
   contact_email: string | null;
   is_active: boolean | null;
   campaigns?: unknown[];
 }
-
-const TIERS = ["all", "standard", "premium", "enterprise"] as const;
-type TierFilter = (typeof TIERS)[number];
 
 const PAGE_SIZE = 20;
 
@@ -29,9 +25,9 @@ export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Filters
+  // Filters — tier is an org-level attribute every brand inherits, so there's
+  // nothing per-brand to filter on; only search + status remain.
   const [search, setSearch] = useState("");
-  const [tierFilter, setTierFilter] = useState<TierFilter>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
 
   // Pagination
@@ -47,7 +43,6 @@ export default function ClientsPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return clients.filter((c) => {
-      if (tierFilter !== "all" && (c.tier ?? "standard") !== tierFilter) return false;
       if (statusFilter === "active" && c.is_active === false) return false;
       if (statusFilter === "inactive" && c.is_active !== false) return false;
       if (q) {
@@ -58,19 +53,18 @@ export default function ClientsPage() {
       }
       return true;
     });
-  }, [clients, search, tierFilter, statusFilter]);
+  }, [clients, search, statusFilter]);
 
   // Reset page when filters change
-  useEffect(() => { setPage(0); }, [search, tierFilter, statusFilter]);
+  useEffect(() => { setPage(0); }, [search, statusFilter]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paged = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const hasActiveFilters = search.trim() !== "" || tierFilter !== "all" || statusFilter !== "all";
+  const hasActiveFilters = search.trim() !== "" || statusFilter !== "all";
 
   function clearFilters() {
     setSearch("");
-    setTierFilter("all");
     setStatusFilter("all");
   }
 
@@ -137,19 +131,6 @@ export default function ClientsPage() {
             </button>
           )}
         </div>
-
-        {/* Tier filter */}
-        <select
-          value={tierFilter}
-          onChange={(e) => setTierFilter(e.target.value as TierFilter)}
-          className="h-9 rounded-lg border border-border bg-surface px-2.5 text-[0.78rem] font-medium text-txt-secondary outline-none focus:border-accent cursor-pointer capitalize"
-        >
-          {TIERS.map((t) => (
-            <option key={t} value={t}>
-              {t === "all" ? "All tiers" : t}
-            </option>
-          ))}
-        </select>
 
         {/* Status filter */}
         <select
@@ -233,7 +214,7 @@ export default function ClientsPage() {
                       className="inline-flex items-center gap-2 text-sm font-medium text-charcoal group-hover:text-accent"
                     >
                       <span className="text-[0.95rem] font-medium text-ink">{client.name}</span>
-                      <TierBadge tier={client.tier ?? "standard"} />
+                      <TierBadge tier={tenant.orgTier} />
                     </Link>
                   </td>
                   <td className="px-5 py-3 text-sm text-txt-secondary">

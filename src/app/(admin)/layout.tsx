@@ -35,7 +35,7 @@ export default async function AdminLayout({
   const actingOrg = ctx.actingOrgId
     ? await db.query.organizations.findFirst({
         where: eq(organizations.id, ctx.actingOrgId),
-        columns: { name: true, status: true },
+        columns: { name: true, status: true, tier: true },
       })
     : null;
 
@@ -53,7 +53,7 @@ export default async function AdminLayout({
     (ctx.effectiveOrgId
       ? await db.query.organizations.findFirst({
           where: eq(organizations.id, ctx.effectiveOrgId),
-          columns: { name: true },
+          columns: { name: true, tier: true },
         })
       : null);
 
@@ -64,6 +64,9 @@ export default async function AdminLayout({
     actingOrgId: ctx.actingOrgId,
     activeBrandId: ctx.activeBrandId,
     orgName: org?.name ?? null,
+    // Authoritative tier from the org; brands inherit it (clients.tier is a
+    // dead mirror). Defaults to "standard" only if the org row is missing.
+    orgTier: org?.tier ?? "standard",
     brands: [] as TenantBrand[],
   };
 
