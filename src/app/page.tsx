@@ -114,7 +114,7 @@ function Navbar() {
         }`}
       >
         <div className="mx-auto max-w-[1240px] px-6 sm:px-10 flex items-center justify-between h-16 sm:h-[68px]">
-          <a href="#" className="group" aria-label="TalentStream">
+          <a href="/" className="group" aria-label="TalentStream — home">
             <Logo size="lg" />
           </a>
 
