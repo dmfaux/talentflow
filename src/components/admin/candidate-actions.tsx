@@ -160,7 +160,7 @@ export function CandidateActions({ candidateId, status, hasCv, canManage = true 
             <button
               onClick={() => { setDecision("accept"); setDecisionReason(""); setNotifyCandidate(false); }}
               disabled={!!loading}
-              className="inline-flex h-8 items-center rounded-lg border border-border px-3 text-[0.75rem] font-medium text-red transition-colors hover:bg-red-light cursor-pointer disabled:opacity-50"
+              className="inline-flex h-8 items-center rounded-lg bg-red px-3 text-[0.75rem] font-medium text-white transition-colors hover:bg-red/90 cursor-pointer disabled:opacity-50"
             >
               Accept rejection
             </button>
