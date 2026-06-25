@@ -5,6 +5,7 @@ import { campaigns, candidates } from "@/db/schema";
 import { and, desc, asc, eq, sql } from "drizzle-orm";
 import { CampaignActions } from "@/components/admin/campaign-actions";
 import { CampaignTabs } from "@/components/admin/campaign-tabs";
+import { CampaignUrl } from "@/components/admin/campaign-url";
 import { CandidateTable } from "@/components/admin/candidate-table";
 import { ShortlistTab } from "@/components/admin/shortlist-tab";
 import { canAccessBrand, orgScope, requireTenant } from "@/lib/tenant";
@@ -209,9 +210,7 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
                   : "\u2014"}
             </span>
             <span className="text-txt-muted">&middot;</span>
-            <a href={campaignUrl} target="_blank" rel="noopener noreferrer" className="font-mono text-accent hover:underline">
-              {campaignUrl.replace("https://", "")}
-            </a>
+            <CampaignUrl url={campaignUrl} />
           </div>
         </div>
         <CampaignActions campaignId={campaign.id} status={campaign.status} canManage={canManageCampaign} />
