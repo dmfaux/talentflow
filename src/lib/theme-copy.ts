@@ -22,7 +22,9 @@ export interface LandingCopy {
   headline: string; // hero eyebrow/tagline above the role title
   intro: string; // a lead paragraph shown above the role description
   highlights: string[]; // short selling-point bullets
-  applyHeading: string; // heading on the apply card, e.g. "Apply for this role"
+  // NB: there is no apply-card heading here — ApplicationForm renders its own
+  // "Apply for this role" heading + helper, so the landing template adds none
+  // (see src/lib/landing.ts). Re-adding one here would duplicate it.
 }
 
 export const DEFAULT_LANDING_COPY: LandingCopy = {
@@ -34,7 +36,6 @@ export const DEFAULT_LANDING_COPY: LandingCopy = {
     "Meaningful, high-impact work",
     "A fair, transparent hiring process",
   ],
-  applyHeading: "Apply for this role",
 };
 
 // ── Email copy ──────────────────────────────────────────────────

@@ -127,27 +127,26 @@ describe("makeLandingTemplate", () => {
     // No unreplaced slot markers survive.
     expect(rendered).not.toMatch(/\{\{/);
     expect(rendered).toContain("Staff Engineer");
-    // Department now renders as the first meta PILL (the eyebrow is the headline).
-    expect(rendered).toContain('<span class="ats-pill">Engineering</span>');
+    // Department now renders as a "role at a glance" fact tile (label + value).
+    expect(rendered).toContain('<span class="ats-fact-v">Engineering</span>');
     expect(rendered).toContain("Acme &amp; Co"); // escaped company name
     expect(rendered).toContain("Build things that matter.");
     // The headline copy carries a {{client.name}} slot → it is resolved + escaped
     // in element content by the downstream replaceSlots pass (not pre-escaped).
     expect(rendered).toContain('<p class="ats-eyebrow">Join Acme &amp; Co</p>');
-    // Empty optional fields → their pills are stripped (location/type/salary): the
-    // only ats-pill spans left are the single department pill.
-    expect((rendered.match(/class="ats-pill"/g) ?? []).length).toBe(1);
+    // Empty optional fields → their tiles are stripped (location/type/salary): the
+    // only fact tile left is the single department one.
+    expect((rendered.match(/class="ats-fact"/g) ?? []).length).toBe(1);
   });
 
   it("renders the resolved landing copy with the default theme copy", () => {
     const html = makeLandingTemplate(THEME);
-    // Headline → hero eyebrow; applyHeading → apply-card head; intro → lead para.
+    // Headline → hero eyebrow; intro → lead para. The apply heading is NOT
+    // rendered here: ApplicationForm renders its own (avoids a duplicate).
     expect(html).toContain(
       `<p class="ats-eyebrow">${DEFAULT_LANDING_COPY.headline}</p>`
     );
-    expect(html).toContain(
-      `<h2 class="ats-apply-head">${DEFAULT_LANDING_COPY.applyHeading}</h2>`
-    );
+    expect(html).not.toContain('class="ats-apply-head"');
     expect(html).toContain(`<p class="ats-intro">${DEFAULT_LANDING_COPY.intro}</p>`);
     // Each default highlight appears as a bulleted list item.
     for (const h of DEFAULT_LANDING_COPY.highlights) {

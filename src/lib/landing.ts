@@ -20,6 +20,15 @@
 //     construction;
 //   • NO <script> (form logic is the app's job).
 //
+// Layout: the role brief and the application face each other from the first
+// pixel — a wide editorial column (eyebrow → title → intro → a "role at a
+// glance" fact panel → highlights → About) beside an elevated apply card, so
+// the form is visible without scrolling past an empty hero. The apply card
+// mounts the form ONLY; ApplicationForm renders its own "Apply for this role"
+// heading + helper, so this template adds no heading of its own (avoids a
+// duplicate). Every colour comes from the palette tokens, so the layout holds
+// on light and dark themes alike.
+//
 // PURE + db-free on purpose: it takes an EmailTheme value, imports `EmailTheme`
 // as a type only, and pulls nothing from theme.ts (which imports @/db). That
 // keeps it safe to import anywhere and trivially unit-testable.
@@ -99,10 +108,10 @@ export function makeLandingTemplate(theme: EmailTheme): string {
     ? `\n      <footer class="ats-footer">Powered by TalentStream</footer>`
     : "";
 
-  // Fixed landing copy (headline / intro / highlights / apply heading). The
-  // strings MAY embed slot tokens like {{client.name}}; they are inserted RAW into
-  // element CONTENT so embedded {{slots}} survive the downstream replaceSlots pass
-  // and are escaped THERE (escapeAttr stays for the logo URL/attributes only).
+  // Fixed landing copy (headline / intro / highlights). The strings MAY embed
+  // slot tokens like {{client.name}}; they are inserted RAW into element CONTENT
+  // so embedded {{slots}} survive the downstream replaceSlots pass and are
+  // escaped THERE (escapeAttr stays for the logo URL/attributes only).
   const copy = DEFAULT_LANDING_COPY;
 
   // CT7 web fonts: one @import per resolved font URL. A MISSING value (pre-CT7
@@ -113,8 +122,8 @@ export function makeLandingTemplate(theme: EmailTheme): string {
     .map((u) => `@import url('${u}');`)
     .join("\n    ");
 
-  // Highlights → a tinted bulleted list. Empty array → render nothing (no empty
-  // <ul> container). Each item is raw operator copy (see the copy note above).
+  // Highlights → a checked selling-point list. Empty array → render nothing (no
+  // empty <ul> container). Each item is raw operator copy (see the copy note).
   const highlights =
     copy.highlights.length > 0
       ? `\n        <ul class="ats-highlights">
@@ -147,41 +156,49 @@ ${paletteVars(theme.palette)}
       color: var(--ink-soft);
       font-family: var(--font-sans);
       font-size: 17px;
-      line-height: 1.65;
+      line-height: 1.6;
       -webkit-font-smoothing: antialiased;
     }
+    a { color: var(--primary); }
 
     .ats-landing { min-height: 100vh; display: flex; flex-direction: column; }
 
-    /* Header — brand mark only, quiet. */
+    /* Header — brand mark only, quiet, defined by a hairline. */
     .ats-header {
       display: flex;
       align-items: center;
-      padding: 22px clamp(20px, 5vw, 64px);
+      padding: 20px clamp(20px, 5vw, 56px);
       background: var(--card);
       border-bottom: 1px solid var(--border);
     }
     .ats-header--top-left { justify-content: flex-start; }
     .ats-header--top-centre { justify-content: center; }
-    .ats-logo { display: block; max-height: 40px; width: auto; }
+    .ats-logo { display: block; max-height: 38px; width: auto; }
     .ats-brand--dark { background: var(--ink); padding: 8px 14px; border-radius: 10px; }
     .ats-brand--text {
       font-family: var(--font-display);
-      font-size: 26px;
+      font-size: 25px;
       color: var(--ink);
       letter-spacing: -0.01em;
     }
 
-    .ats-wrap { width: 100%; max-width: 1120px; margin: 0 auto; padding: clamp(36px, 6vw, 76px) clamp(20px, 5vw, 64px); flex: 1; }
+    .ats-wrap { width: 100%; max-width: 1200px; margin: 0 auto; padding: clamp(34px, 5vw, 64px) clamp(20px, 5vw, 56px); flex: 1; }
+
+    /* The shell: the role brief (left) faces the application (right), from the top. */
+    .ats-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(360px, 1fr);
+      gap: clamp(34px, 4.5vw, 60px);
+      align-items: start;
+    }
 
     /* Hero — the role is the headline. */
-    .ats-hero { max-width: 760px; }
     .ats-eyebrow {
-      margin: 0 0 14px;
+      margin: 0 0 16px;
       font-family: var(--font-sans);
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 600;
-      letter-spacing: 0.14em;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
       color: var(--primary);
     }
@@ -189,44 +206,53 @@ ${paletteVars(theme.palette)}
       margin: 0;
       font-family: var(--font-display);
       font-weight: 400;
-      font-size: clamp(40px, 6.5vw, 68px);
+      font-size: clamp(38px, 5.2vw, 58px);
       line-height: 1.04;
       letter-spacing: -0.02em;
       color: var(--ink);
     }
-    .ats-rule { width: 64px; height: 3px; margin: 28px 0 0; background: var(--primary); border-radius: 2px; }
+    .ats-rule { width: 54px; height: 3px; margin: 26px 0 0; background: var(--primary); border-radius: 2px; }
     .ats-intro {
       margin: 24px 0 0;
-      max-width: 620px;
+      max-width: 60ch;
       font-family: var(--font-sans);
-      font-size: 18px;
+      font-size: clamp(17px, 2vw, 19px);
       color: var(--ink-soft);
     }
-    .ats-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
-    .ats-pill {
-      display: inline-block;
-      padding: 7px 14px;
-      border-radius: 999px;
-      background: var(--primary-tint);
-      color: var(--primary-deep);
-      font-size: 14px;
-      font-weight: 500;
-      line-height: 1.2;
-    }
-    .ats-pill--accent { background: var(--accent); color: var(--ink); }
 
-    /* Highlights — operator selling-points as a tinted bullet list. */
+    /* "Role at a glance" — labelled fact tiles. Each is a self-contained tinted
+       tile, so an absent field simply leaves no tile (never an empty box). */
+    .ats-facts { display: flex; flex-wrap: wrap; gap: 12px; margin: 30px 0 0; }
+    .ats-fact {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 12px 16px;
+      min-width: 132px;
+      background: var(--primary-tint);
+      border-radius: 12px;
+    }
+    .ats-fact-k {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+    }
+    .ats-fact-v { font-size: 15px; font-weight: 600; color: var(--ink); line-height: 1.35; }
+
+    /* Highlights — operator selling-points, checked. */
     .ats-highlights {
       list-style: none;
-      margin: 26px 0 0;
+      margin: 28px 0 0;
       padding: 0;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 11px;
     }
     .ats-highlight {
       position: relative;
-      padding-left: 26px;
+      padding-left: 30px;
       font-family: var(--font-sans);
       font-size: 16px;
       color: var(--ink-soft);
@@ -234,27 +260,26 @@ ${paletteVars(theme.palette)}
     .ats-highlight::before {
       content: "";
       position: absolute;
-      left: 0;
-      top: 0.6em;
-      width: 8px;
+      left: 2px;
+      top: 0.34em;
+      width: 14px;
       height: 8px;
-      border-radius: 999px;
-      background: var(--primary);
+      border-left: 2.5px solid var(--primary);
+      border-bottom: 2.5px solid var(--primary);
+      transform: rotate(-45deg);
     }
 
-    /* Body — description beside the framed apply card. */
-    .ats-body {
-      display: grid;
-      grid-template-columns: minmax(0, 1.7fr) minmax(330px, 1fr);
-      gap: clamp(32px, 5vw, 60px);
-      align-items: start;
-      margin-top: clamp(44px, 6vw, 72px);
+    /* About the role — continues the brief column, set off by a hairline. */
+    .ats-about {
+      margin-top: clamp(34px, 4vw, 44px);
+      padding-top: clamp(30px, 3.5vw, 40px);
+      border-top: 1px solid var(--border);
     }
-    .ats-about-head, .ats-apply-head {
-      margin: 0 0 18px;
+    .ats-about-head {
+      margin: 0 0 16px;
       font-family: var(--font-display);
       font-weight: 400;
-      font-size: 25px;
+      font-size: 26px;
       letter-spacing: -0.01em;
       color: var(--ink);
     }
@@ -271,28 +296,27 @@ ${paletteVars(theme.palette)}
     .ats-description ul, .ats-description ol { margin: 0 0 16px; padding-left: 22px; }
     .ats-description li { margin: 0 0 8px; }
 
-    /* Apply card — the conversion moment. Primary accent edge, no risky
-       text-on-primary (the form supplies its own brand-coloured button). */
-    .ats-apply { position: sticky; top: 28px; }
+    /* Apply card — the conversion moment. Elevated, with a primary top edge; the
+       form mounts here and supplies its own heading + brand-coloured button. */
+    .ats-apply { position: relative; }
     .ats-apply-card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-top: 3px solid var(--primary);
-      border-radius: 14px;
-      padding: clamp(24px, 3vw, 32px);
-      box-shadow: 0 1px 2px rgba(17, 18, 60, 0.04);
+      border-top: 4px solid var(--primary);
+      border-radius: 16px;
+      padding: clamp(24px, 2.6vw, 34px);
+      box-shadow: 0 18px 40px -24px rgba(15, 23, 42, 0.45);
     }
 
     .ats-footer {
-      padding: 32px 20px 40px;
+      padding: 36px 20px 44px;
       text-align: center;
       font-size: 13px;
       color: var(--ink-faint);
     }
 
-    @media (max-width: 880px) {
-      .ats-body { grid-template-columns: 1fr; }
-      .ats-apply { position: static; }
+    @media (max-width: 900px) {
+      .ats-shell { grid-template-columns: 1fr; gap: 36px; }
     }
   </style>
 </head>
@@ -303,29 +327,25 @@ ${paletteVars(theme.palette)}
     </header>
 
     <div class="ats-wrap">
-      <section class="ats-hero">
-        <p class="ats-eyebrow">${copy.headline}</p>
-        <h1 class="ats-title">{{campaign.role_title}}</h1>
-        <div class="ats-rule"></div>
-        <p class="ats-intro">${copy.intro}</p>
-        <div class="ats-meta">
-          {{#campaign.department}}<span class="ats-pill">{{campaign.department}}</span>{{/campaign.department}}
-          {{#campaign.location}}<span class="ats-pill">{{campaign.location}}</span>{{/campaign.location}}
-          {{#campaign.employment_type}}<span class="ats-pill">{{campaign.employment_type}}</span>{{/campaign.employment_type}}
-          {{#campaign.salary_range}}<span class="ats-pill ats-pill--accent">{{campaign.salary_range}}</span>{{/campaign.salary_range}}
-        </div>${highlights}
-      </section>
-
-      <div class="ats-body">
-        <main class="ats-main">
+      <div class="ats-shell">
+        <div class="ats-brief">
+          <p class="ats-eyebrow">${copy.headline}</p>
+          <h1 class="ats-title">{{campaign.role_title}}</h1>
+          <div class="ats-rule"></div>
+          <p class="ats-intro">${copy.intro}</p>
+          <div class="ats-facts">
+            {{#campaign.department}}<div class="ats-fact"><span class="ats-fact-k">Department</span><span class="ats-fact-v">{{campaign.department}}</span></div>{{/campaign.department}}
+            {{#campaign.location}}<div class="ats-fact"><span class="ats-fact-k">Location</span><span class="ats-fact-v">{{campaign.location}}</span></div>{{/campaign.location}}
+            {{#campaign.employment_type}}<div class="ats-fact"><span class="ats-fact-k">Type</span><span class="ats-fact-v">{{campaign.employment_type}}</span></div>{{/campaign.employment_type}}
+            {{#campaign.salary_range}}<div class="ats-fact"><span class="ats-fact-k">Salary</span><span class="ats-fact-v">{{campaign.salary_range}}</span></div>{{/campaign.salary_range}}
+          </div>${highlights}
           {{#campaign.role_description}}<section class="ats-about">
             <h2 class="ats-about-head">About the role</h2>
             <div class="ats-description">{{campaign.role_description}}</div>
           </section>{{/campaign.role_description}}
-        </main>
+        </div>
         <aside class="ats-apply">
           <div class="ats-apply-card">
-            <h2 class="ats-apply-head">${copy.applyHeading}</h2>
             <div id="application-form"></div>
           </div>
         </aside>

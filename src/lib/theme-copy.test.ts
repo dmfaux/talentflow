@@ -10,7 +10,6 @@ describe("DEFAULT_LANDING_COPY", () => {
     expect(DEFAULT_LANDING_COPY.headline).toBe("Join {{client.name}}");
     expect(DEFAULT_LANDING_COPY.intro).toContain("We're glad you're here.");
     expect(DEFAULT_LANDING_COPY.highlights).toHaveLength(3);
-    expect(DEFAULT_LANDING_COPY.applyHeading).toBe("Apply for this role");
   });
 });
 
