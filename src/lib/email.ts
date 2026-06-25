@@ -635,6 +635,24 @@ export function passwordResetEmail(
   `);
 }
 
+/** Internal team notification for a homepage "request access" enquiry. The source
+ *  is a public, unauthenticated form, so the submitted address is HTML-escaped and
+ *  carried as Reply-To (set by the caller) so the team can respond directly.
+ *  Non-campaign → always the default theme, sent unmetered via
+ *  sendTransactionalEmail. */
+export function contactRequestEmail(email: string, submittedAt: string): string {
+  const addr = escapeHtml(email);
+  const when = escapeHtml(submittedAt);
+  const { wrapTemplate, emailHeading, emailP, emailInfoCard, emailNote } =
+    makeEmailKit(DEFAULT_EMAIL_THEME);
+  return wrapTemplate(`
+    ${emailHeading("New enquiry", "Someone wants to start a campaign")}
+    ${emailP("A visitor requested access from the TalentStream homepage.")}
+    ${emailInfoCard([["Work email", addr], ["Received", when]])}
+    ${emailNote("Just reply to this email to reach them directly.")}
+  `);
+}
+
 /** Colleague invitation to join an org on TalentStream (S8). Credential-granting
  *  link with a 7-day TTL. orgName + inviterName are DB free text → HTML-escaped. */
 export function invitationEmail(

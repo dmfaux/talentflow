@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Logo } from "@/components/brand/logo";
 
 /* ─────────────────────────────────────────────
@@ -902,6 +902,45 @@ function Pricing() {
 function FinalCTA() {
   const ref = useScrollAnimation();
   const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (status === "submitting") return; // guard against double-submit
+    setError(null);
+
+    const form = e.currentTarget;
+    const trimmed = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setError("Please enter a valid email address, like you@company.com.");
+      return;
+    }
+    const company =
+      (form.elements.namedItem("company") as HTMLInputElement | null)?.value ?? "";
+
+    setStatus("submitting");
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmed, company }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setError(
+          data?.error ??
+            "Something went wrong on our end. Please email hello@talentstream.co.za."
+        );
+        setStatus("error");
+        return;
+      }
+      setStatus("success");
+    } catch {
+      setError("We couldn't reach the server. Check your connection and try again.");
+      setStatus("error");
+    }
+  }
 
   return (
     <section ref={ref} id="start" className="py-24 sm:py-36 bg-paper border-t border-rule relative overflow-hidden scroll-mt-20">
@@ -924,28 +963,86 @@ function FinalCTA() {
             <br />
             <span className="font-display-italic text-cobalt">See a shortlist in days.</span>
           </h2>
-          <p className="animate-on-scroll stagger-2 mt-8 text-ink-muted text-[1.05rem] sm:text-[1.15rem] leading-[1.55] max-w-[520px] mx-auto">
-            Set up a branded campaign in minutes, let the AI handle the screening, and watch a ranked shortlist build as candidates apply.
-          </p>
-          <form
-            onSubmit={(e) => e.preventDefault()}
-            className="animate-on-scroll stagger-3 mt-12 flex flex-col sm:flex-row items-stretch gap-3 max-w-[520px] mx-auto"
-          >
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@company.com"
-              className="h-[56px] w-full flex-1 px-5 rounded-full bg-canvas border border-rule text-ink placeholder:text-ink-faint text-[0.95rem] outline-none transition-all duration-200 focus:border-cobalt focus:ring-2 focus:ring-cobalt/20"
-            />
-            <button
-              type="submit"
-              className="arrow-parent group h-[56px] px-7 bg-cobalt text-white font-medium text-[0.95rem] rounded-full hover:bg-cobalt-deep transition-colors duration-300 shrink-0 inline-flex items-center justify-center gap-2.5 lift shadow-[0_8px_24px_-8px_rgba(44,91,255,0.35)]"
+
+          {status === "success" ? (
+            // Not gated by .animate-on-scroll: it mounts after the observer has
+            // run, so a reveal class would leave it stuck hidden. Render visible.
+            <div
+              role="status"
+              className="mt-10 mx-auto max-w-[520px] rounded-2xl border border-moss/30 bg-moss-soft px-6 py-7 text-left"
             >
-              Start a campaign
-              <span className="arrow-slide">→</span>
-            </button>
-          </form>
+              <div className="flex items-start gap-3.5">
+                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-moss text-white">
+                  <svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M3 8.5l3 3 7-7" />
+                  </svg>
+                </span>
+                <div>
+                  <p className="font-display text-ink text-[1.3rem] leading-[1.2] tracking-[-0.01em]">
+                    You&rsquo;re on the list.
+                  </p>
+                  <p className="mt-1.5 text-ink-soft text-[0.95rem] leading-[1.55]">
+                    Thanks &mdash; we&rsquo;re onboarding founding clients and will be in touch within one business day at{" "}
+                    <span className="font-medium text-ink">{email.trim()}</span>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="animate-on-scroll stagger-2 mt-8 text-ink-muted text-[1.05rem] sm:text-[1.15rem] leading-[1.55] max-w-[520px] mx-auto">
+                Tell us where to reach you. We&rsquo;ll set up a branded campaign and you&rsquo;ll watch a ranked shortlist build as candidates apply.
+              </p>
+              <form onSubmit={handleSubmit} noValidate className="animate-on-scroll stagger-3 mt-10 max-w-[520px] mx-auto">
+                <label htmlFor="cta-email" className="sr-only">Work email address</label>
+                {/* Honeypot: invisible to people, catches bots that auto-fill fields. */}
+                <div aria-hidden className="absolute -left-[9999px] h-px w-px overflow-hidden">
+                  <input type="text" name="company" tabIndex={-1} autoComplete="off" />
+                </div>
+                <div className="flex flex-col sm:flex-row items-stretch gap-3">
+                  <input
+                    id="cta-email"
+                    name="email"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (error) setError(null);
+                    }}
+                    placeholder="you@company.com"
+                    aria-invalid={!!error}
+                    aria-describedby={error ? "cta-error cta-help" : "cta-help"}
+                    disabled={status === "submitting"}
+                    className={`h-[56px] w-full flex-1 px-5 rounded-full bg-canvas border text-ink placeholder:text-ink-faint text-[0.95rem] outline-none transition-all duration-200 focus:ring-2 disabled:opacity-60 ${
+                      error
+                        ? "border-red focus:border-red focus:ring-red/20"
+                        : "border-rule focus:border-cobalt focus:ring-cobalt/20"
+                    }`}
+                  />
+                  <button
+                    type="submit"
+                    disabled={status === "submitting"}
+                    className="arrow-parent group h-[56px] px-7 bg-cobalt text-white font-medium text-[0.95rem] rounded-full hover:bg-cobalt-deep transition-colors duration-300 shrink-0 inline-flex items-center justify-center gap-2.5 lift shadow-[0_8px_24px_-8px_rgba(44,91,255,0.35)] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:bg-cobalt"
+                  >
+                    {status === "submitting" ? "Sending…" : "Request access"}
+                    {status !== "submitting" && <span className="arrow-slide">→</span>}
+                  </button>
+                </div>
+                {error && (
+                  <p id="cta-error" role="alert" className="mt-3 text-[0.85rem] text-red text-left sm:text-center">
+                    {error}
+                  </p>
+                )}
+                <p id="cta-help" className="mt-4 text-[0.82rem] text-ink-muted">
+                  No credit card. We reply within one business day.
+                </p>
+              </form>
+            </>
+          )}
+
           <p className="animate-on-scroll stagger-4 mt-6 text-[0.82rem] text-ink-faint">
             Or email{" "}
             <a href="mailto:hello@talentstream.co.za" className="text-ink link-underline font-medium">
