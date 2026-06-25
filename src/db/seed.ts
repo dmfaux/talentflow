@@ -1030,53 +1030,56 @@ export async function seed(db: Db): Promise<SeedSummary> {
       if (!gatingPassed) {
         status = "gating_failed";
       } else {
+        // Every seeded candidate lands in a terminal, already-scored state. We
+        // never seed `gating_passed` or `scoring`: the jobs processor's recovery
+        // loop re-enqueues candidates in those statuses on startup and would run
+        // real AI scoring against seed data — burning credits to recompute work
+        // that's already represented here. (`follow_up` is safe: it's scored,
+        // carries a completed processing job, and the recovery loop ignores it.)
         const scoreBucket = weighted([
-          { value: "scored", weight: 40 },
+          { value: "scored", weight: 50 },
           { value: "follow_up", weight: 20 },
           { value: "shortlisted", weight: 15 },
           { value: "rejected", weight: 10 },
           { value: "withdrawn", weight: 5 },
-          { value: "gating_passed", weight: 10 },
         ]);
         status = scoreBucket;
 
-        if (status !== "gating_passed") {
-          const mean = status === "shortlisted" ? 8.7
-            : status === "rejected" ? 4.5
-            : status === "withdrawn" ? 6.5
-            : status === "follow_up" ? 6.8
-            : 6.5;
-          aiScore = Math.round(normalScore(mean, 1.0) * 10) / 10;
-          aiConfidence = aiScore >= 8.0 ? pick(["high", "high", "medium"]) : aiScore >= 6.0 ? pick(["high", "medium", "medium"]) : pick(["medium", "low", "low"]);
-          aiRationale = aiScore >= 8.0 ? pick(RATIONALES_STRONG) : aiScore >= 6.5 ? pick(RATIONALES_GOOD) : pick(RATIONALES_WEAK);
-          aiDimensions = {
-            skills_match: Math.round(normalScore(aiScore, 0.8) * 10) / 10,
-            experience_depth: Math.round(normalScore(aiScore, 0.8) * 10) / 10,
-            career_progression: Math.round(normalScore(aiScore, 0.8) * 10) / 10,
-            tenure_patterns: Math.round(normalScore(aiScore, 0.8) * 10) / 10,
-          };
+        const mean = status === "shortlisted" ? 8.7
+          : status === "rejected" ? 4.5
+          : status === "withdrawn" ? 6.5
+          : status === "follow_up" ? 6.8
+          : 6.5;
+        aiScore = Math.round(normalScore(mean, 1.0) * 10) / 10;
+        aiConfidence = aiScore >= 8.0 ? pick(["high", "high", "medium"]) : aiScore >= 6.0 ? pick(["high", "medium", "medium"]) : pick(["medium", "low", "low"]);
+        aiRationale = aiScore >= 8.0 ? pick(RATIONALES_STRONG) : aiScore >= 6.5 ? pick(RATIONALES_GOOD) : pick(RATIONALES_WEAK);
+        aiDimensions = {
+          skills_match: Math.round(normalScore(aiScore, 0.8) * 10) / 10,
+          experience_depth: Math.round(normalScore(aiScore, 0.8) * 10) / 10,
+          career_progression: Math.round(normalScore(aiScore, 0.8) * 10) / 10,
+          tenure_patterns: Math.round(normalScore(aiScore, 0.8) * 10) / 10,
+        };
 
-          // Generate flags based on status
-          if (status === "follow_up") {
-            const flagCategory = pick(Object.keys(FLAG_TEMPLATES) as (keyof typeof FLAG_TEMPLATES)[]);
-            aiFlags = [pick(FLAG_TEMPLATES[flagCategory])];
-            if (rand() < 0.4) {
-              const otherCategory = pick(Object.keys(FLAG_TEMPLATES).filter((c) => c !== flagCategory) as (keyof typeof FLAG_TEMPLATES)[]);
-              aiFlags.push(pick(FLAG_TEMPLATES[otherCategory]));
-            }
-          } else {
-            aiFlags = rand() < 0.2 ? [pick(FLAG_TEMPLATES.general)] : [];
+        // Generate flags based on status
+        if (status === "follow_up") {
+          const flagCategory = pick(Object.keys(FLAG_TEMPLATES) as (keyof typeof FLAG_TEMPLATES)[]);
+          aiFlags = [pick(FLAG_TEMPLATES[flagCategory])];
+          if (rand() < 0.4) {
+            const otherCategory = pick(Object.keys(FLAG_TEMPLATES).filter((c) => c !== flagCategory) as (keyof typeof FLAG_TEMPLATES)[]);
+            aiFlags.push(pick(FLAG_TEMPLATES[otherCategory]));
           }
+        } else {
+          aiFlags = rand() < 0.2 ? [pick(FLAG_TEMPLATES.general)] : [];
+        }
 
-          if (status === "rejected") {
-            rejectionReason = pick([
-              "Insufficient experience for the seniority level required",
-              "Skills mismatch — candidate's background is not aligned with core requirements",
-              "Better-qualified candidates available for this position",
-              "Candidate salary expectations significantly above budget",
-              "Unable to meet location/hybrid working requirements",
-            ]);
-          }
+        if (status === "rejected") {
+          rejectionReason = pick([
+            "Insufficient experience for the seniority level required",
+            "Skills mismatch — candidate's background is not aligned with core requirements",
+            "Better-qualified candidates available for this position",
+            "Candidate salary expectations significantly above budget",
+            "Unable to meet location/hybrid working requirements",
+          ]);
         }
       }
 
@@ -1301,7 +1304,7 @@ export async function seed(db: Db): Promise<SeedSummary> {
     // Gating result email
     if (cand.status === "gating_failed") {
       pushMessage("Application update — unfortunately we are unable to progress your application at this time.", 60);
-    } else if (cand.status !== "gating_passed") {
+    } else {
       pushMessage("Good news — your CV is being reviewed by our team.", 60);
     }
 
