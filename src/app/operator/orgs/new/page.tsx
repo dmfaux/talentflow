@@ -43,6 +43,10 @@ export default function NewOrganizationPage() {
   const [slugManual, setSlugManual] = useState(false);
   const [tier, setTier] = useState<Tier>("standard");
   const [ownerEmail, setOwnerEmail] = useState("");
+  // Optional per-org plan overrides — blank = inherit the tier's plan default.
+  const [baseFee, setBaseFee] = useState("");
+  const [includedCredits, setIncludedCredits] = useState("");
+  const [overageDiscount, setOverageDiscount] = useState("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -60,6 +64,9 @@ export default function NewOrganizationPage() {
     setFormError("");
     if (!canSubmit) return;
 
+    const toOverride = (s: string) =>
+      s.trim() === "" ? null : Math.max(0, parseInt(s, 10) || 0);
+
     setSaving(true);
     try {
       const res = await fetch("/api/operator/organizations", {
@@ -70,6 +77,12 @@ export default function NewOrganizationPage() {
           slug,
           tier,
           ownerEmail: ownerEmail.trim(),
+          base_fee_zar: toOverride(baseFee),
+          included_credits: toOverride(includedCredits),
+          overage_discount_pct:
+            overageDiscount.trim() === ""
+              ? null
+              : Math.min(100, Math.max(0, parseInt(overageDiscount, 10) || 0)),
         }),
       });
       const { data, error } = await res.json();
@@ -178,6 +191,65 @@ export default function NewOrganizationPage() {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Custom plan overrides (optional) — blank inherits the plan default */}
+            <div className="rounded-lg border border-dashed border-rule p-4">
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-muted">
+                Custom plan overrides
+              </p>
+              <p className="mt-1 text-[0.68rem] text-ink-muted">
+                Optional negotiated commercials. Leave blank to inherit the {tier} plan
+                — you can set these later on the org page.
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label htmlFor="ovr-base-fee" className={labelClass}>
+                    Base fee (ZAR/mo)
+                  </label>
+                  <input
+                    id="ovr-base-fee"
+                    type="number"
+                    min={0}
+                    step={500}
+                    value={baseFee}
+                    onChange={(e) => setBaseFee(e.target.value)}
+                    placeholder="Plan default"
+                    className={`${inputClass} font-mono`}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="ovr-credits" className={labelClass}>
+                    Credits/mo
+                  </label>
+                  <input
+                    id="ovr-credits"
+                    type="number"
+                    min={0}
+                    step={1000}
+                    value={includedCredits}
+                    onChange={(e) => setIncludedCredits(e.target.value)}
+                    placeholder="Plan default"
+                    className={`${inputClass} font-mono`}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="ovr-overage" className={labelClass}>
+                    Overage disc. (%)
+                  </label>
+                  <input
+                    id="ovr-overage"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={overageDiscount}
+                    onChange={(e) => setOverageDiscount(e.target.value)}
+                    placeholder="Plan default"
+                    className={`${inputClass} font-mono`}
+                  />
+                </div>
               </div>
             </div>
 

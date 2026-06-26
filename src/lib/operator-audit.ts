@@ -34,6 +34,14 @@ export const OPERATOR_AUDIT_ACTIONS = [
   // carries {invoiceId, invoiceNo, reason}.
   "mark_invoice_paid",
   "void_invoice",
+  // Public pricing-page plan visibility — operator hides a plan or redacts its
+  // commercials. Carries {tier, field, from, to}; target_org_id stays null (this
+  // is global catalogue config, not an org-scoped action).
+  "set_plan_visibility",
+  // Per-org negotiated plan override — operator sets a bespoke base fee /
+  // included credits / overage discount for one org (null = inherit the tier's
+  // plan). metadata.field distinguishes which; all carry {field, from, to}.
+  "set_org_plan_override",
 ] as const;
 
 export type OperatorAuditAction = (typeof OPERATOR_AUDIT_ACTIONS)[number];

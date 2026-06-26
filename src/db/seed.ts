@@ -678,9 +678,13 @@ export async function seed(db: Db): Promise<SeedSummary> {
   // (CREDIT_PRICE_ZAR in src/lib/pricing.ts), not stored here.
   await db.delete(schema.plans);
   await db.insert(schema.plans).values([
+    // Standard & Premium advertise openly; Enterprise is shown but its
+    // commercials are negotiated, so show_pricing is off (card renders a
+    // "let's talk" CTA instead of price/credits). All three are public_visible
+    // by default — operators hide any of them from /operator/plans.
     { tier: "standard", base_fee_zar: 7500, included_credits: 6000, overage_discount_pct: 0 },
     { tier: "premium", base_fee_zar: 18000, included_credits: 18000, overage_discount_pct: 10 },
-    { tier: "enterprise", base_fee_zar: 36000, included_credits: 45000, overage_discount_pct: 25 },
+    { tier: "enterprise", base_fee_zar: 36000, included_credits: 45000, overage_discount_pct: 25, show_pricing: false },
   ]);
   console.log("Plans: 3 (standard, premium, enterprise)");
 

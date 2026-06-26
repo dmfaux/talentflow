@@ -55,6 +55,16 @@ interface OrgDetail {
   billing_email: string | null;
   operator_max_model_tier: string;
   hard_ceiling_credits: number | null;
+  // Per-org negotiated plan overrides (null = inherit the tier's plan default).
+  base_fee_zar: number | null;
+  included_credits: number | null;
+  overage_discount_pct: number | null;
+  planDefaults: {
+    base_fee_zar: number;
+    included_credits: number;
+    overage_discount_pct: number;
+    hard_ceiling_credits: number | null;
+  } | null;
   suspended_at: string | null;
   deleted_at: string | null;
   created_at: string;
@@ -102,6 +112,10 @@ export default function OperatorOrgDetailPage() {
   const [billingEmail, setBillingEmail] = useState("");
   const [operatorMaxTier, setOperatorMaxTier] = useState<ModelTier>("executive");
   const [hardCeiling, setHardCeiling] = useState("");
+  // Per-org plan overrides — empty string = inherit the tier's plan default.
+  const [baseFee, setBaseFee] = useState("");
+  const [includedCredits, setIncludedCredits] = useState("");
+  const [overageDiscount, setOverageDiscount] = useState("");
   const [saving, setSaving] = useState(false);
   const [resending, setResending] = useState(false);
 
@@ -123,6 +137,13 @@ export default function OperatorOrgDetailPage() {
         setHardCeiling(
           data.hard_ceiling_credits != null ? String(data.hard_ceiling_credits) : ""
         );
+        setBaseFee(data.base_fee_zar != null ? String(data.base_fee_zar) : "");
+        setIncludedCredits(
+          data.included_credits != null ? String(data.included_credits) : ""
+        );
+        setOverageDiscount(
+          data.overage_discount_pct != null ? String(data.overage_discount_pct) : ""
+        );
       })
       .catch(() => setLoadError("Organisation not found"))
       .finally(() => setLoading(false));
@@ -130,6 +151,15 @@ export default function OperatorOrgDetailPage() {
 
   const ceilingValue =
     hardCeiling.trim() === "" ? null : Math.max(0, parseInt(hardCeiling, 10) || 0);
+  // Blank override → null (inherit the plan default); otherwise a clamped int.
+  const toOverride = (s: string) =>
+    s.trim() === "" ? null : Math.max(0, parseInt(s, 10) || 0);
+  const baseFeeValue = toOverride(baseFee);
+  const includedCreditsValue = toOverride(includedCredits);
+  const overageDiscountValue =
+    overageDiscount.trim() === ""
+      ? null
+      : Math.min(100, Math.max(0, parseInt(overageDiscount, 10) || 0));
   const orgOperatorMaxTier =
     org && isModelTierValue(org.operator_max_model_tier)
       ? org.operator_max_model_tier
@@ -139,7 +169,10 @@ export default function OperatorOrgDetailPage() {
     (tier !== normaliseTier(org.tier) ||
       (billingEmail.trim() || null) !== (org.billing_email ?? null) ||
       operatorMaxTier !== orgOperatorMaxTier ||
-      ceilingValue !== (org.hard_ceiling_credits ?? null));
+      ceilingValue !== (org.hard_ceiling_credits ?? null) ||
+      baseFeeValue !== (org.base_fee_zar ?? null) ||
+      includedCreditsValue !== (org.included_credits ?? null) ||
+      overageDiscountValue !== (org.overage_discount_pct ?? null));
 
   async function save() {
     if (!org) return;
@@ -153,6 +186,9 @@ export default function OperatorOrgDetailPage() {
           billing_email: billingEmail.trim() || null,
           operator_max_model_tier: operatorMaxTier,
           hard_ceiling_credits: ceilingValue,
+          base_fee_zar: baseFeeValue,
+          included_credits: includedCreditsValue,
+          overage_discount_pct: overageDiscountValue,
         }),
       });
       const { data, error } = await res.json();
@@ -164,6 +200,13 @@ export default function OperatorOrgDetailPage() {
       setBillingEmail(data.billing_email ?? "");
       setHardCeiling(
         data.hard_ceiling_credits != null ? String(data.hard_ceiling_credits) : ""
+      );
+      setBaseFee(data.base_fee_zar != null ? String(data.base_fee_zar) : "");
+      setIncludedCredits(
+        data.included_credits != null ? String(data.included_credits) : ""
+      );
+      setOverageDiscount(
+        data.overage_discount_pct != null ? String(data.overage_discount_pct) : ""
       );
       toast("Billing settings updated", "success");
     } catch {
@@ -399,6 +442,86 @@ export default function OperatorOrgDetailPage() {
             <p className="mt-1.5 text-[0.68rem] text-ink-muted">
               New candidate intake pauses past this. Blank = uncapped (plan default).
             </p>
+          </div>
+
+          {/* Per-org negotiated overrides — blank inherits the tier's plan. */}
+          <div className="mt-6 border-t border-rule pt-5">
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-muted">
+              Custom plan overrides
+            </p>
+            <p className="mt-1 text-[0.68rem] text-ink-muted">
+              Negotiated commercials for this client. Blank inherits the {tier} plan default.
+            </p>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="ovr_base_fee"
+                  className="mb-1.5 block text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-muted"
+                >
+                  Base fee (ZAR / month)
+                </label>
+                <input
+                  id="ovr_base_fee"
+                  type="number"
+                  min={0}
+                  step={500}
+                  value={baseFee}
+                  onChange={(e) => setBaseFee(e.target.value)}
+                  placeholder={
+                    org.planDefaults
+                      ? `Default ${zar(org.planDefaults.base_fee_zar)}`
+                      : "Plan default"
+                  }
+                  className="h-10 w-full rounded-lg border border-rule bg-canvas/40 px-3.5 font-mono text-sm text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="ovr_credits"
+                  className="mb-1.5 block text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-muted"
+                >
+                  Included credits / month
+                </label>
+                <input
+                  id="ovr_credits"
+                  type="number"
+                  min={0}
+                  step={1000}
+                  value={includedCredits}
+                  onChange={(e) => setIncludedCredits(e.target.value)}
+                  placeholder={
+                    org.planDefaults
+                      ? `Default ${nf(org.planDefaults.included_credits)}`
+                      : "Plan default"
+                  }
+                  className="h-10 w-full rounded-lg border border-rule bg-canvas/40 px-3.5 font-mono text-sm text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="ovr_overage"
+                  className="mb-1.5 block text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-muted"
+                >
+                  Overage discount (%)
+                </label>
+                <input
+                  id="ovr_overage"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={overageDiscount}
+                  onChange={(e) => setOverageDiscount(e.target.value)}
+                  placeholder={
+                    org.planDefaults
+                      ? `Default ${org.planDefaults.overage_discount_pct}%`
+                      : "Plan default"
+                  }
+                  className="h-10 w-full rounded-lg border border-rule bg-canvas/40 px-3.5 font-mono text-sm text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="mt-5 flex justify-end">
