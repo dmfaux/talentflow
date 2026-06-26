@@ -186,6 +186,14 @@ body {
 .animate-on-scroll.is-visible {
   animation: fadeInUp 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
+/* Never hide content from users who opt out of motion. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-on-scroll {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+}
 
 .stagger-1 { animation-delay: 0.08s; }
 .stagger-2 { animation-delay: 0.16s; }
