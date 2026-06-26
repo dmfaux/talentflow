@@ -6,6 +6,8 @@ import {
 } from "@/components/operator/theme-builder";
 import { ThemeEmailPreview } from "@/components/operator/theme-email-preview";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { BrandColors, LogoInput } from "@/lib/prompt-builder";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -55,10 +57,10 @@ function ThemeCard({
   onEdit: () => void;
 }) {
   return (
-    <div className="group flex flex-col overflow-hidden rounded-xl border border-border bg-surface transition-colors hover:border-border-strong">
-      <div className="flex justify-center border-b border-border bg-canvas/60 p-4">
+    <div className="group flex flex-col overflow-hidden rounded-xl border border-rule bg-surface transition-colors hover:border-rule-strong">
+      <div className="flex justify-center border-b border-rule bg-canvas/60 p-4">
         <div
-          className="overflow-hidden rounded-lg border border-border shadow-sm"
+          className="overflow-hidden rounded-lg border border-rule shadow-sm"
           style={{ width: 267 }}
         >
           {row.preview_image_url ? (
@@ -83,18 +85,18 @@ function ThemeCard({
           <p className="truncate text-sm font-medium text-ink">{row.name}</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {row.scope === "gallery" ? (
-              <span className="inline-flex items-center rounded-full bg-cobalt-tint px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-cobalt">
+              <Badge tone="cobalt" uppercase size="sm">
                 Gallery
-              </span>
+              </Badge>
             ) : (
-              <span className="inline-flex items-center rounded-full bg-vermillion/10 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-vermillion">
+              <Badge tone="teal" uppercase size="sm">
                 Bespoke
-              </span>
+              </Badge>
             )}
             {!row.show_powered_by && (
-              <span className="inline-flex items-center rounded-full bg-canvas-2 px-2 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-ink-muted">
+              <Badge tone="neutral" uppercase size="sm">
                 White-label
-              </span>
+              </Badge>
             )}
             {row.scope === "custom" && row.client && (
               <span className="truncate font-mono text-[0.62rem] text-ink-muted">
@@ -103,13 +105,9 @@ function ThemeCard({
             )}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-[0.72rem] font-medium text-ink-soft transition-colors hover:bg-canvas cursor-pointer"
-        >
+        <Button variant="secondary" size="sm" className="shrink-0" onClick={onEdit}>
           Edit
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -267,19 +265,15 @@ function ThemesConsole() {
       <section className="mb-10">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="font-serif text-lg text-ink">Gallery</h2>
-          <button
-            type="button"
-            onClick={() => setBuilder({ open: true, scope: "gallery" })}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-cobalt px-4 text-[0.8rem] font-medium text-white transition-colors hover:bg-cobalt-deep cursor-pointer"
-          >
+          <Button onClick={() => setBuilder({ open: true, scope: "gallery" })}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M7 2v10M2 7h10" />
             </svg>
             New gallery theme
-          </button>
+          </Button>
         </div>
         {loading ? (
-          <div className="rounded-xl border border-border bg-surface py-16 text-center text-sm text-ink-muted">
+          <div className="rounded-xl border border-rule bg-surface py-16 text-center text-sm text-ink-muted">
             Loading themes…
           </div>
         ) : gallery.length === 0 ? (
@@ -323,7 +317,7 @@ function ThemesConsole() {
                   logo: activeKit?.logo ?? null,
                 })
               }
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-cobalt bg-cobalt-tint px-4 text-[0.8rem] font-medium text-cobalt transition-colors hover:bg-cobalt-tint/70 cursor-pointer"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-cobalt bg-cobalt-tint px-4 text-[0.8rem] font-medium text-cobalt-deep transition-colors hover:bg-cobalt-tint/70 cursor-pointer"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <path d="M7 2v10M2 7h10" />
@@ -332,7 +326,7 @@ function ThemesConsole() {
             </button>
           </div>
           {loading ? null : bespoke.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-border bg-surface px-5 py-8 text-center text-sm text-ink-muted">
+            <p className="rounded-xl border border-dashed border-rule bg-surface px-5 py-8 text-center text-sm text-ink-muted">
               No bespoke themes for this brand yet. Bespoke themes can be
               white-labelled (no TalentStream footer).
             </p>

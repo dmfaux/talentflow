@@ -36,18 +36,18 @@ const ICONS: Record<string, React.ReactNode> = {
 
 export function EmptyState({ icon, title, description, actionLabel, actionHref }: Props) {
   return (
-    <div className="rounded-xl border border-border bg-surface px-5 py-14 text-center">
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-cream">
+    <div className="rounded-xl border border-rule bg-surface px-5 py-14 text-center">
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-canvas">
         {ICONS[icon]}
       </div>
-      <h3 className="text-sm font-semibold text-charcoal">{title}</h3>
-      <p className="mx-auto mt-1.5 max-w-xs text-xs leading-relaxed text-txt-muted">
+      <h3 className="text-sm font-semibold text-ink">{title}</h3>
+      <p className="mx-auto mt-1.5 max-w-xs text-xs leading-relaxed text-ink-muted">
         {description}
       </p>
       {actionLabel && actionHref && (
         <Link
           href={actionHref}
-          className="mt-4 inline-flex h-8 items-center rounded-lg bg-accent px-4 text-[0.75rem] font-medium text-white transition-colors hover:bg-accent-light"
+          className="mt-4 inline-flex h-8 items-center rounded-lg bg-cobalt px-4 text-[0.75rem] font-medium text-white transition-colors hover:bg-cobalt-deep"
         >
           {actionLabel}
         </Link>

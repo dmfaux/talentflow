@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   PreviewStatusOverlay,
   type ThemePreviewPayload,
@@ -152,7 +153,7 @@ export function ThemePreviewDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col bg-charcoal/50 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex flex-col bg-ink/50 backdrop-blur-sm"
       onMouseDown={(e) => {
         backdropArmed.current = e.target === e.currentTarget;
       }}
@@ -168,12 +169,12 @@ export function ThemePreviewDialog({
         <div
           ref={panelRef}
           tabIndex={-1}
-          className="flex h-[92vh] w-full max-w-[1400px] flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-xl outline-none"
+          className="flex h-[92vh] w-full max-w-[1400px] flex-col overflow-hidden rounded-2xl border border-rule bg-surface shadow-xl outline-none"
         >
           {/* ── Toolbar ─────────────────────────────────────────── */}
-          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+          <div className="flex items-center justify-between gap-3 border-b border-rule px-4 py-3">
             <div className="min-w-0">
-              <p className="font-mono text-[0.56rem] font-semibold uppercase tracking-[0.2em] text-ink-faint">
+              <p className="font-mono text-[0.56rem] font-semibold uppercase tracking-[0.2em] text-ink-muted">
                 Realistic preview
               </p>
               <p className="truncate text-[0.8rem] text-ink-soft">
@@ -184,7 +185,7 @@ export function ThemePreviewDialog({
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="inline-flex gap-0.5 rounded-lg border border-border bg-cream/60 p-0.5">
+              <div className="inline-flex gap-0.5 rounded-lg border border-rule bg-canvas/60 p-0.5">
                 {(["email", "landing"] as const).map((s) => (
                   <button
                     key={s}
@@ -198,7 +199,7 @@ export function ThemePreviewDialog({
               </div>
 
               {!isEmail && (
-                <div className="inline-flex gap-0.5 rounded-lg border border-border bg-cream/60 p-0.5">
+                <div className="inline-flex gap-0.5 rounded-lg border border-rule bg-canvas/60 p-0.5">
                   {(["desktop", "mobile"] as const).map((d) => (
                     <button
                       key={d}
@@ -212,11 +213,11 @@ export function ThemePreviewDialog({
                 </div>
               )}
 
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={openInNewTab}
                 disabled={!html}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-[0.72rem] font-medium text-ink-soft transition-colors hover:bg-cream disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
               >
                 <svg
                   width="13"
@@ -232,13 +233,13 @@ export function ThemePreviewDialog({
                   <path d="M8.5 2H12v3.5M12 2 6.5 7.5" />
                 </svg>
                 New tab
-              </button>
+              </Button>
 
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Close preview"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-ink-soft transition-colors hover:bg-cream cursor-pointer"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rule text-ink-soft transition-colors hover:bg-canvas cursor-pointer"
               >
                 <svg
                   width="13"
@@ -278,8 +279,8 @@ export function ThemePreviewDialog({
           </div>
 
           {/* ── Caption ─────────────────────────────────────────── */}
-          <div className="border-t border-border px-4 py-2 text-center">
-            <p className="font-mono text-[0.56rem] uppercase tracking-[0.14em] text-ink-faint">
+          <div className="border-t border-rule px-4 py-2 text-center">
+            <p className="font-mono text-[0.56rem] uppercase tracking-[0.14em] text-ink-muted">
               Sample data · live from your theme
             </p>
           </div>
@@ -310,10 +311,10 @@ function EmailStage({
 }) {
   return (
     <div className="mx-auto max-w-[760px] p-4 sm:p-8">
-      <div className="overflow-hidden rounded-xl border border-border bg-white shadow-sm">
-        <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+      <div className="overflow-hidden rounded-xl border border-rule bg-white shadow-sm">
+        <div className="flex items-center gap-3 border-b border-rule px-5 py-4">
           <span
-            className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border ${
+            className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-rule ${
               logoBackground === "dark" ? "bg-ink" : "bg-white"
             }`}
           >
@@ -338,7 +339,7 @@ function EmailStage({
               {company} Careers&ensp;·&ensp;to {candidate}
             </p>
           </div>
-          <span className="shrink-0 text-[0.68rem] text-ink-faint">9:41 AM</span>
+          <span className="shrink-0 text-[0.68rem] text-ink-muted">9:41 AM</span>
         </div>
         <div className="relative bg-white" style={{ height: 680 }}>
           {html !== null && (
@@ -426,22 +427,22 @@ function LandingStage({
               transform: `scale(${scale})`,
               transformOrigin: "top left",
             }}
-            className={`overflow-hidden border border-border bg-white shadow-xl ${
+            className={`overflow-hidden border border-rule bg-white shadow-xl ${
               isMobile ? "rounded-[2.25rem]" : "rounded-xl"
             }`}
           >
             <div
-              className="flex items-center gap-2 border-b border-border bg-cream/70 px-3"
+              className="flex items-center gap-2 border-b border-rule bg-canvas/70 px-3"
               style={{ height: CHROME_H }}
             >
               {!isMobile && (
                 <span className="flex gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-border-strong" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-border-strong" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-border-strong" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-rule-strong" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-rule-strong" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-rule-strong" />
                 </span>
               )}
-              <span className="mx-auto max-w-[80%] truncate rounded-md border border-border bg-white px-3 py-1 font-mono text-[0.62rem] text-ink-muted">
+              <span className="mx-auto max-w-[80%] truncate rounded-md border border-rule bg-white px-3 py-1 font-mono text-[0.62rem] text-ink-muted">
                 {url}
               </span>
             </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useToast } from "@/components/ui/toast-provider";
+import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
@@ -109,7 +110,7 @@ export function ThemesCard({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-6">
+    <div className="rounded-xl border border-rule bg-surface p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-serif text-lg text-ink">Themes</h2>
@@ -118,10 +119,7 @@ export function ThemesCard({
             require Premium+.
           </p>
         </div>
-        <Link
-          href="/operator/themes"
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-3.5 text-[0.78rem] font-medium text-ink-soft transition-colors hover:bg-canvas"
-        >
+        <Link href="/operator/themes" className={buttonVariants({ variant: "secondary" })}>
           Gallery
           <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 11L11 3M5 3h6v6" />
@@ -130,7 +128,7 @@ export function ThemesCard({
       </div>
 
       {!premium && (
-        <p className="mt-4 rounded-lg border border-dashed border-border bg-cream/40 px-3.5 py-2.5 text-[0.78rem] text-ink-muted">
+        <p className="mt-4 rounded-lg border border-dashed border-rule bg-canvas/40 px-3.5 py-2.5 text-[0.78rem] text-ink-muted">
           This organisation is on{" "}
           <span className="font-medium capitalize text-ink-soft">{tier}</span>.
           Brands can pick gallery themes; bespoke white-label themes unlock on
@@ -140,7 +138,7 @@ export function ThemesCard({
 
       <div className="mt-4 space-y-2.5">
         {brands.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-ink-muted">
+          <p className="rounded-lg border border-dashed border-rule px-4 py-6 text-center text-sm text-ink-muted">
             No brands in this organisation yet.
           </p>
         ) : (
@@ -150,7 +148,7 @@ export function ThemesCard({
             return (
               <div
                 key={brand.id}
-                className="rounded-lg border border-border bg-cream/30 p-3.5"
+                className="rounded-lg border border-rule bg-canvas/30 p-3.5"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -172,8 +170,8 @@ export function ThemesCard({
                     }}
                     className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-[0.72rem] font-medium transition-colors ${
                       premium
-                        ? "border-border text-ink-soft hover:bg-canvas"
-                        : "cursor-not-allowed border-border/60 text-ink-faint"
+                        ? "border-rule text-ink-soft hover:bg-canvas"
+                        : "cursor-not-allowed border-rule/60 text-ink-muted"
                     }`}
                     title={
                       premium
@@ -192,7 +190,7 @@ export function ThemesCard({
                     value={brand.default_theme_id ?? ""}
                     disabled={busy}
                     onChange={(e) => assign(brand.id, e.target.value || null)}
-                    className="h-9 w-full cursor-pointer rounded-lg border border-border bg-paper px-3 text-sm text-ink-soft outline-none focus:border-cobalt disabled:opacity-50"
+                    className="h-9 w-full cursor-pointer rounded-lg border border-rule bg-surface px-3 text-sm text-ink-soft outline-none focus:border-cobalt disabled:opacity-50"
                   >
                     <option value="">Gallery default (inherit)</option>
                     {opts.length > 0 && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useToast } from "@/components/ui/toast-provider";
+import { Button } from "@/components/ui/button";
 import {
   buildBespokeKitPrompt,
   type BrandColors,
@@ -129,11 +130,11 @@ const SECTION_SURFACE: Record<BuilderSection, PreviewSurface> = {
 const labelClass =
   "mb-1.5 block text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-muted";
 const inputClass =
-  "h-10 w-full rounded-lg border border-border bg-cream/40 px-3.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20";
+  "h-10 w-full rounded-lg border border-rule bg-canvas/40 px-3.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20";
 const textareaClass =
-  "w-full resize-none rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20";
+  "w-full resize-none rounded-lg border border-rule bg-canvas/40 px-3.5 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20";
 const selectClass =
-  "h-10 w-full cursor-pointer rounded-lg border border-border bg-cream/40 px-3 text-sm text-ink-soft outline-none focus:border-cobalt";
+  "h-10 w-full cursor-pointer rounded-lg border border-rule bg-canvas/40 px-3 text-sm text-ink-soft outline-none focus:border-cobalt";
 
 /** Coerce a stored override map to a partial of only the 11 known tokens, so a
  *  stale/unknown key on a saved row can never leak into the builder's state. */
@@ -601,49 +602,34 @@ export function ThemeBuilder({
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onDone(false)}
-            className="inline-flex h-9 items-center rounded-lg border border-border px-4 text-[0.8rem] font-medium text-ink-soft transition-colors hover:bg-canvas cursor-pointer"
-          >
+          <Button variant="secondary" onClick={() => onDone(false)}>
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving}
-            className="inline-flex h-9 items-center gap-2 rounded-lg bg-cobalt px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-cobalt-deep disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-          >
-            {saving && (
-              <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            )}
+          </Button>
+          <Button onClick={save} loading={saving}>
             {editing ? "Save changes" : "Create theme"}
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[200px_minmax(0,1fr)_minmax(360px,440px)]">
         {/* ── Rail (the theme outline) ───────────────────────── */}
         <nav className="space-y-3 lg:sticky lg:top-24 lg:self-start" aria-label="Theme sections">
-          <div className="rounded-xl border border-border bg-surface p-2.5">
+          <div className="rounded-xl border border-rule bg-surface p-2.5">
             <div className="mb-1 flex items-center gap-2 px-2">
-              <span className="font-mono text-[0.56rem] font-semibold uppercase tracking-[0.18em] text-ink-faint">
+              <span className="font-mono text-[0.56rem] font-semibold uppercase tracking-[0.18em] text-ink-muted">
                 The theme
               </span>
-              <span className="h-px flex-1 bg-border" />
+              <span className="h-px flex-1 bg-rule" />
             </div>
             <div className="space-y-0.5">{CORE_SECTIONS.map(railItem)}</div>
 
             {!isGallery && (
               <>
                 <div className="mb-1 mt-3 flex items-center gap-2 px-2">
-                  <span className="font-mono text-[0.56rem] font-semibold uppercase tracking-[0.18em] text-ink-faint">
+                  <span className="font-mono text-[0.56rem] font-semibold uppercase tracking-[0.18em] text-ink-muted">
                     Premium · bespoke
                   </span>
-                  <span className="h-px flex-1 bg-border" />
+                  <span className="h-px flex-1 bg-rule" />
                 </div>
                 <div className="space-y-0.5">{ADVANCED_SECTIONS.map(railItem)}</div>
               </>
@@ -651,13 +637,13 @@ export function ThemeBuilder({
           </div>
 
           {/* Powered-by footer — the white-label lever */}
-          <div className="rounded-xl border border-border bg-surface p-3.5">
+          <div className="rounded-xl border border-rule bg-surface p-3.5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-[0.82rem] font-medium text-ink-soft">
                   Powered-by footer
                 </p>
-                <p className="mt-0.5 text-[0.66rem] text-ink-faint">
+                <p className="mt-0.5 text-[0.66rem] text-ink-muted">
                   {isGallery ? "Always on for gallery themes" : "Off = fully white-label"}
                 </p>
               </div>
@@ -669,7 +655,7 @@ export function ThemeBuilder({
                 disabled={isGallery}
                 onClick={() => setShowPoweredBy((v) => !v)}
                 className={`relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                  showPoweredBy ? "bg-cobalt" : "bg-border-strong"
+                  showPoweredBy ? "bg-cobalt" : "bg-rule-strong"
                 } ${isGallery ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
               >
                 <span
@@ -686,7 +672,7 @@ export function ThemeBuilder({
         <div className="min-w-0">
           {/* BASICS */}
           {section === "basics" && (
-            <section className="rounded-xl border border-border bg-surface p-5">
+            <section className="rounded-xl border border-rule bg-surface p-5">
               <div className="mb-4">
                 <h3 className="font-serif text-base text-ink">Basics</h3>
                 <p className="mt-0.5 text-xs text-ink-muted">
@@ -716,7 +702,7 @@ export function ThemeBuilder({
               <div className="mt-4">
                 <label htmlFor="preview_image_url" className={labelClass}>
                   Card thumbnail URL{" "}
-                  <span className="font-sans normal-case tracking-normal text-ink-faint">
+                  <span className="font-sans normal-case tracking-normal text-ink-muted">
                     optional
                   </span>
                 </label>
@@ -734,7 +720,7 @@ export function ThemeBuilder({
 
           {/* COLOUR */}
           {section === "colour" && (
-            <section className="rounded-xl border border-border bg-surface p-5">
+            <section className="rounded-xl border border-rule bg-surface p-5">
               <h3 className="font-serif text-base text-ink">Colour</h3>
               <p className="mt-0.5 text-xs text-ink-muted">
                 Pick three. The kit derives the full eleven-token palette —
@@ -748,11 +734,11 @@ export function ThemeBuilder({
                 {SEED_FIELDS.map((field) => (
                   <div
                     key={field.key}
-                    className="rounded-lg border border-border bg-cream/40 p-3"
+                    className="rounded-lg border border-rule bg-canvas/40 p-3"
                   >
                     <div className="flex items-center gap-3">
                       <label
-                        className="relative h-10 w-10 shrink-0 cursor-pointer overflow-hidden rounded-md border border-border"
+                        className="relative h-10 w-10 shrink-0 cursor-pointer overflow-hidden rounded-md border border-rule"
                         style={{ backgroundColor: to6(seeds[field.key]) }}
                       >
                         <input
@@ -775,7 +761,7 @@ export function ThemeBuilder({
                         />
                       </div>
                     </div>
-                    <p className="mt-2 text-[0.66rem] leading-snug text-ink-faint">
+                    <p className="mt-2 text-[0.66rem] leading-snug text-ink-muted">
                       {field.hint}
                     </p>
                   </div>
@@ -793,17 +779,17 @@ export function ThemeBuilder({
                 }
               >
                 <summary className="inline-flex cursor-pointer select-none items-center gap-1.5 text-[0.76rem] text-ink-muted hover:text-ink-soft">
-                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={`text-ink-faint transition-transform ${tokensOpen ? "rotate-90" : ""}`}>
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={`text-ink-muted transition-transform ${tokensOpen ? "rotate-90" : ""}`}>
                     <path d="M4 2.5L8 6l-4 3.5" />
                   </svg>
                   Fine-tune the 11 derived tokens
                   {overrideCount > 0 && (
-                    <span className="rounded-full bg-cobalt-tint px-1.5 py-0.5 font-mono text-[0.56rem] font-semibold uppercase tracking-[0.08em] text-cobalt">
+                    <span className="rounded-full bg-cobalt-tint px-1.5 py-0.5 font-mono text-[0.56rem] font-semibold uppercase tracking-[0.08em] text-cobalt-deep">
                       {overrideCount} overridden
                     </span>
                   )}
                 </summary>
-                <div className="mt-3 space-y-4 rounded-lg border border-dashed border-border bg-cream/20 p-4">
+                <div className="mt-3 space-y-4 rounded-lg border border-dashed border-rule bg-canvas/20 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <p className="text-[0.66rem] leading-snug text-ink-muted">
                       Each token is derived from your three seeds. Override any of
@@ -813,7 +799,7 @@ export function ThemeBuilder({
                       <button
                         type="button"
                         onClick={resetAllTokens}
-                        className="shrink-0 whitespace-nowrap rounded-md border border-border bg-surface px-2 py-1 text-[0.62rem] font-medium text-ink-muted transition-colors hover:bg-canvas hover:text-ink-soft cursor-pointer"
+                        className="shrink-0 whitespace-nowrap rounded-md border border-rule bg-surface px-2 py-1 text-[0.62rem] font-medium text-ink-muted transition-colors hover:bg-canvas hover:text-ink-soft cursor-pointer"
                       >
                         Reset all to derived
                       </button>
@@ -821,7 +807,7 @@ export function ThemeBuilder({
                   </div>
                   {DERIVED_GROUPS.map((group) => (
                     <div key={group.label}>
-                      <p className="mb-1.5 text-[0.58rem] font-semibold uppercase tracking-[0.12em] text-ink-faint">
+                      <p className="mb-1.5 text-[0.58rem] font-semibold uppercase tracking-[0.12em] text-ink-muted">
                         {group.label}
                       </p>
                       <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
@@ -831,11 +817,11 @@ export function ThemeBuilder({
                             <div
                               key={key}
                               className={`flex items-center gap-2 rounded-md border bg-surface px-2 py-1.5 transition-colors ${
-                                overridden ? "border-cobalt/50" : "border-border"
+                                overridden ? "border-cobalt/50" : "border-rule"
                               }`}
                             >
                               <label
-                                className="relative h-6 w-6 shrink-0 cursor-pointer overflow-hidden rounded border border-border"
+                                className="relative h-6 w-6 shrink-0 cursor-pointer overflow-hidden rounded border border-rule"
                                 style={{ backgroundColor: to6(palette[key]) }}
                                 title={`Edit ${DERIVED_LABELS[key]}`}
                               >
@@ -871,7 +857,7 @@ export function ThemeBuilder({
                                   }}
                                   spellCheck={false}
                                   aria-label={`${DERIVED_LABELS[key]} hex`}
-                                  className="w-full bg-transparent font-mono text-[0.58rem] text-ink-faint outline-none focus:text-ink"
+                                  className="w-full bg-transparent font-mono text-[0.58rem] text-ink-muted outline-none focus:text-ink"
                                 />
                               </div>
                               {overridden && (
@@ -880,7 +866,7 @@ export function ThemeBuilder({
                                   onClick={() => resetToken(key)}
                                   title={`Reset to derived (${derivedPalette[key]})`}
                                   aria-label={`Reset ${DERIVED_LABELS[key]} to derived`}
-                                  className="shrink-0 rounded p-1 text-ink-faint transition-colors hover:bg-canvas hover:text-ink-soft cursor-pointer"
+                                  className="shrink-0 rounded p-1 text-ink-muted transition-colors hover:bg-canvas hover:text-ink-soft cursor-pointer"
                                 >
                                   <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M3 7a4 4 0 1 1 1.2 2.85" />
@@ -901,7 +887,7 @@ export function ThemeBuilder({
 
           {/* TYPE */}
           {section === "type" && (
-            <section className="rounded-xl border border-border bg-surface p-5">
+            <section className="rounded-xl border border-rule bg-surface p-5">
               <h3 className="font-serif text-base text-ink">Type</h3>
               <p className="mt-0.5 text-xs text-ink-muted">
                 A display face for headings and a body face for copy. The real web
@@ -925,7 +911,7 @@ export function ThemeBuilder({
                     ))}
                   </select>
                   <p
-                    className="mt-2 truncate rounded-md border border-border bg-cream/30 px-3 py-2 text-lg leading-tight text-ink"
+                    className="mt-2 truncate rounded-md border border-rule bg-canvas/30 px-3 py-2 text-lg leading-tight text-ink"
                     style={{ fontFamily: displayFont.stack }}
                   >
                     {brandName ?? "Northwind Studio"}
@@ -948,7 +934,7 @@ export function ThemeBuilder({
                     ))}
                   </select>
                   <p
-                    className="mt-2 rounded-md border border-border bg-cream/30 px-3 py-2 text-[0.82rem] leading-snug text-ink-soft"
+                    className="mt-2 rounded-md border border-rule bg-canvas/30 px-3 py-2 text-[0.82rem] leading-snug text-ink-soft"
                     style={{ fontFamily: bodyFont.stack }}
                   >
                     The quick brown fox jumps over the lazy dog.
@@ -960,7 +946,7 @@ export function ThemeBuilder({
 
           {/* BESPOKE KIT (custom only) — one prompt, two matching artifacts */}
           {!isGallery && section === "bespoke" && (
-            <section className="rounded-xl border border-border bg-surface p-5">
+            <section className="rounded-xl border border-rule bg-surface p-5">
               <h3 className="font-serif text-base text-ink">Bespoke kit</h3>
               <p className="mt-0.5 text-xs text-ink-muted">
                 One prompt designs the brand and returns two matching pieces — a
@@ -976,7 +962,7 @@ export function ThemeBuilder({
                 <div>
                   <label htmlFor="kit_brief" className={labelClass}>
                     Design brief{" "}
-                    <span className="font-sans normal-case tracking-normal text-ink-faint">
+                    <span className="font-sans normal-case tracking-normal text-ink-muted">
                       optional
                     </span>
                   </label>
@@ -993,14 +979,14 @@ export function ThemeBuilder({
                 {/* What the prompt carries — the theme's colours + logo, live from
                     the sections that set them. Fused with the Copy action below so
                     it reads as "these ingredients → copy the prompt that holds them". */}
-                <div className="overflow-hidden rounded-xl border border-border bg-cream/30">
+                <div className="overflow-hidden rounded-xl border border-rule bg-canvas/30">
                   <div className="space-y-3.5 p-4">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-[0.56rem] font-semibold uppercase tracking-[0.16em] text-ink-faint">
+                      <span className="font-mono text-[0.56rem] font-semibold uppercase tracking-[0.16em] text-ink-muted">
                         Carried into the prompt
                       </span>
-                      <span className="h-px flex-1 bg-border" />
-                      <span className="font-mono text-[0.56rem] uppercase tracking-[0.1em] text-ink-faint">
+                      <span className="h-px flex-1 bg-rule" />
+                      <span className="font-mono text-[0.56rem] uppercase tracking-[0.1em] text-ink-muted">
                         live from your theme
                       </span>
                     </div>
@@ -1013,7 +999,7 @@ export function ThemeBuilder({
                         className="group/src mb-1.5 inline-flex items-center gap-1 text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-ink-muted transition-colors hover:text-cobalt cursor-pointer"
                       >
                         Colour
-                        <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="text-ink-faint transition-colors group-hover/src:text-cobalt">
+                        <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="text-ink-muted transition-colors group-hover/src:text-cobalt">
                           <path d="M3.5 8.5L8.5 3.5M4.5 3.5h4v4" />
                         </svg>
                       </button>
@@ -1021,11 +1007,11 @@ export function ThemeBuilder({
                         {promptColours.map((c) => (
                           <div
                             key={c.label}
-                            className="flex items-center gap-2 rounded-md border border-border bg-surface px-2 py-1.5"
+                            className="flex items-center gap-2 rounded-md border border-rule bg-surface px-2 py-1.5"
                             title={`${c.label} · ${c.value}`}
                           >
                             <span
-                              className="h-5 w-5 shrink-0 rounded border border-border"
+                              className="h-5 w-5 shrink-0 rounded border border-rule"
                               style={{ backgroundColor: to6(c.value) }}
                               aria-hidden="true"
                             />
@@ -1033,7 +1019,7 @@ export function ThemeBuilder({
                               <p className="truncate text-[0.62rem] font-medium text-ink-soft">
                                 {c.label}
                               </p>
-                              <p className="font-mono text-[0.58rem] text-ink-faint">
+                              <p className="font-mono text-[0.58rem] text-ink-muted">
                                 {c.value}
                               </p>
                             </div>
@@ -1050,15 +1036,15 @@ export function ThemeBuilder({
                         className="group/src mb-1.5 inline-flex items-center gap-1 text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-ink-muted transition-colors hover:text-cobalt cursor-pointer"
                       >
                         Brand mark
-                        <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="text-ink-faint transition-colors group-hover/src:text-cobalt">
+                        <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="text-ink-muted transition-colors group-hover/src:text-cobalt">
                           <path d="M3.5 8.5L8.5 3.5M4.5 3.5h4v4" />
                         </svg>
                       </button>
-                      <div className="flex items-center gap-2.5 rounded-md border border-border bg-surface px-2.5 py-2">
+                      <div className="flex items-center gap-2.5 rounded-md border border-rule bg-surface px-2.5 py-2">
                         {promptLogo ? (
                           <>
                             <span
-                              className={`flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded border border-border ${
+                              className={`flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded border border-rule ${
                                 promptLogo.background === "dark"
                                   ? "bg-ink"
                                   : promptLogo.background === "transparent"
@@ -1083,7 +1069,7 @@ export function ThemeBuilder({
                           </>
                         ) : (
                           <>
-                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-dashed border-border font-serif text-[0.72rem] text-ink-muted">
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-dashed border-rule font-serif text-[0.72rem] text-ink-muted">
                               Aa
                             </span>
                             <p className="text-[0.7rem] text-ink-soft">
@@ -1103,11 +1089,11 @@ export function ThemeBuilder({
                   <button
                     type="button"
                     onClick={copyKitPrompt}
-                    className="flex h-11 w-full items-center justify-center gap-2 border-t border-border bg-surface px-4 text-[0.8rem] font-medium text-ink transition-colors hover:bg-cream cursor-pointer"
+                    className="flex h-11 w-full items-center justify-center gap-2 border-t border-rule bg-surface px-4 text-[0.8rem] font-medium text-ink transition-colors hover:bg-canvas cursor-pointer"
                   >
                     {kitCopied ? (
                       <>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-moss-deep">
                           <path d="M3 8.5L6.5 12L13 4" />
                         </svg>
                         Copied — prompt carries your theme
@@ -1125,7 +1111,7 @@ export function ThemeBuilder({
                 </div>
 
                 <div className="relative">
-                  <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
+                  <div className="absolute inset-x-0 top-1/2 h-px bg-rule" />
                   <p className="relative mx-auto w-fit bg-surface px-3 text-[0.62rem] font-medium uppercase tracking-[0.15em] text-ink-muted">
                     Then paste both artifacts
                   </p>
@@ -1143,16 +1129,16 @@ export function ThemeBuilder({
                     placeholder="Paste the complete landing-page HTML here…"
                     spellCheck={false}
                     rows={8}
-                    className={`w-full resize-none rounded-lg border bg-cream/40 px-3.5 py-2.5 font-mono text-xs text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-muted focus:ring-1 focus:ring-cobalt/20 ${
+                    className={`w-full resize-none rounded-lg border bg-canvas/40 px-3.5 py-2.5 font-mono text-xs text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-muted focus:ring-1 focus:ring-cobalt/20 ${
                       landingValidation && !landingValidation.ok
                         ? "border-red focus:border-red"
                         : landingValidation?.ok
-                          ? "border-green focus:border-cobalt"
-                          : "border-border focus:border-cobalt"
+                          ? "border-moss focus:border-cobalt"
+                          : "border-rule focus:border-cobalt"
                     }`}
                   />
                   {landingValidation?.ok && (
-                    <p className="mt-1 flex items-center gap-1 text-xs text-green">
+                    <p className="mt-1 flex items-center gap-1 text-xs text-moss-deep">
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M2.5 6.5L5 9l4.5-6" />
                       </svg>
@@ -1183,16 +1169,16 @@ export function ThemeBuilder({
                     placeholder="Paste the matching email-shell HTML here…"
                     spellCheck={false}
                     rows={8}
-                    className={`w-full resize-none rounded-lg border bg-cream/40 px-3.5 py-2.5 font-mono text-xs text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-muted focus:ring-1 focus:ring-cobalt/20 ${
+                    className={`w-full resize-none rounded-lg border bg-canvas/40 px-3.5 py-2.5 font-mono text-xs text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-muted focus:ring-1 focus:ring-cobalt/20 ${
                       emailShellValidation && !emailShellValidation.ok
                         ? "border-red focus:border-red"
                         : emailShellValidation?.ok
-                          ? "border-green focus:border-cobalt"
-                          : "border-border focus:border-cobalt"
+                          ? "border-moss focus:border-cobalt"
+                          : "border-rule focus:border-cobalt"
                     }`}
                   />
                   {emailShellValidation?.ok && (
-                    <p className="mt-1 flex items-center gap-1 text-xs text-green">
+                    <p className="mt-1 flex items-center gap-1 text-xs text-moss-deep">
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M2.5 6.5L5 9l4.5-6" />
                       </svg>
@@ -1217,7 +1203,7 @@ export function ThemeBuilder({
           {/* Logo — brand identity, so it rides under Basics rather than owning a
               rail slot of its own. */}
           {section === "basics" && (
-            <section className="mt-6 rounded-xl border border-border bg-surface p-5">
+            <section className="mt-6 rounded-xl border border-rule bg-surface p-5">
               <h3 className="font-serif text-base text-ink">Logo</h3>
               <p className="mt-0.5 text-xs text-ink-muted">
                 {isGallery
@@ -1275,9 +1261,9 @@ export function ThemeBuilder({
 
         {/* ── Live preview column (sticky, follows the open section) ── */}
         <div className="hidden lg:sticky lg:top-24 lg:block lg:self-start">
-          <div className="rounded-xl border border-border bg-surface p-4">
+          <div className="rounded-xl border border-rule bg-surface p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="inline-flex gap-0.5 rounded-lg border border-border bg-cream/60 p-0.5">
+              <div className="inline-flex gap-0.5 rounded-lg border border-rule bg-canvas/60 p-0.5">
                 {(["email", "landing"] as const).map((s) => (
                   <button
                     key={s}
@@ -1298,7 +1284,7 @@ export function ThemeBuilder({
                   type="button"
                   onClick={() => setExpanded(true)}
                   disabled={!previewHtml}
-                  className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2.5 text-[0.62rem] font-medium text-ink-soft transition-colors hover:bg-cream disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                  className="inline-flex h-7 items-center gap-1.5 rounded-md border border-rule px-2.5 text-[0.62rem] font-medium text-ink-soft transition-colors hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                 >
                   <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M8.5 2H12v3.5M5.5 12H2V8.5M12 8.5V12H8.5M2 5.5V2h3.5" />
@@ -1311,7 +1297,7 @@ export function ThemeBuilder({
                   disabled={!previewHtml}
                   aria-label="Open preview in a new tab"
                   title="Open in a new tab"
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border text-ink-soft transition-colors hover:bg-cream disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-rule text-ink-soft transition-colors hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                 >
                   <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M6.5 3H3.4A1.4 1.4 0 0 0 2 4.4v6.2A1.4 1.4 0 0 0 3.4 12h6.2A1.4 1.4 0 0 0 11 10.6V7.5" />
