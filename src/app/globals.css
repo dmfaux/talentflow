@@ -346,6 +346,96 @@ body {
   background: rgba(127, 127, 127, 0.12);
 }
 
+/* ─── Legal / policy long-form documents ───
+   Scoped prose styles for the Privacy, POPIA and Terms pages. The project ships
+   Tailwind v4 with no @tailwindcss/typography plugin, so (like `.chat-markdown`
+   above) we hand-roll the reading styles for plain semantic HTML. Headings borrow
+   the serif display face; body copy uses Ink Soft for AA contrast on the canvas. */
+.legal-prose {
+  color: var(--color-ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.75;
+}
+.legal-prose > section + section {
+  margin-top: 2.75rem;
+}
+.legal-prose h2 {
+  font-family: var(--font-fraunces), Georgia, serif;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  color: var(--color-ink);
+  margin-bottom: 1rem;
+  scroll-margin-top: 5.5rem; /* clears the sticky top bar on anchor jumps */
+  text-wrap: balance;
+}
+.legal-prose h3 {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--color-ink);
+  margin-top: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+.legal-prose p {
+  margin: 0 0 1rem;
+}
+.legal-prose ul,
+.legal-prose ol {
+  margin: 0 0 1rem;
+  padding-left: 1.4rem;
+}
+.legal-prose ul {
+  list-style: disc;
+}
+.legal-prose ol {
+  list-style: decimal;
+}
+.legal-prose li {
+  margin-top: 0.4rem;
+  padding-left: 0.25rem;
+}
+.legal-prose li::marker {
+  color: var(--color-ink-faint);
+}
+.legal-prose a {
+  color: var(--color-cobalt);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.legal-prose strong {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.legal-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1.25rem;
+  font-size: 0.88rem;
+}
+.legal-prose th,
+.legal-prose td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--color-rule);
+}
+.legal-prose th {
+  background: var(--color-canvas-2);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+/* Conspicuous-clause box — used to draw attention to liability, indemnity and
+   "as-is" terms, in line with s49 of the Consumer Protection Act. */
+.legal-prose .callout {
+  margin: 1.5rem 0;
+  border: 1px solid var(--color-saffron);
+  background: var(--color-saffron-soft);
+  border-radius: 0.6rem;
+  padding: 1rem 1.25rem;
+}
+.legal-prose .callout > :last-child {
+  margin-bottom: 0;
+}
+
 /* ─── Smooth scroll ─── */
 html {
   scroll-behavior: smooth;
