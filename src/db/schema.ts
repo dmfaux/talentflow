@@ -34,6 +34,14 @@ export const organizations = pgTable(
       .notNull()
       .default("executive"),
     hard_ceiling_credits: integer("hard_ceiling_credits"),
+    // Per-org negotiated plan overrides. Each is null by default, meaning "fall
+    // back to the plans-row default for this org's tier". When set, they take
+    // precedence at billing time (see priceInvoice caller in src/lib/billing.ts),
+    // so a bespoke deal can be struck per client without minting a new tier.
+    // hard_ceiling_credits above is the matching ceiling override.
+    base_fee_zar: integer("base_fee_zar"),
+    included_credits: integer("included_credits"),
+    overage_discount_pct: integer("overage_discount_pct"),
     billing_email: text("billing_email"), // moved up from clients (copy) — operator-owned
     // Tenant-editable org contact (S9), distinct from the operator-owned
     // billing_email. Both nullable/backfill-free; written via the tenant
@@ -61,6 +69,13 @@ export const plans = pgTable("plans", {
   included_credits: integer("included_credits").notNull(),
   overage_discount_pct: integer("overage_discount_pct").notNull().default(0),
   hard_ceiling_credits: integer("hard_ceiling_credits"),
+  // Public marketing-page visibility, operator-toggled (no inbound billing
+  // effect). public_visible hides the card from the pricing page entirely;
+  // show_pricing keeps the card but redacts the numbers (price + included
+  // credits + overage rate) behind a "let's talk" CTA — so a plan can exist and
+  // be assignable internally while we negotiate its commercials privately.
+  public_visible: boolean("public_visible").notNull().default(true),
+  show_pricing: boolean("show_pricing").notNull().default(true),
   created_at: timestamp("created_at").defaultNow().notNull(),
   updated_at: timestamp("updated_at").defaultNow().notNull(),
 });

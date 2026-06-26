@@ -5,6 +5,7 @@ import {
   clients,
   invitations,
   organizations,
+  plans,
   themes,
   usageEvents,
   users,
@@ -54,6 +55,18 @@ export async function GET(
       where: eq(organizations.id, id),
     });
     if (!org) return error("Organisation not found", 404);
+
+    // The tier's plan defaults — shown as placeholders next to the per-org
+    // override inputs so an operator can see what each blank field inherits.
+    const planDefaults = await db.query.plans.findFirst({
+      where: eq(plans.tier, org.tier),
+      columns: {
+        base_fee_zar: true,
+        included_credits: true,
+        overage_discount_pct: true,
+        hard_ceiling_credits: true,
+      },
+    });
 
     // Per-org usage aggregate (S10), windowed to the last 30 days, plus
     // all-time token totals for context. Uses usage_events_org_kind_idx /
@@ -153,6 +166,7 @@ export async function GET(
 
     return success({
       ...org,
+      planDefaults: planDefaults ?? null,
       counts: {
         brands: brands.total,
         campaigns: camps.total,
@@ -246,9 +260,33 @@ export async function PATCH(
       updates.hard_ceiling_credits = hc;
     }
 
+    // Per-org negotiated plan overrides (null = inherit the tier's plan default).
+    // base_fee_zar / included_credits are non-negative integers; the overage
+    // discount is a 0–100 percentage. priceInvoice coalesces override ?? plan.
+    for (const field of [
+      "base_fee_zar",
+      "included_credits",
+      "overage_discount_pct",
+    ] as const) {
+      if (body[field] === undefined) continue;
+      const v = body[field];
+      const max = field === "overage_discount_pct" ? 100 : Number.MAX_SAFE_INTEGER;
+      if (
+        v !== null &&
+        (typeof v !== "number" || !Number.isInteger(v) || v < 0 || v > max)
+      ) {
+        return error(
+          field === "overage_discount_pct"
+            ? "overage_discount_pct must be an integer 0–100 or null"
+            : `${field} must be a non-negative integer or null`
+        );
+      }
+      updates[field] = v;
+    }
+
     if (Object.keys(updates).length === 0) {
       return error(
-        "No editable fields supplied (tier, billing_email, operator_max_model_tier, hard_ceiling_credits)"
+        "No editable fields supplied (tier, billing_email, operator_max_model_tier, hard_ceiling_credits, base_fee_zar, included_credits, overage_discount_pct)"
       );
     }
 
@@ -324,6 +362,22 @@ export async function PATCH(
         ip,
         endedAt: now,
       });
+    }
+    for (const field of [
+      "base_fee_zar",
+      "included_credits",
+      "overage_discount_pct",
+    ] as const) {
+      if (updates[field] !== undefined && updates[field] !== org[field]) {
+        await recordOperatorAudit({
+          operatorUserId: ctx.userId,
+          action: "set_org_plan_override",
+          targetOrgId: id,
+          metadata: { field, from: org[field], to: updates[field], slug: org.slug },
+          ip,
+          endedAt: now,
+        });
+      }
     }
 
     // If the spend ceiling moved and the org is no longer over it, drain the

@@ -56,6 +56,12 @@ export default async function OperatorLayout({
               >
                 Themes
               </Link>
+              <Link
+                href="/operator/plans"
+                className="rounded-md px-2.5 py-1 text-[0.72rem] font-medium text-white/55 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                Plans
+              </Link>
             </nav>
           </div>
           <div className="flex items-center gap-3">

@@ -116,6 +116,30 @@ export async function POST(request: NextRequest) {
       return error("A valid owner email is required");
     }
 
+    // Optional per-org plan overrides (null = inherit the tier's plan default).
+    const overrides: {
+      base_fee_zar: number | null;
+      included_credits: number | null;
+      overage_discount_pct: number | null;
+    } = { base_fee_zar: null, included_credits: null, overage_discount_pct: null };
+    for (const field of [
+      "base_fee_zar",
+      "included_credits",
+      "overage_discount_pct",
+    ] as const) {
+      const v = body[field];
+      if (v === undefined || v === null) continue;
+      const max = field === "overage_discount_pct" ? 100 : Number.MAX_SAFE_INTEGER;
+      if (typeof v !== "number" || !Number.isInteger(v) || v < 0 || v > max) {
+        return error(
+          field === "overage_discount_pct"
+            ? "overage_discount_pct must be an integer 0–100 or null"
+            : `${field} must be a non-negative integer or null`
+        );
+      }
+      overrides[field] = v;
+    }
+
     // Org-slug collision → generic (don't confirm cross-org existence). The
     // unique index is the real backstop (the race is caught below).
     const slugTaken = await db.query.organizations.findFirst({
@@ -140,7 +164,7 @@ export async function POST(request: NextRequest) {
       ({ org, invitation, rawToken } = await db.transaction(async (tx) => {
         const [createdOrg] = await tx
           .insert(organizations)
-          .values({ name, slug, tier: body.tier, status: "active" })
+          .values({ name, slug, tier: body.tier, status: "active", ...overrides })
           .returning();
         const created = await createInvitationRow(
           {

@@ -51,19 +51,37 @@ export async function closeOrgPeriod(
   const usage = await getOrgUsageForPeriod(orgId, start, end);
   const org = await db.query.organizations.findFirst({
     where: eq(organizations.id, orgId),
-    columns: { id: true, name: true, tier: true, billing_email: true },
+    columns: {
+      id: true,
+      name: true,
+      tier: true,
+      billing_email: true,
+      // Per-org negotiated overrides; null = use the plan default for this tier.
+      base_fee_zar: true,
+      included_credits: true,
+      overage_discount_pct: true,
+    },
   });
   if (!org) throw new Error(`closeOrgPeriod: org ${orgId} not found`);
 
   const plan = await db.query.plans.findFirst({ where: eq(plans.tier, org.tier) });
   if (!plan) throw new Error(`closeOrgPeriod: no plan for tier ${org.tier}`);
 
+  // Resolve the effective commercials: a bespoke per-org override wins over the
+  // tier's plan default (a null override means "inherit the plan"). The tier
+  // still selects the plan template and all feature entitlements unchanged.
+  const rates = {
+    base_fee_zar: org.base_fee_zar ?? plan.base_fee_zar,
+    included_credits: org.included_credits ?? plan.included_credits,
+    overage_discount_pct: org.overage_discount_pct ?? plan.overage_discount_pct,
+  };
+
   const creditsByTier = {
     essential: usage.byTier.essential.credits,
     professional: usage.byTier.professional.credits,
     executive: usage.byTier.executive.credits,
   } satisfies Record<ModelTier, number>;
-  const priced = priceInvoice(plan, creditsByTier, usage.chatCredits);
+  const priced = priceInvoice(rates, creditsByTier, usage.chatCredits);
 
   const { invoice, created } = await db.transaction(async (tx) => {
     // Idempotency + gapless numbering both hinge on this lock: serialise all
