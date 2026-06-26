@@ -14,11 +14,25 @@ function useScrollAnimation() {
     const el = ref.current;
     if (!el) return;
 
+    const targets = el.querySelectorAll<HTMLElement>(".animate-on-scroll");
+    const reveal = (t: Element) => t.classList.add("is-visible");
+    const revealIfInView = (t: HTMLElement) => {
+      const r = t.getBoundingClientRect();
+      if (r.top < window.innerHeight && r.bottom > 0) reveal(t);
+    };
+
+    // Older browsers / non-DOM envs: show everything rather than leave content
+    // stuck at opacity:0.
+    if (typeof IntersectionObserver === "undefined") {
+      targets.forEach(reveal);
+      return;
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
+            reveal(entry.target);
             observer.unobserve(entry.target);
           }
         });
@@ -26,10 +40,23 @@ function useScrollAnimation() {
       { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
     );
 
-    const targets = el.querySelectorAll(".animate-on-scroll");
-    targets.forEach((t) => observer.observe(t));
+    targets.forEach((t: HTMLElement) => observer.observe(t));
 
-    return () => observer.disconnect();
+    // Reveal anything already on-screen at mount (page restored to a scroll
+    // position, short viewports) so content doesn't flash blank while waiting
+    // for the observer's first async callback.
+    targets.forEach(revealIfInView);
+
+    // Safety net: if the observer never fires for an on-screen element (fast
+    // scroll, hydration race, an element that mounts later), reveal it so
+    // content can't get permanently stuck invisible. Off-screen elements are
+    // left untouched and still animate in as they scroll into view.
+    const backstop = window.setTimeout(() => targets.forEach(revealIfInView), 1500);
+
+    return () => {
+      clearTimeout(backstop);
+      observer.disconnect();
+    };
   }, []);
 
   return ref;
