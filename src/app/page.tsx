@@ -348,9 +348,9 @@ function Hero() {
         </div>
       </div>
 
-      {/* Live snapshot strip */}
+      {/* Campaign capability strip */}
       <div className="load-fade load-6 relative mt-20 sm:mt-28">
-        <LiveTicker />
+        <CapabilityStrip />
       </div>
     </section>
   );
@@ -358,10 +358,10 @@ function Hero() {
 
 function HeroStat() {
   const [ref, inView] = useInView<HTMLDivElement>();
-  // Live, present-tense campaign snapshot — deliberately distinct from the
-  // outcome proofs in the Stats band (no shared figures).
+  // What a campaign is built to deliver — the platform's potential, not a live
+  // activity feed. Figures stay distinct from the outcome proofs in the Stats
+  // band (no shared numbers) so the page never repeats itself.
   const weeks = useCountUp(2, 1200, inView);
-  const speed = useCountUp(12, 1400, inView);
   const confidence = useCountUp(84, 1600, inView);
 
   return (
@@ -370,24 +370,24 @@ function HeroStat() {
       className="relative border border-ink/10 bg-paper rounded-2xl p-6 sm:p-7"
     >
       <div className="flex items-center gap-2">
-        <span className="relative w-1.5 h-1.5 rounded-full bg-moss pulse-dot" aria-hidden />
-        <span className="eyebrow text-ink-muted text-[0.64rem]">Campaign metrics · live</span>
+        <span className="w-1.5 h-1.5 rounded-full bg-cobalt" aria-hidden />
+        <span className="eyebrow text-ink-muted text-[0.64rem]">What every campaign delivers</span>
       </div>
       <dl className="mt-6 space-y-5">
         <div className="flex items-baseline justify-between border-b border-rule pb-4">
-          <dt className="text-[0.82rem] text-ink-muted">Time to shortlist</dt>
+          <dt className="text-[0.82rem] text-ink-muted">Time to first shortlist</dt>
           <dd className="font-mono text-[1.5rem] text-ink font-medium tracking-tight">
-            {weeks}<span className="text-ink-muted ml-1 text-sm font-normal">weeks</span>
+            ~{weeks}<span className="text-ink-muted ml-1 text-sm font-normal">weeks</span>
           </dd>
         </div>
         <div className="flex items-baseline justify-between border-b border-rule pb-4">
-          <dt className="text-[0.82rem] text-ink-muted">Candidates scored / hour</dt>
+          <dt className="text-[0.82rem] text-ink-muted">CVs scored in parallel</dt>
           <dd className="font-mono text-[1.5rem] text-cobalt font-medium tracking-tight">
-            {speed}
+            100s<span className="text-ink-muted ml-1 text-sm font-normal">/ hr</span>
           </dd>
         </div>
         <div className="flex items-baseline justify-between">
-          <dt className="text-[0.82rem] text-ink-muted">Avg. shortlist confidence</dt>
+          <dt className="text-[0.82rem] text-ink-muted">Typical shortlist confidence</dt>
           <dd className="font-mono text-[1.5rem] text-moss font-medium tracking-tight">
             {confidence}<span className="text-ink-muted ml-0.5 text-sm font-normal">%</span>
           </dd>
@@ -397,30 +397,37 @@ function HeroStat() {
   );
 }
 
-function LiveTicker() {
-  // A calm, static snapshot of today's funnel — no perpetual marquee. Liveness is
-  // carried by a single pulse dot, not by motion that never stops. Figures stay
-  // monochrome so the strip reads as quiet proof, not a scoreboard.
-  const items = [
-    { label: "Applied today", value: "+312" },
-    { label: "Scored", value: "+89" },
-    { label: "Gating passed", value: "+47" },
-    { label: "Shortlisted", value: "+14" },
-    { label: "Confidence ≥ 80%", value: "+18" },
-    { label: "Active campaigns", value: "11" },
+function CapabilityStrip() {
+  // The campaign pipeline stated as capability, not a live counter. Each item is
+  // something the platform does for every applicant — honest potential, with no
+  // fabricated "today" figures and no numbers borrowed from the Stats band.
+  const steps = [
+    "Every applicant scored",
+    "Screened on your must-haves",
+    "Ranked, rated shortlist",
+    "Confidence on every pick",
+    "You approve every call",
   ];
   return (
     <div className="border-y border-rule bg-paper/60">
       <div className="mx-auto max-w-[1240px] px-6 sm:px-10 py-5">
-        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
-          <div className="flex items-center gap-2">
-            <span className="relative w-1.5 h-1.5 rounded-full bg-moss pulse-dot" aria-hidden />
-            <span className="eyebrow text-[0.62rem] text-ink-muted">Live now</span>
-          </div>
-          {items.map((it, i) => (
-            <div key={i} className="flex items-baseline gap-2">
-              <span className="font-mono text-[0.88rem] font-medium text-ink">{it.value}</span>
-              <span className="eyebrow text-[0.62rem] text-ink-muted">{it.label}</span>
+        <div className="flex flex-wrap items-center justify-center gap-x-7 gap-y-3">
+          <span className="eyebrow text-[0.62rem] text-ink-muted">In every campaign</span>
+          {steps.map((step, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <svg
+                viewBox="0 0 16 16"
+                className="shrink-0 w-3 h-3 text-cobalt"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M3 8.5L6.5 12l7-8" />
+              </svg>
+              <span className="text-[0.8rem] text-ink-soft">{step}</span>
             </div>
           ))}
         </div>
