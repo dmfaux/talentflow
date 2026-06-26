@@ -265,7 +265,7 @@ function Navbar() {
                 className="flex h-14 items-center justify-between border-b border-rule/70 text-[1.05rem] font-medium text-ink transition-colors hover:text-cobalt"
               >
                 {l.label}
-                <span className="arrow-slide text-ink-faint" aria-hidden>→</span>
+                <span className="arrow-slide text-ink-muted" aria-hidden>→</span>
               </a>
             ))}
           </nav>
@@ -316,8 +316,8 @@ function Hero() {
       <div className="relative mx-auto max-w-[1240px] px-6 sm:px-10">
         {/* Eyebrow tag */}
         <div className="load-fade load-1 flex items-center gap-3 mb-8 sm:mb-10">
-          <span className="inline-block w-6 h-px bg-vermillion" aria-hidden />
-          <span className="eyebrow text-vermillion">
+          <span className="inline-block w-6 h-px bg-cobalt" aria-hidden />
+          <span className="eyebrow text-cobalt">
             Recruitment · rebuilt for South Africa · est. 2026
           </span>
         </div>
@@ -327,7 +327,7 @@ function Hero() {
           <div className="lg:col-span-8">
             <h1 className="font-display text-ink text-[2.75rem] sm:text-[4rem] lg:text-[5.25rem] leading-[0.96] tracking-[-0.025em]">
               <span className="load-reveal load-1 block">A shortlist,</span>
-              <span className="load-reveal load-2 block">not a <span className="font-display-italic text-vermillion">headache</span>.</span>
+              <span className="load-reveal load-2 block">not a <span className="font-display-italic text-cobalt">headache</span>.</span>
             </h1>
             <p className="load-fade load-3 mt-8 sm:mt-10 text-ink-soft text-[1.05rem] sm:text-[1.18rem] leading-[1.55] max-w-[560px]">
               TalentStream is where South African corporates run AI-powered hiring. Launch a branded campaign, let the AI screen and score every applicant, and get a ranked shortlist — paying only for the analysis you run, never a slice of anyone&rsquo;s salary.
@@ -418,10 +418,10 @@ function LiveTicker() {
     { label: "Active campaigns", value: "11", tone: "vermillion" as const },
   ];
   const toneClass = {
-    moss: "text-moss",
+    moss: "text-moss-deep",
     cobalt: "text-cobalt",
     saffron: "text-saffron-deep",
-    vermillion: "text-vermillion",
+    vermillion: "text-cobalt",
     ink: "text-ink",
   };
   return (
@@ -443,7 +443,7 @@ function LiveTicker() {
             <span className={`font-mono text-[0.88rem] font-medium ${toneClass[it.tone]}`}>
               {it.value}
             </span>
-            <span className="text-ink-faint">·</span>
+            <span className="text-ink-muted">·</span>
           </div>
         ))}
       </div>
@@ -485,7 +485,7 @@ function Problem() {
     cobalt: "bg-cobalt",
   };
   const toneText = {
-    vermillion: "text-vermillion",
+    vermillion: "text-cobalt",
     saffron: "text-saffron-deep",
     cobalt: "text-cobalt",
   };
@@ -500,7 +500,7 @@ function Problem() {
               <span className="eyebrow text-ink-muted">The challenge</span>
             </div>
             <h2 className="animate-on-scroll stagger-1 font-display text-ink text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] tracking-[-0.02em] leading-[1.02]">
-              Modern hiring needs a new <span className="font-display-italic text-vermillion">co-pilot</span>.
+              Modern hiring needs a new <span className="font-display-italic text-cobalt">co-pilot</span>.
             </h2>
             <p className="animate-on-scroll stagger-2 mt-6 text-ink-muted text-[0.98rem] leading-[1.6] max-w-md">
               Three realities every hiring team faces — and how an AI co-pilot in your corner lightens the load.
@@ -592,7 +592,7 @@ function Method() {
               className={`animate-on-scroll stagger-${i + 2} group relative bg-paper p-7 sm:p-8 transition-colors hover:bg-canvas`}
             >
               <div className="flex items-start justify-between mb-8">
-                <span className="font-mono text-[0.7rem] text-ink-faint">{s.tag}</span>
+                <span className="font-mono text-[0.7rem] text-ink-muted">{s.tag}</span>
                 <span className="font-mono text-[2.5rem] text-cobalt leading-none font-medium tabular-nums">
                   {s.num}
                 </span>
@@ -703,7 +703,7 @@ function Benefits() {
           <div>
             <div className="animate-on-scroll flex items-center gap-3 mb-5">
               <span className="inline-block w-5 h-px bg-moss" aria-hidden />
-              <span className="eyebrow text-moss">Why TalentStream</span>
+              <span className="eyebrow text-moss-deep">Why TalentStream</span>
             </div>
             <h2 className="animate-on-scroll stagger-1 font-display text-ink text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] tracking-[-0.02em] leading-[1.02] max-w-[760px]">
               Built for the way South African teams <span className="font-display-italic">actually&nbsp;hire</span>.
@@ -843,8 +843,8 @@ function Pricing() {
       <div className="mx-auto max-w-[1240px] px-6 sm:px-10">
         <div className="max-w-[720px]">
           <div className="animate-on-scroll flex items-center gap-3 mb-5">
-            <span className="inline-block w-5 h-px bg-vermillion" aria-hidden />
-            <span className="eyebrow text-vermillion">Pricing</span>
+            <span className="inline-block w-5 h-px bg-cobalt" aria-hidden />
+            <span className="eyebrow text-cobalt">Pricing</span>
           </div>
           <h2 className="animate-on-scroll stagger-1 font-display text-ink text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] tracking-[-0.02em] leading-[1.02]">
             A floor you can <span className="font-display-italic">plan around</span>.
@@ -866,8 +866,8 @@ function Pricing() {
             >
               {tier.featured && (
                 <div className="absolute -top-3 left-8">
-                  <span className="inline-flex items-center gap-1.5 bg-vermillion text-white text-[0.66rem] font-semibold uppercase tracking-[0.12em] px-3 py-1.5 rounded-full">
-                    <span className="w-1 h-1 rounded-full bg-white pulse-dot" />
+                  <span className="inline-flex items-center gap-1.5 bg-vermillion text-ink text-[0.66rem] font-semibold uppercase tracking-[0.12em] px-3 py-1.5 rounded-full">
+                    <span className="w-1 h-1 rounded-full bg-ink pulse-dot" />
                     Most chosen
                   </span>
                 </div>
@@ -877,14 +877,14 @@ function Pricing() {
                   {tier.name}
                 </h3>
               </div>
-              <p className={`mt-2 text-[0.82rem] ${tier.featured ? "text-canvas/55" : "text-ink-faint"}`}>
+              <p className={`mt-2 text-[0.82rem] ${tier.featured ? "text-canvas/55" : "text-ink-muted"}`}>
                 {tier.desc}
               </p>
               <div className="mt-6 flex items-baseline gap-1.5">
                 <span className={`font-mono text-[1.75rem] font-medium tracking-tight tabular-nums ${tier.featured ? "text-canvas" : "text-ink"}`}>
                   {tier.price}
                 </span>
-                <span className={`font-mono text-[0.85rem] ${tier.featured ? "text-canvas/55" : "text-ink-faint"}`}>
+                <span className={`font-mono text-[0.85rem] ${tier.featured ? "text-canvas/55" : "text-ink-muted"}`}>
                   {tier.priceRange}
                 </span>
               </div>
@@ -913,7 +913,7 @@ function Pricing() {
                 href="#start"
                 className={`mt-8 inline-flex w-full items-center justify-center h-11 rounded-full text-[0.85rem] font-medium transition-colors ${
                   tier.featured
-                    ? "bg-vermillion text-white hover:bg-vermillion-deep"
+                    ? "bg-vermillion text-ink hover:bg-vermillion-deep"
                     : "bg-ink text-canvas hover:bg-cobalt"
                 }`}
               >
@@ -922,7 +922,7 @@ function Pricing() {
             </div>
           ))}
         </div>
-        <p className="animate-on-scroll mt-8 font-mono text-[0.72rem] text-ink-faint text-center tracking-wide">
+        <p className="animate-on-scroll mt-8 font-mono text-[0.72rem] text-ink-muted text-center tracking-wide">
           INCLUDED ALLOWANCE RENEWS MONTHLY · USAGE BILLED IN ZAR · EXCLUDES 15% VAT
         </p>
 
@@ -945,8 +945,8 @@ function Pricing() {
             {/* Essential */}
             <div className="animate-on-scroll stagger-2 relative flex flex-col rounded-2xl border border-rule bg-paper p-7 transition-all lift hover:border-ink/20">
               <div className="flex items-center justify-between mb-5">
-                <span className="eyebrow text-moss text-[0.64rem]">Essential</span>
-                <span className="font-mono text-[0.7rem] text-ink-faint">tier 01</span>
+                <span className="eyebrow text-moss-deep text-[0.64rem]">Essential</span>
+                <span className="font-mono text-[0.7rem] text-ink-muted">tier 01</span>
               </div>
               <h4 className="font-display text-ink text-[1.3rem] leading-[1.15] tracking-[-0.01em] mb-2.5">
                 Fast &amp; efficient
@@ -955,10 +955,10 @@ function Pricing() {
                 Quick, capable screening for high-volume intakes where speed wins.
               </p>
               <div className="mt-auto pt-5 border-t border-rule">
-                <p className="text-[0.68rem] text-ink-faint mb-1.5">Draws from your allowance</p>
+                <p className="text-[0.68rem] text-ink-muted mb-1.5">Draws from your allowance</p>
                 <div className="flex items-baseline gap-1.5">
                   <span className="font-mono text-[1.4rem] text-ink font-medium tracking-tight">≈ 3</span>
-                  <span className="font-mono text-[0.76rem] text-ink-faint">credits / candidate</span>
+                  <span className="font-mono text-[0.76rem] text-ink-muted">credits / candidate</span>
                 </div>
               </div>
             </div>
@@ -972,7 +972,7 @@ function Pricing() {
               </div>
               <div className="flex items-center justify-between mb-5">
                 <span className="eyebrow text-cobalt text-[0.64rem]">Professional</span>
-                <span className="font-mono text-[0.7rem] text-ink-faint">tier 02</span>
+                <span className="font-mono text-[0.7rem] text-ink-muted">tier 02</span>
               </div>
               <h4 className="font-display text-ink text-[1.3rem] leading-[1.15] tracking-[-0.01em] mb-2.5">
                 Balanced judgement
@@ -981,10 +981,10 @@ function Pricing() {
                 The everyday workhorse — sharp reasoning at a sensible price. Set as your default.
               </p>
               <div className="mt-auto pt-5 border-t border-rule">
-                <p className="text-[0.68rem] text-ink-faint mb-1.5">Draws from your allowance</p>
+                <p className="text-[0.68rem] text-ink-muted mb-1.5">Draws from your allowance</p>
                 <div className="flex items-baseline gap-1.5">
                   <span className="font-mono text-[1.4rem] text-ink font-medium tracking-tight">≈ 7</span>
-                  <span className="font-mono text-[0.76rem] text-ink-faint">credits / candidate</span>
+                  <span className="font-mono text-[0.76rem] text-ink-muted">credits / candidate</span>
                 </div>
               </div>
             </div>
@@ -1025,7 +1025,7 @@ function Pricing() {
             </div>
           </div>
 
-          <p className="animate-on-scroll mt-7 font-mono text-[0.72rem] text-ink-faint text-center tracking-wide">
+          <p className="animate-on-scroll mt-7 font-mono text-[0.72rem] text-ink-muted text-center tracking-wide">
             EACH CANDIDATE DRAWS FROM YOUR MONTHLY ALLOWANCE FIRST · BILLED ONLY BEYOND IT · CHATS ALWAYS RUN ON ESSENTIAL
           </p>
         </div>
@@ -1155,7 +1155,7 @@ function FinalCTA() {
                     aria-invalid={!!error}
                     aria-describedby={error ? "cta-error cta-help" : "cta-help"}
                     disabled={status === "submitting"}
-                    className={`h-[56px] w-full flex-1 px-5 rounded-full bg-canvas border text-ink placeholder:text-ink-faint text-[0.95rem] outline-none transition-all duration-200 focus:ring-2 disabled:opacity-60 ${
+                    className={`h-[56px] w-full flex-1 px-5 rounded-full bg-canvas border text-ink placeholder:text-ink-muted text-[0.95rem] outline-none transition-all duration-200 focus:ring-2 disabled:opacity-60 ${
                       error
                         ? "border-red focus:border-red focus:ring-red/20"
                         : "border-rule focus:border-cobalt focus:ring-cobalt/20"
@@ -1182,7 +1182,7 @@ function FinalCTA() {
             </>
           )}
 
-          <p className="animate-on-scroll stagger-4 mt-6 text-[0.82rem] text-ink-faint">
+          <p className="animate-on-scroll stagger-4 mt-6 text-[0.82rem] text-ink-muted">
             Or email{" "}
             <a href="mailto:hello@talentstream.co.za" className="text-ink link-underline font-medium">
               hello@talentstream.co.za
@@ -1211,7 +1211,7 @@ function Footer() {
           </div>
           <div className="sm:col-span-7 grid grid-cols-2 sm:grid-cols-3 gap-8">
             <div>
-              <p className="eyebrow text-ink-faint mb-4">Product</p>
+              <p className="eyebrow text-ink-muted mb-4">Product</p>
               <ul className="space-y-2.5">
                 <li><a href="#method" className="text-[0.88rem] text-ink-soft hover:text-cobalt link-underline transition-colors">Method</a></li>
                 <li><a href="#why" className="text-[0.88rem] text-ink-soft hover:text-cobalt link-underline transition-colors">Why us</a></li>
@@ -1219,14 +1219,14 @@ function Footer() {
               </ul>
             </div>
             <div>
-              <p className="eyebrow text-ink-faint mb-4">Company</p>
+              <p className="eyebrow text-ink-muted mb-4">Company</p>
               <ul className="space-y-2.5">
                 <li><a href="/login" className="text-[0.88rem] text-ink-soft hover:text-cobalt link-underline transition-colors">Log in</a></li>
                 <li><a href="mailto:hello@talentstream.co.za" className="text-[0.88rem] text-ink-soft hover:text-cobalt link-underline transition-colors">Contact</a></li>
               </ul>
             </div>
             <div>
-              <p className="eyebrow text-ink-faint mb-4">Legal</p>
+              <p className="eyebrow text-ink-muted mb-4">Legal</p>
               <ul className="space-y-2.5">
                 <li><a href="#" className="text-[0.88rem] text-ink-soft hover:text-cobalt link-underline transition-colors">Privacy</a></li>
                 <li><a href="#" className="text-[0.88rem] text-ink-soft hover:text-cobalt link-underline transition-colors">POPIA</a></li>
@@ -1236,10 +1236,10 @@ function Footer() {
           </div>
         </div>
         <div className="pt-8 border-t border-rule flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <p className="font-mono text-[0.72rem] text-ink-faint tracking-wide">
+          <p className="font-mono text-[0.72rem] text-ink-muted tracking-wide">
             © 2026 TALENTSTREAM (PTY) LTD · ALL RIGHTS RESERVED
           </p>
-          <p className="font-mono text-[0.72rem] text-ink-faint tracking-wide">
+          <p className="font-mono text-[0.72rem] text-ink-muted tracking-wide">
             HOSTED ON AZURE SOUTH AFRICA
           </p>
         </div>

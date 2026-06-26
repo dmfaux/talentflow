@@ -12,7 +12,7 @@ colors:
   moss-deep: "#066b44"
   moss-soft: "#d0f0de"
   saffron: "#d68a0b"
-  saffron-deep: "#a86a00"
+  saffron-deep: "#8f5a00"
   saffron-soft: "#fff0cc"
   red: "#c02616"
   red-light: "#ffe0da"
@@ -166,7 +166,7 @@ A cool, low-temperature palette: a blue-grey field and deep-indigo ink, punctuat
 - **Cobalt Signal** (`#2c5bff`): The single primary action and brand colour. Primary buttons, the active form field's focus ring, selected state, key links, the wordmark's second syllable, the `::selection` highlight. Its deep variant **Cobalt Deep** (`#1a45d4`) is the hover/pressed state; **Cobalt Tint** (`#e8eeff`) backs informational chips and the Premium tier badge.
 
 ### Secondary
-- **Electric Teal** (`#05dbd6`): The "notice this" accent — the single bright signal beside the funnel. The live pulse dot in the logo and the active-nav indicator, premium/enterprise highlights, moments of editorial emphasis. Used even more sparingly than Cobalt. Deep variant **Electric Teal Deep** (`#04b0ac`) for text on tint; **Electric Teal Soft** (`#d4f7f6`) for backgrounds. *Note: the CSS token is historically named `--color-vermillion`; it is teal, not vermillion — a legacy misnomer, not a second colour.*
+- **Electric Teal** (`#05dbd6`): The "notice this" accent — the single bright signal beside the funnel. The live pulse dot in the logo and the active-nav indicator, premium/enterprise highlights, moments of editorial emphasis. Used even more sparingly than Cobalt. **Dark-surface only as text/icon:** on the light canvas teal hits just ~1.6:1, so it is reserved for dark backgrounds (the navy Stats band, the featured/Executive cards, the logo) where it reads at ~10:1; on light surfaces Cobalt is the accent. Deep variant **Electric Teal Deep** (`#04b0ac`) for backgrounds/hover; **Electric Teal Soft** (`#d4f7f6`) for fills. *Note: the CSS token is historically named `--color-vermillion`; it is teal, not vermillion — a legacy misnomer, not a second colour.*
 
 ### Tertiary
 The semantic status set — slightly warm against the cool field so success/warning/error read instantly. Always rendered as a soft-tint callout: tinted background + matching deep text + a thin matching-hue border.

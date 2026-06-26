@@ -38,7 +38,7 @@
         "role": "tertiary",
         "displayName": "Saffron (Warning)",
         "canonical": "#d68a0b",
-        "tonalRamp": ["#3a2400", "#6b4400", "#a86a00", "#d68a0b", "#e8a838", "#f2c474", "#f9deab", "#fff0cc"]
+        "tonalRamp": ["#3a2400", "#6b4400", "#8f5a00", "#d68a0b", "#e8a838", "#f2c474", "#f9deab", "#fff0cc"]
       },
       "red": {
         "role": "tertiary",
