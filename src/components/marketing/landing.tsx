@@ -1215,9 +1215,9 @@ function Footer() {
             <div>
               <p className="eyebrow text-ink-muted mb-4">Legal</p>
               <ul className="space-y-2.5">
-                <li><a href="#" className="text-[0.88rem] text-ink-soft hover:text-cobalt link-underline transition-colors">Privacy</a></li>
-                <li><a href="#" className="text-[0.88rem] text-ink-soft hover:text-cobalt link-underline transition-colors">POPIA</a></li>
-                <li><a href="#" className="text-[0.88rem] text-ink-soft hover:text-cobalt link-underline transition-colors">Terms</a></li>
+                <li><a href="/privacy" className="text-[0.88rem] text-ink-soft hover:text-cobalt link-underline transition-colors">Privacy</a></li>
+                <li><a href="/popia" className="text-[0.88rem] text-ink-soft hover:text-cobalt link-underline transition-colors">POPIA</a></li>
+                <li><a href="/terms" className="text-[0.88rem] text-ink-soft hover:text-cobalt link-underline transition-colors">Terms</a></li>
               </ul>
             </div>
           </div>
