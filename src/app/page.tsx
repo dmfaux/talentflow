@@ -199,7 +199,7 @@ function Navbar() {
             </a>
             <a
               href="#start"
-              className="arrow-parent group hidden sm:inline-flex items-center gap-2 h-10 px-[18px] bg-ink text-canvas text-[0.82rem] font-medium rounded-full hover:bg-cobalt transition-colors duration-300 lift"
+              className="arrow-parent group hidden sm:inline-flex items-center gap-2 h-10 px-[18px] bg-ink text-canvas text-[0.82rem] font-medium rounded-lg hover:bg-cobalt transition-colors duration-300 lift"
             >
               Start a campaign
               <span className="arrow-slide">→</span>
@@ -273,7 +273,7 @@ function Navbar() {
             <a
               href="#start"
               onClick={() => setMenuOpen(false)}
-              className="arrow-parent group inline-flex h-12 items-center justify-center gap-2.5 rounded-full bg-cobalt text-white text-[0.95rem] font-medium transition-colors hover:bg-cobalt-deep"
+              className="arrow-parent group inline-flex h-12 items-center justify-center gap-2.5 rounded-lg bg-cobalt text-white text-[0.95rem] font-medium transition-colors hover:bg-cobalt-deep"
             >
               Start a campaign
               <span className="arrow-slide">→</span>
@@ -281,7 +281,7 @@ function Navbar() {
             <a
               href="/login"
               onClick={() => setMenuOpen(false)}
-              className="inline-flex h-12 items-center justify-center rounded-full border border-ink/15 text-ink text-[0.95rem] font-medium transition-colors hover:bg-ink hover:text-canvas"
+              className="inline-flex h-12 items-center justify-center rounded-lg border border-ink/15 text-ink text-[0.95rem] font-medium transition-colors hover:bg-ink hover:text-canvas"
             >
               Log in
             </a>
@@ -335,14 +335,14 @@ function Hero() {
             <div className="load-fade load-4 mt-10 sm:mt-12 flex flex-wrap items-center gap-3 sm:gap-4">
               <a
                 href="#start"
-                className="arrow-parent group inline-flex items-center gap-2.5 h-[52px] px-7 bg-cobalt text-white text-[0.95rem] font-medium rounded-full hover:bg-cobalt-deep transition-colors duration-300 lift shadow-[0_8px_24px_-8px_rgba(44,91,255,0.35)]"
+                className="arrow-parent group inline-flex items-center gap-2.5 h-[52px] px-7 bg-cobalt text-white text-[0.95rem] font-medium rounded-lg hover:bg-cobalt-deep transition-colors duration-300 lift shadow-[0_8px_24px_-8px_rgba(44,91,255,0.35)]"
               >
                 Start a campaign
                 <span className="arrow-slide">→</span>
               </a>
               <a
                 href="#method"
-                className="inline-flex items-center gap-2.5 h-[52px] px-7 border border-ink/15 text-ink text-[0.95rem] font-medium rounded-full hover:bg-ink hover:text-canvas transition-colors duration-300"
+                className="inline-flex items-center gap-2.5 h-[52px] px-7 border border-ink/15 text-ink text-[0.95rem] font-medium rounded-lg hover:bg-ink hover:text-canvas transition-colors duration-300"
               >
                 See the method
               </a>
@@ -366,18 +366,17 @@ function Hero() {
 
 function HeroStat() {
   const [ref, inView] = useInView<HTMLDivElement>();
+  // Live, present-tense campaign snapshot — deliberately distinct from the
+  // outcome proofs in the Stats band (no shared figures).
   const weeks = useCountUp(2, 1200, inView);
-  const savings = useCountUp(58, 1600, inView);
   const speed = useCountUp(12, 1400, inView);
+  const confidence = useCountUp(84, 1600, inView);
 
   return (
     <div
       ref={ref}
       className="relative border border-ink/10 bg-paper rounded-2xl p-6 sm:p-7"
     >
-      <div className="absolute -top-[1px] -right-[1px] w-16 h-16 pointer-events-none" aria-hidden>
-        <div className="absolute top-0 right-0 w-full h-full border-t-2 border-r-2 border-vermillion rounded-tr-2xl" />
-      </div>
       <div className="flex items-center gap-2">
         <span className="relative w-1.5 h-1.5 rounded-full bg-moss pulse-dot" aria-hidden />
         <span className="eyebrow text-ink-muted text-[0.64rem]">Campaign metrics · live</span>
@@ -390,15 +389,15 @@ function HeroStat() {
           </dd>
         </div>
         <div className="flex items-baseline justify-between border-b border-rule pb-4">
-          <dt className="text-[0.82rem] text-ink-muted">Cost savings</dt>
-          <dd className="font-mono text-[1.5rem] text-moss font-medium tracking-tight">
-            {savings}<span className="text-ink-muted ml-0.5 text-sm font-normal">%</span>
-          </dd>
-        </div>
-        <div className="flex items-baseline justify-between">
           <dt className="text-[0.82rem] text-ink-muted">Candidates scored / hour</dt>
           <dd className="font-mono text-[1.5rem] text-cobalt font-medium tracking-tight">
             {speed}
+          </dd>
+        </div>
+        <div className="flex items-baseline justify-between">
+          <dt className="text-[0.82rem] text-ink-muted">Avg. shortlist confidence</dt>
+          <dd className="font-mono text-[1.5rem] text-moss font-medium tracking-tight">
+            {confidence}<span className="text-ink-muted ml-0.5 text-sm font-normal">%</span>
           </dd>
         </div>
       </dl>
@@ -460,49 +459,28 @@ function Problem() {
 
   const pains = [
     {
-      num: "01",
       title: "Per-placement fees scale with salary, not with effort",
       body: "Percentage-of-salary pricing ties cost to the role, not the work involved. For high-volume or senior hiring, that adds up fast.",
-      tone: "vermillion" as const,
     },
     {
-      num: "02",
       title: "Internal hiring burns your team out",
       body: "HR drowns in unqualified applications. Every open role becomes a second full-time job for someone.",
-      tone: "saffron" as const,
     },
     {
-      num: "03",
       title: "Contingency models pressure speed over fit",
       body: "When revenue depends on who fills the seat first, depth of assessment is the first thing to give. Everyone involved deserves better tooling.",
-      tone: "cobalt" as const,
     },
   ];
-
-  const toneBar = {
-    vermillion: "bg-vermillion",
-    saffron: "bg-saffron",
-    cobalt: "bg-cobalt",
-  };
-  const toneText = {
-    vermillion: "text-cobalt",
-    saffron: "text-saffron-deep",
-    cobalt: "text-cobalt",
-  };
 
   return (
     <section ref={ref} className="py-24 sm:py-32 border-t border-rule bg-canvas">
       <div className="mx-auto max-w-[1240px] px-6 sm:px-10">
         <div className="grid lg:grid-cols-12 gap-10 lg:gap-16 mb-16 sm:mb-20">
           <div className="lg:col-span-5 lg:sticky lg:top-28 lg:self-start">
-            <div className="animate-on-scroll flex items-center gap-3 mb-5">
-              <span className="inline-block w-5 h-px bg-ink" aria-hidden />
-              <span className="eyebrow text-ink-muted">The challenge</span>
-            </div>
-            <h2 className="animate-on-scroll stagger-1 font-display text-ink text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] tracking-[-0.02em] leading-[1.02]">
+            <h2 className="animate-on-scroll font-display text-ink text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] tracking-[-0.02em] leading-[1.02]">
               Modern hiring needs a new <span className="font-display-italic text-cobalt">co-pilot</span>.
             </h2>
-            <p className="animate-on-scroll stagger-2 mt-6 text-ink-muted text-[0.98rem] leading-[1.6] max-w-md">
+            <p className="animate-on-scroll stagger-1 mt-6 text-ink-muted text-[0.98rem] leading-[1.6] max-w-md">
               Three realities every hiring team faces — and how an AI co-pilot in your corner lightens the load.
             </p>
           </div>
@@ -511,26 +489,16 @@ function Problem() {
             {pains.map((p, i) => (
               <div
                 key={i}
-                className={`animate-on-scroll stagger-${i + 2} group relative bg-paper border border-rule p-7 sm:p-8 transition-colors hover:bg-canvas-2 ${
+                className={`animate-on-scroll stagger-${i + 2} bg-paper border border-rule p-7 sm:p-8 transition-colors hover:bg-canvas-2 ${
                   i === 0 ? "rounded-t-2xl" : ""
                 } ${i === pains.length - 1 ? "rounded-b-2xl" : ""}`}
               >
-                <div className="flex items-start gap-5 sm:gap-7">
-                  <div className={`shrink-0 w-1 h-12 ${toneBar[p.tone]}`} aria-hidden />
-                  <div className="flex-1">
-                    <div className="flex items-baseline justify-between gap-4 mb-2.5">
-                      <h3 className="font-display text-ink text-[1.25rem] sm:text-[1.35rem] leading-[1.2] tracking-[-0.01em] max-w-[420px]">
-                        {p.title}
-                      </h3>
-                      <span className={`font-mono text-[0.72rem] ${toneText[p.tone]} shrink-0`}>
-                        {p.num}
-                      </span>
-                    </div>
-                    <p className="text-ink-muted text-[0.92rem] leading-[1.6]">
-                      {p.body}
-                    </p>
-                  </div>
-                </div>
+                <h3 className="font-display text-ink text-[1.25rem] sm:text-[1.35rem] leading-[1.2] tracking-[-0.01em] mb-2.5 max-w-[460px]">
+                  {p.title}
+                </h3>
+                <p className="text-ink-muted text-[0.92rem] leading-[1.6]">
+                  {p.body}
+                </p>
               </div>
             ))}
           </div>
@@ -577,11 +545,7 @@ function Method() {
   return (
     <section ref={ref} id="method" className="relative py-24 sm:py-32 bg-paper border-t border-rule scroll-mt-20">
       <div className="mx-auto max-w-[1240px] px-6 sm:px-10">
-        <div className="animate-on-scroll flex items-center gap-3 mb-5">
-          <span className="inline-block w-5 h-px bg-cobalt" aria-hidden />
-          <span className="eyebrow text-cobalt">The method</span>
-        </div>
-        <h2 className="animate-on-scroll stagger-1 font-display text-ink text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] tracking-[-0.02em] leading-[1.02] max-w-[820px]">
+        <h2 className="animate-on-scroll font-display text-ink text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] tracking-[-0.02em] leading-[1.02] max-w-[820px]">
           From role spec to shortlist in <span className="font-display-italic text-cobalt">four&nbsp;steps</span>.
         </h2>
 
@@ -683,49 +647,29 @@ function Benefits() {
     },
   ];
 
-  const toneText = {
-    cobalt: "text-cobalt",
-    vermillion: "text-vermillion",
-    moss: "text-moss",
-    saffron: "text-saffron-deep",
-  };
-  const toneBg = {
-    cobalt: "bg-cobalt-tint",
-    vermillion: "bg-vermillion-soft",
-    moss: "bg-moss-soft",
-    saffron: "bg-saffron-soft",
-  };
-
   return (
     <section ref={ref} id="why" className="py-24 sm:py-32 bg-canvas border-t border-rule scroll-mt-20">
       <div className="mx-auto max-w-[1240px] px-6 sm:px-10">
-        <div className="flex items-end justify-between mb-14 sm:mb-16 flex-wrap gap-6">
-          <div>
-            <div className="animate-on-scroll flex items-center gap-3 mb-5">
-              <span className="inline-block w-5 h-px bg-moss" aria-hidden />
-              <span className="eyebrow text-moss-deep">Why TalentStream</span>
-            </div>
-            <h2 className="animate-on-scroll stagger-1 font-display text-ink text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] tracking-[-0.02em] leading-[1.02] max-w-[760px]">
-              Built for the way South African teams <span className="font-display-italic">actually&nbsp;hire</span>.
-            </h2>
-          </div>
-        </div>
+        <h2 className="animate-on-scroll font-display text-ink text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] tracking-[-0.02em] leading-[1.02] max-w-[760px] mb-14 sm:mb-16">
+          Built for the way South African teams <span className="font-display-italic">actually&nbsp;hire</span>.
+        </h2>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {/* Editorial spec-list: a two-column ruled list, not an icon-tile card grid. */}
+        <div className="grid sm:grid-cols-2 gap-x-12 lg:gap-x-20 border-t border-rule">
           {items.map((item, i) => (
             <div
               key={i}
-              className={`animate-on-scroll stagger-${(i % 3) + 2} group relative bg-paper border border-rule rounded-2xl p-7 transition-all lift hover:border-ink/20`}
+              className={`animate-on-scroll stagger-${(i % 2) + 1} flex gap-4 py-7 border-b border-rule`}
             >
-              <div className={`w-10 h-10 rounded-lg ${toneBg[item.tone]} flex items-center justify-center ${toneText[item.tone]} mb-6`}>
-                <div className="w-5 h-5">{item.icon}</div>
+              <span className="shrink-0 mt-0.5 block w-5 h-5 text-cobalt">{item.icon}</span>
+              <div>
+                <h3 className="font-display text-ink text-[1.2rem] leading-[1.2] tracking-[-0.01em] mb-1.5">
+                  {item.title}
+                </h3>
+                <p className="text-ink-muted text-[0.9rem] leading-[1.55]">
+                  {item.body}
+                </p>
               </div>
-              <h3 className="font-display text-ink text-[1.2rem] leading-[1.2] tracking-[-0.01em] mb-2.5">
-                {item.title}
-              </h3>
-              <p className="text-ink-muted text-[0.9rem] leading-[1.55]">
-                {item.body}
-              </p>
             </div>
           ))}
         </div>
@@ -741,15 +685,16 @@ function Benefits() {
 function Stats() {
   const [ref, inView] = useInView<HTMLDivElement>();
   const stats = [
-    { value: useCountUp(14, 1400, inView), suffix: " days", label: "Avg. time to shortlist", tone: "cobalt" as const },
     { value: useCountUp(58, 1700, inView), suffix: "%", label: "Lower cost than per-placement fees", tone: "moss" as const },
-    { value: useCountUp(12, 1300, inView), suffix: "/hr", label: "Candidates scored by AI", tone: "vermillion" as const },
-    { value: useCountUp(100, 1600, inView), suffix: "%", label: "POPIA compliant, ZA-hosted", tone: "cobalt" as const },
+    { value: useCountUp(850, 1500, inView), suffix: "", label: "Candidates analysed per campaign", tone: "cobalt" as const },
+    { value: useCountUp(100, 1600, inView), suffix: "%", label: "POPIA compliant, ZA-hosted", tone: "vermillion" as const },
+    { value: useCountUp(3, 1200, inView), suffix: "", label: "AI intelligence tiers per campaign", tone: "saffron" as const },
   ];
   const toneText = {
     cobalt: "text-cobalt",
     moss: "text-moss",
     vermillion: "text-vermillion",
+    saffron: "text-saffron",
   };
 
   return (
@@ -764,10 +709,6 @@ function Stats() {
         aria-hidden
       />
       <div className="relative mx-auto max-w-[1240px] px-6 sm:px-10">
-        <div className="flex items-center gap-3 mb-10 sm:mb-14">
-          <span className="inline-block w-5 h-px bg-vermillion" aria-hidden />
-          <span className="eyebrow text-vermillion">By the numbers</span>
-        </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-12">
           {stats.map((s, i) => (
             <div key={i} className="border-l border-canvas/15 pl-5 sm:pl-6">
@@ -842,11 +783,7 @@ function Pricing() {
     <section ref={ref} id="pricing" className="py-24 sm:py-32 bg-canvas border-t border-rule scroll-mt-20">
       <div className="mx-auto max-w-[1240px] px-6 sm:px-10">
         <div className="max-w-[720px]">
-          <div className="animate-on-scroll flex items-center gap-3 mb-5">
-            <span className="inline-block w-5 h-px bg-cobalt" aria-hidden />
-            <span className="eyebrow text-cobalt">Pricing</span>
-          </div>
-          <h2 className="animate-on-scroll stagger-1 font-display text-ink text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] tracking-[-0.02em] leading-[1.02]">
+          <h2 className="animate-on-scroll font-display text-ink text-[2.25rem] sm:text-[2.75rem] lg:text-[3.25rem] tracking-[-0.02em] leading-[1.02]">
             A floor you can <span className="font-display-italic">plan around</span>.
           </h2>
           <p className="animate-on-scroll stagger-2 mt-6 text-ink-muted text-[1rem] leading-[1.6] max-w-[520px]">
@@ -911,7 +848,7 @@ function Pricing() {
               </ul>
               <a
                 href="#start"
-                className={`mt-8 inline-flex w-full items-center justify-center h-11 rounded-full text-[0.85rem] font-medium transition-colors ${
+                className={`mt-8 inline-flex w-full items-center justify-center h-11 rounded-lg text-[0.85rem] font-medium transition-colors ${
                   tier.featured
                     ? "bg-vermillion text-ink hover:bg-vermillion-deep"
                     : "bg-ink text-canvas hover:bg-cobalt"
@@ -928,12 +865,8 @@ function Pricing() {
 
         {/* Model-intelligence tiers — the signature: choose the brain per campaign */}
         <div className="mt-24 sm:mt-28">
-          <div className="animate-on-scroll flex items-center gap-3 mb-5">
-            <span className="inline-block w-5 h-px bg-saffron" aria-hidden />
-            <span className="eyebrow text-saffron-deep">Choose the intelligence</span>
-          </div>
           <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-end mb-12">
-            <h3 className="animate-on-scroll stagger-1 lg:col-span-7 font-display text-ink text-[1.85rem] sm:text-[2.35rem] lg:text-[2.75rem] tracking-[-0.02em] leading-[1.04]">
+            <h3 className="animate-on-scroll lg:col-span-7 font-display text-ink text-[1.85rem] sm:text-[2.35rem] lg:text-[2.75rem] tracking-[-0.02em] leading-[1.04]">
               Pick the AI mind for each campaign. Pay for the <span className="font-display-italic text-saffron-deep">brilliance</span> the role deserves.
             </h3>
             <p className="animate-on-scroll stagger-2 lg:col-span-5 text-ink-muted text-[0.95rem] leading-[1.6]">
@@ -1155,7 +1088,7 @@ function FinalCTA() {
                     aria-invalid={!!error}
                     aria-describedby={error ? "cta-error cta-help" : "cta-help"}
                     disabled={status === "submitting"}
-                    className={`h-[56px] w-full flex-1 px-5 rounded-full bg-canvas border text-ink placeholder:text-ink-muted text-[0.95rem] outline-none transition-all duration-200 focus:ring-2 disabled:opacity-60 ${
+                    className={`h-[56px] w-full flex-1 px-5 rounded-lg bg-canvas border text-ink placeholder:text-ink-muted text-[0.95rem] outline-none transition-all duration-200 focus:ring-2 disabled:opacity-60 ${
                       error
                         ? "border-red focus:border-red focus:ring-red/20"
                         : "border-rule focus:border-cobalt focus:ring-cobalt/20"
@@ -1164,7 +1097,7 @@ function FinalCTA() {
                   <button
                     type="submit"
                     disabled={status === "submitting"}
-                    className="arrow-parent group h-[56px] px-7 bg-cobalt text-white font-medium text-[0.95rem] rounded-full hover:bg-cobalt-deep transition-colors duration-300 shrink-0 inline-flex items-center justify-center gap-2.5 lift shadow-[0_8px_24px_-8px_rgba(44,91,255,0.35)] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:bg-cobalt"
+                    className="arrow-parent group h-[56px] px-7 bg-cobalt text-white font-medium text-[0.95rem] rounded-lg hover:bg-cobalt-deep transition-colors duration-300 shrink-0 inline-flex items-center justify-center gap-2.5 lift shadow-[0_8px_24px_-8px_rgba(44,91,255,0.35)] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:bg-cobalt"
                   >
                     {status === "submitting" ? "Sending…" : "Request access"}
                     {status !== "submitting" && <span className="arrow-slide">→</span>}

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-06-25",
+  "generatedAt": "2026-06-26",
   "title": "Design System: TalentStream",
   "extensions": {
     "colorMeta": {
@@ -161,7 +161,8 @@
       { "name": "The Cool-Field Rule", "body": "The body background is Cool Slate (#f0f3f7), never white and never warm-tinted. Warmth lives in the status set and the serif, not the canvas. A warm or cream background is forbidden - it breaks the instrument.", "section": "colors" },
       { "name": "The Fixed-Scale Rule", "body": "Inside the product app, type sizes are fixed rem, not fluid. clamp() headings belong on brand surfaces only - a fluid h1 that shrinks inside a sidebar looks worse, not designed.", "section": "typography" },
       { "name": "The Serif-Is-For-Voice Rule", "body": "Instrument Serif is for display and editorial voice. Never set UI labels, buttons, inputs, or table data in the serif - that's the product-register tell to avoid.", "section": "typography" },
-      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat at rest. If you reach for a shadow on a resting card, reach for a border or a tonal step first. Shadow appears only when something is genuinely above the page (overlay) or responding to state.", "section": "elevation" }
+      { "name": "The Flat-By-Default Rule", "body": "Surfaces are flat at rest. If you reach for a shadow on a resting card, reach for a border or a tonal step first. Shadow appears only when something is genuinely above the page (overlay) or responding to state.", "section": "elevation" },
+      { "name": "The Teal-On-Dark Rule", "body": "Bright Electric Teal text and icons only read on dark surfaces (~10:1 on the navy band/cards); on the light canvas teal falls to ~1.6:1. Reserve teal for dark backgrounds and use Cobalt as the accent on light.", "section": "colors" }
     ],
     "dos": [
       "Do keep the body background Cool Slate (#f0f3f7) - never white, never warm/cream.",
