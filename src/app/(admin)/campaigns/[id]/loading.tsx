@@ -13,14 +13,14 @@ export default function CampaignDetailLoading() {
       {/* Stats row */}
       <div className="mb-6 grid grid-cols-5 gap-3">
         {Array.from({ length: 5 }, (_, i) => (
-          <div key={i} className="rounded-xl border border-border bg-surface px-5 py-4">
+          <div key={i} className="rounded-xl border border-rule bg-surface px-5 py-4">
             <Sk className="h-3 w-16 mb-3" />
             <Sk className="h-7 w-12" />
           </div>
         ))}
       </div>
       {/* Pipeline */}
-      <div className="mb-6 rounded-xl border border-border bg-surface px-6 py-5">
+      <div className="mb-6 rounded-xl border border-rule bg-surface px-6 py-5">
         <Sk className="h-3 w-16 mb-5" />
         {Array.from({ length: 4 }, (_, i) => (
           <div key={i} className="flex items-center gap-4 mb-3">
@@ -30,12 +30,12 @@ export default function CampaignDetailLoading() {
         ))}
       </div>
       {/* Table skeleton */}
-      <div className="rounded-xl border border-border bg-surface">
-        <div className="border-b border-border px-5 py-3">
+      <div className="rounded-xl border border-rule bg-surface">
+        <div className="border-b border-rule px-5 py-3">
           <Sk className="h-4 w-28" />
         </div>
         {Array.from({ length: 6 }, (_, i) => (
-          <div key={i} className="flex items-center gap-4 px-5 py-3 border-b border-border last:border-0">
+          <div key={i} className="flex items-center gap-4 px-5 py-3 border-b border-rule last:border-0">
             <Sk className="h-8 w-8 rounded-full" />
             <Sk className="h-3 w-32 flex-1" />
             <Sk className="h-3 w-10" />

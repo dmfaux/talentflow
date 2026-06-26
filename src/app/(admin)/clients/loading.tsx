@@ -12,14 +12,14 @@ export default function ClientsLoading() {
         </div>
         <Sk className="h-9 w-32 rounded-lg" />
       </div>
-      <div className="overflow-hidden rounded-xl border border-border bg-surface">
-        <div className="border-b border-border px-5 py-3 flex gap-12">
+      <div className="overflow-hidden rounded-xl border border-rule bg-surface">
+        <div className="border-b border-rule px-5 py-3 flex gap-12">
           {Array.from({ length: 5 }, (_, i) => (
             <Sk key={i} className="h-3 w-16" />
           ))}
         </div>
         {Array.from({ length: 5 }, (_, i) => (
-          <div key={i} className="flex items-center gap-12 px-5 py-3 border-b border-border last:border-0">
+          <div key={i} className="flex items-center gap-12 px-5 py-3 border-b border-rule last:border-0">
             <Sk className="h-3 w-32" />
             <Sk className="h-3 w-24" />
             <Sk className="h-3 w-36" />

@@ -15,7 +15,7 @@ export default function CampaignsLoading() {
       <Sk className="h-9 w-64 mb-5 rounded-lg" />
       <div className="space-y-3">
         {Array.from({ length: 4 }, (_, i) => (
-          <div key={i} className="rounded-xl border border-border bg-surface p-5">
+          <div key={i} className="rounded-xl border border-rule bg-surface p-5">
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <Sk className="h-4 w-48 mb-2" />

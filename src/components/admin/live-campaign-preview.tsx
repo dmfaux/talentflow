@@ -85,12 +85,12 @@ export function LiveCampaignPreview({ values, clientName, clientSlug }: Props) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[0.65rem] font-medium uppercase tracking-[0.14em] text-ink-faint">
+        <span className="text-[0.65rem] font-medium uppercase tracking-[0.14em] text-ink-muted">
           Live Preview
         </span>
         <div className="flex items-center gap-2">
           {lowContrast && (
-            <span className="inline-flex items-center gap-1.5 text-[0.7rem] text-saffron">
+            <span className="inline-flex items-center gap-1.5 text-[0.7rem] text-saffron-deep">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
                 <path d="M6 1L11 10H1L6 1z" />
                 <path d="M6 5v2M6 8.5v.1" />
@@ -99,7 +99,7 @@ export function LiveCampaignPreview({ values, clientName, clientSlug }: Props) {
             </span>
           )}
           <div
-            className="inline-flex items-center rounded-md border border-border bg-canvas-2 p-0.5"
+            className="inline-flex items-center rounded-md border border-rule bg-canvas-2 p-0.5"
             role="group"
             aria-label="Preview device"
           >
@@ -111,7 +111,7 @@ export function LiveCampaignPreview({ values, clientName, clientSlug }: Props) {
               title="Desktop"
               className={`inline-flex h-6 w-7 items-center justify-center rounded transition-colors ${
                 viewMode === "desktop"
-                  ? "bg-paper text-ink shadow-sm"
+                  ? "bg-surface text-ink shadow-sm"
                   : "text-ink-muted hover:text-ink"
               }`}
             >
@@ -128,7 +128,7 @@ export function LiveCampaignPreview({ values, clientName, clientSlug }: Props) {
               title="Mobile"
               className={`inline-flex h-6 w-7 items-center justify-center rounded transition-colors ${
                 viewMode === "mobile"
-                  ? "bg-paper text-ink shadow-sm"
+                  ? "bg-surface text-ink shadow-sm"
                   : "text-ink-muted hover:text-ink"
               }`}
             >
@@ -142,10 +142,10 @@ export function LiveCampaignPreview({ values, clientName, clientSlug }: Props) {
       </div>
 
       {isMobile ? (
-        <div className="flex justify-center rounded-xl border border-border bg-canvas-2 px-6 py-6">
+        <div className="flex justify-center rounded-xl border border-rule bg-canvas-2 px-6 py-6">
           {/* Phone frame */}
           <div
-            className="overflow-hidden rounded-[1.75rem] border-[6px] border-[#11123c] bg-paper"
+            className="overflow-hidden rounded-[1.75rem] border-[6px] border-[#11123c] bg-surface"
             style={{ width: "280px", boxShadow: "0 12px 32px -16px rgba(17, 18, 60, 0.35)" }}
           >
             {/* Status bar */}
@@ -168,7 +168,7 @@ export function LiveCampaignPreview({ values, clientName, clientSlug }: Props) {
               </div>
             </div>
             {/* Page content — scaled to fit mobile frame */}
-            <div className="relative overflow-hidden bg-paper">
+            <div className="relative overflow-hidden bg-surface">
               <div
                 className="origin-top-left"
                 style={{
@@ -197,18 +197,18 @@ export function LiveCampaignPreview({ values, clientName, clientSlug }: Props) {
       ) : (
         /* Browser chrome */
         <div
-          className="overflow-hidden rounded-xl border border-border bg-paper"
+          className="overflow-hidden rounded-xl border border-rule bg-surface"
           style={{ boxShadow: "0 12px 32px -16px rgba(17, 18, 60, 0.18)" }}
         >
           {/* Title bar */}
-          <div className="flex items-center gap-3 border-b border-border bg-canvas-2 px-3 py-2">
+          <div className="flex items-center gap-3 border-b border-rule bg-canvas-2 px-3 py-2">
             <div className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-[#d9b8b0]" />
               <span className="h-2.5 w-2.5 rounded-full bg-[#dfc9a0]" />
               <span className="h-2.5 w-2.5 rounded-full bg-[#b4c7a8]" />
             </div>
             <div className="flex-1">
-              <div className="flex h-6 items-center justify-center rounded-md border border-border bg-paper px-3">
+              <div className="flex h-6 items-center justify-center rounded-md border border-rule bg-surface px-3">
                 <span className="font-mono text-[0.65rem] text-ink-muted">
                   {subdomain}.talentstream.co.za
                 </span>
@@ -217,7 +217,7 @@ export function LiveCampaignPreview({ values, clientName, clientSlug }: Props) {
           </div>
 
           {/* Page content — scaled */}
-          <div className="relative overflow-hidden bg-paper">
+          <div className="relative overflow-hidden bg-surface">
             <div
               className="origin-top-left"
               style={{

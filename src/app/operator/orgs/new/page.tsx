@@ -1,6 +1,8 @@
 "use client";
 
 import { useToast } from "@/components/ui/toast-provider";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
 import type { Tier } from "@/components/admin/tier-badge";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -85,7 +87,7 @@ export default function NewOrganizationPage() {
   }
 
   const inputClass =
-    "h-10 w-full rounded-lg border border-border bg-cream/40 px-3.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20";
+    "h-10 w-full rounded-lg border border-rule bg-canvas/40 px-3.5 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20";
   const labelClass =
     "mb-1.5 block text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-ink-muted";
 
@@ -111,11 +113,11 @@ export default function NewOrganizationPage() {
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div className="rounded-xl border border-border bg-surface p-6">
+        <div className="rounded-xl border border-rule bg-surface p-6">
           {formError && (
-            <div className="mb-5 rounded-lg bg-red-light px-4 py-2.5 text-sm text-red">
+            <Callout tone="error" className="mb-5">
               {formError}
-            </div>
+            </Callout>
           )}
 
           <div className="space-y-5">
@@ -168,7 +170,7 @@ export default function NewOrganizationPage() {
                       type="button"
                       onClick={() => setTier(opt.value)}
                       className={`flex flex-col gap-1.5 rounded-lg border px-3 py-2.5 text-left transition-colors cursor-pointer ${
-                        selected ? "border-cobalt bg-cobalt-tint" : "border-border bg-paper hover:border-border-strong"
+                        selected ? "border-cobalt bg-cobalt-tint" : "border-rule bg-surface hover:border-rule-strong"
                       }`}
                     >
                       <span className="text-[0.8rem] font-semibold text-ink">{opt.label}</span>
@@ -198,26 +200,13 @@ export default function NewOrganizationPage() {
             </div>
           </div>
 
-          <div className="mt-6 flex items-center justify-end gap-3 border-t border-border pt-5">
-            <Link
-              href="/operator"
-              className="inline-flex h-9 items-center rounded-lg px-4 text-[0.8rem] font-medium text-ink-muted transition-colors hover:text-ink"
-            >
+          <div className="mt-6 flex items-center justify-end gap-3 border-t border-rule pt-5">
+            <Link href="/operator" className={buttonVariants({ variant: "ghost" })}>
               Cancel
             </Link>
-            <button
-              type="submit"
-              disabled={!canSubmit || saving}
-              className="inline-flex h-9 items-center gap-2 rounded-lg bg-cobalt px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-cobalt-deep disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-            >
-              {saving && (
-                <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              )}
+            <Button type="submit" disabled={!canSubmit} loading={saving}>
               Provision organisation
-            </button>
+            </Button>
           </div>
         </div>
       </form>

@@ -164,11 +164,11 @@ function uid() {
 // ── Shared styles ────────────────────────────────────────────────────
 
 const inputClass =
-  "h-10 w-full rounded-lg border border-border bg-cream/40 px-3.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20";
+  "h-10 w-full rounded-lg border border-rule bg-canvas/40 px-3.5 text-sm text-ink placeholder:text-ink-muted outline-none transition-colors focus:border-cobalt focus:ring-1 focus:ring-cobalt/20";
 const labelClass =
-  "mb-1.5 block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted";
+  "mb-1.5 block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-ink-muted";
 const smallInputClass =
-  "h-9 w-full rounded-lg border border-border bg-cream/40 px-3 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20";
+  "h-9 w-full rounded-lg border border-rule bg-canvas/40 px-3 text-sm text-ink placeholder:text-ink-muted outline-none transition-colors focus:border-cobalt focus:ring-1 focus:ring-cobalt/20";
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -577,12 +577,12 @@ export function CampaignWizard({
   return (
     <div className="mx-auto max-w-4xl">
       {/* Breadcrumb */}
-      <div className="mb-6 flex items-center gap-2 text-xs text-txt-muted">
-        <Link href="/campaigns" className="hover:text-charcoal transition-colors">
+      <div className="mb-6 flex items-center gap-2 text-xs text-ink-muted">
+        <Link href="/campaigns" className="hover:text-ink transition-colors">
           Campaigns
         </Link>
         <span>/</span>
-        <span className="text-txt-secondary">{breadcrumbLabel}</span>
+        <span className="text-ink-soft">{breadcrumbLabel}</span>
       </div>
 
       {/* Step indicator */}
@@ -593,10 +593,10 @@ export function CampaignWizard({
               onClick={() => { if (i < step) setStep(i); }}
               className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-semibold transition-colors cursor-pointer ${
                 i < step
-                  ? "bg-accent text-white"
+                  ? "bg-cobalt text-white"
                   : i === step
-                    ? "bg-charcoal text-white"
-                    : "bg-cream text-txt-muted border border-border"
+                    ? "bg-ink text-white"
+                    : "bg-canvas text-ink-muted border border-rule"
               }`}
             >
               {i < step ? (
@@ -609,7 +609,7 @@ export function CampaignWizard({
             </button>
             <span
               className={`hidden sm:block text-[0.7rem] font-medium whitespace-nowrap ${
-                i <= step ? "text-charcoal" : "text-txt-muted"
+                i <= step ? "text-ink" : "text-ink-muted"
               }`}
             >
               {label}
@@ -617,7 +617,7 @@ export function CampaignWizard({
             {i < STEPS.length - 1 && (
               <div
                 className={`mx-1 h-px flex-1 ${
-                  i < step ? "bg-accent" : "bg-border"
+                  i < step ? "bg-cobalt" : "bg-border"
                 }`}
               />
             )}
@@ -626,11 +626,11 @@ export function CampaignWizard({
       </div>
 
       {/* Step content */}
-      <div className="rounded-xl border border-border bg-surface p-8">
+      <div className="rounded-xl border border-rule bg-surface p-8">
         {/* ── Step 0: Basics ────────────────────────────────────── */}
         {step === 0 && (
           <div className="space-y-5">
-            <h2 className="text-base font-semibold text-charcoal">Campaign Basics</h2>
+            <h2 className="text-base font-semibold text-ink">Campaign Basics</h2>
 
             {mode === "create" ? (
               <BrandPicker error={errors.client_id} />
@@ -652,7 +652,7 @@ export function CampaignWizard({
                   ))}
                 </select>
                 {lockClient && (
-                  <p className="mt-1 text-[0.7rem] text-txt-muted">
+                  <p className="mt-1 text-[0.7rem] text-ink-muted">
                     Brand can&apos;t change on an existing campaign.
                   </p>
                 )}
@@ -697,19 +697,19 @@ export function CampaignWizard({
                     errors.slug || slugStatus === "taken" || slugStatus === "invalid"
                       ? "border-red"
                       : slugStatus === "available"
-                        ? "border-green"
+                        ? "border-moss"
                         : ""
                   }`}
                 />
                 <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
                   {slugStatus === "checking" && (
-                    <svg className="h-3.5 w-3.5 animate-spin text-txt-muted" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <svg className="h-3.5 w-3.5 animate-spin text-ink-muted" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
                       <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                     </svg>
                   )}
                   {slugStatus === "available" && (
-                    <svg className="h-4 w-4 text-green" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <svg className="h-4 w-4 text-moss-deep" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <path d="M3 8.5L6.5 12L13 4" />
                     </svg>
                   )}
@@ -721,7 +721,7 @@ export function CampaignWizard({
                   )}
                 </div>
               </div>
-              <p className="mt-1.5 font-mono text-[0.7rem] text-txt-muted">
+              <p className="mt-1.5 font-mono text-[0.7rem] text-ink-muted">
                 {clients.find((c) => c.id === form.client_id)?.slug || "client"}.talentstream.co.za/{form.slug || "campaign-slug"}
               </p>
               {slugStatus === "invalid" && !errors.slug && (
@@ -736,7 +736,7 @@ export function CampaignWizard({
                       <button
                         type="button"
                         onClick={() => updateForm({ slug: slugSuggestion })}
-                        className="font-medium text-accent hover:underline cursor-pointer"
+                        className="font-medium text-cobalt hover:underline cursor-pointer"
                       >
                         Use &ldquo;{slugSuggestion}&rdquo;
                       </button>
@@ -745,7 +745,7 @@ export function CampaignWizard({
                 </p>
               )}
               {slugStatus === "available" && !errors.slug && (
-                <p className="mt-1 text-xs text-green">Available</p>
+                <p className="mt-1 text-xs text-moss-deep">Available</p>
               )}
               {errors.slug && <p className="mt-1 text-xs text-red">{errors.slug}</p>}
             </div>
@@ -792,9 +792,9 @@ export function CampaignWizard({
                 onChange={(e) => updateForm({ role_description: e.target.value })}
                 placeholder="Describe the role, team, and what makes it a great opportunity..."
                 rows={5}
-                className="w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none"
+                className="w-full rounded-lg border border-rule bg-canvas/40 px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-muted outline-none transition-colors focus:border-cobalt focus:ring-1 focus:ring-cobalt/20 resize-none"
               />
-              <button type="button" onClick={() => setShowMarkdownHelp(true)} className="mt-1 inline-flex items-center gap-1 text-[0.65rem] text-txt-muted hover:text-accent transition-colors cursor-pointer">
+              <button type="button" onClick={() => setShowMarkdownHelp(true)} className="mt-1 inline-flex items-center gap-1 text-[0.65rem] text-ink-muted hover:text-cobalt transition-colors cursor-pointer">
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><circle cx="8" cy="8" r="6.5" /><path d="M6.5 6.2a1.5 1.5 0 0 1 2.8.5c0 1-1.3 1.3-1.3 2.3" /><path d="M8 12v.01" /></svg>
                 Supports markdown — formatting guide
               </button>
@@ -805,24 +805,24 @@ export function CampaignWizard({
         {/* ── Step 1: Gating Questions ─────────────────────────── */}
         {step === 1 && (
           <div className="space-y-5">
-            <h2 className="text-base font-semibold text-charcoal">Gating Questions</h2>
-            <p className="text-xs text-txt-muted">Add 3–5 screening questions. Candidates must match the pass criteria to proceed.</p>
+            <h2 className="text-base font-semibold text-ink">Gating Questions</h2>
+            <p className="text-xs text-ink-muted">Add 3–5 screening questions. Candidates must match the pass criteria to proceed.</p>
             {errors.gating && <p className="text-xs text-red">{errors.gating}</p>}
 
             {form.gating_config.map((q, qIdx) => (
-              <div key={q.id} className="rounded-lg border border-border p-4 space-y-3">
+              <div key={q.id} className="rounded-lg border border-rule p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-txt-muted">
+                  <span className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-ink-muted">
                     Question {qIdx + 1}
                   </span>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => moveQuestion(qIdx, -1)} disabled={qIdx === 0} className="p-1 text-txt-muted hover:text-charcoal disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed">
+                    <button onClick={() => moveQuestion(qIdx, -1)} disabled={qIdx === 0} className="p-1 text-ink-muted hover:text-ink disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3.5 8.5L7 5l3.5 3.5" /></svg>
                     </button>
-                    <button onClick={() => moveQuestion(qIdx, 1)} disabled={qIdx === form.gating_config.length - 1} className="p-1 text-txt-muted hover:text-charcoal disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed">
+                    <button onClick={() => moveQuestion(qIdx, 1)} disabled={qIdx === form.gating_config.length - 1} className="p-1 text-ink-muted hover:text-ink disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3.5 5.5L7 9l3.5-3.5" /></svg>
                     </button>
-                    <button onClick={() => removeQuestion(qIdx)} className="p-1 text-txt-muted hover:text-red cursor-pointer">
+                    <button onClick={() => removeQuestion(qIdx)} className="p-1 text-ink-muted hover:text-red cursor-pointer">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 3l8 8M11 3l-8 8" /></svg>
                     </button>
                   </div>
@@ -863,24 +863,24 @@ export function CampaignWizard({
                                 className={`pointer-events-none absolute inset-y-0 right-2.5 flex items-center font-mono text-[0.65rem] ${
                                   opt.value.length >= GATING_OPTION_MAX_LENGTH
                                     ? "text-red"
-                                    : "text-txt-muted"
+                                    : "text-ink-muted"
                                 }`}
                               >
                                 {opt.value.length}/{GATING_OPTION_MAX_LENGTH}
                               </span>
                             )}
                           </div>
-                          <label className="flex items-center gap-1.5 text-[0.7rem] text-txt-secondary whitespace-nowrap cursor-pointer">
+                          <label className="flex items-center gap-1.5 text-[0.7rem] text-ink-soft whitespace-nowrap cursor-pointer">
                             <input
                               type="checkbox"
                               checked={q.pass_criteria.includes(opt.value) && opt.value !== ""}
                               onChange={() => opt.value && togglePassCriteria(qIdx, opt.value)}
-                              className="accent-accent"
+                              className="accent-cobalt"
                             />
                             Pass
                           </label>
                           {q.options.length > 2 && (
-                            <button onClick={() => removeOption(qIdx, oIdx)} className="p-1 text-txt-muted hover:text-red cursor-pointer">
+                            <button onClick={() => removeOption(qIdx, oIdx)} className="p-1 text-ink-muted hover:text-red cursor-pointer">
                               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" /></svg>
                             </button>
                           )}
@@ -891,7 +891,7 @@ export function CampaignWizard({
                   {errors[`q_${qIdx}_pass`] && <p className="mt-1 text-xs text-red">{errors[`q_${qIdx}_pass`]}</p>}
                   <button
                     onClick={() => addOption(qIdx)}
-                    className="mt-2 text-[0.72rem] font-medium text-accent hover:underline cursor-pointer"
+                    className="mt-2 text-[0.72rem] font-medium text-cobalt hover:underline cursor-pointer"
                   >
                     + Add option
                   </button>
@@ -902,7 +902,7 @@ export function CampaignWizard({
             <button
               onClick={addQuestion}
               disabled={form.gating_config.length >= 5}
-              className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-transparent px-3 text-[0.75rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:border-txt-muted cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-border"
+              className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-rule bg-transparent px-3 text-[0.75rem] font-medium text-ink-soft transition-colors hover:bg-canvas hover:border-ink-muted cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-rule"
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 2v8M2 6h8" /></svg>
               {form.gating_config.length >= 5 ? "Maximum 5 questions" : "Add Question"}
@@ -913,7 +913,7 @@ export function CampaignWizard({
         {/* ── Step 2: Scoring Rubric ───────────────────────────── */}
         {step === 2 && (
           <div className="space-y-6">
-            <h2 className="text-base font-semibold text-charcoal">Scoring Rubric</h2>
+            <h2 className="text-base font-semibold text-ink">Scoring Rubric</h2>
 
             {(["must_haves", "nice_to_haves", "dealbreakers"] as const).map((key) => (
               <div key={key}>
@@ -930,14 +930,14 @@ export function CampaignWizard({
                         className={`${smallInputClass} flex-1`}
                       />
                       {form[key].length > 1 && (
-                        <button onClick={() => removeListItem(key, idx)} className="p-1 text-txt-muted hover:text-red cursor-pointer">
+                        <button onClick={() => removeListItem(key, idx)} className="p-1 text-ink-muted hover:text-red cursor-pointer">
                           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7" /></svg>
                         </button>
                       )}
                     </div>
                   ))}
                 </div>
-                <button onClick={() => addListItem(key)} className="mt-2 text-[0.72rem] font-medium text-accent hover:underline cursor-pointer">
+                <button onClick={() => addListItem(key)} className="mt-2 text-[0.72rem] font-medium text-cobalt hover:underline cursor-pointer">
                   + Add item
                 </button>
               </div>
@@ -948,8 +948,8 @@ export function CampaignWizard({
               {errors.weights && <p className="mb-2 text-xs text-red">{errors.weights}</p>}
               <div className="grid grid-cols-2 gap-3">
                 {(["skills", "experience", "progression", "tenure"] as const).map((dim) => (
-                  <div key={dim} className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5">
-                    <span className="text-xs font-medium text-txt-secondary capitalize flex-1">
+                  <div key={dim} className="flex items-center gap-3 rounded-lg border border-rule px-3 py-2.5">
+                    <span className="text-xs font-medium text-ink-soft capitalize flex-1">
                       {dim === "skills" ? "Skills Match" : dim === "experience" ? "Experience Depth" : dim === "progression" ? "Career Progression" : "Tenure Patterns"}
                     </span>
                     <div className="flex items-center gap-1">
@@ -966,14 +966,14 @@ export function CampaignWizard({
                             },
                           })
                         }
-                        className="h-8 w-14 rounded border border-border bg-cream/40 px-2 text-center font-mono text-sm text-charcoal outline-none focus:border-accent"
+                        className="h-8 w-14 rounded border border-rule bg-canvas/40 px-2 text-center font-mono text-sm text-ink outline-none focus:border-cobalt"
                       />
-                      <span className="text-xs text-txt-muted">%</span>
+                      <span className="text-xs text-ink-muted">%</span>
                     </div>
                   </div>
                 ))}
               </div>
-              <p className="mt-2 font-mono text-xs text-txt-muted">
+              <p className="mt-2 font-mono text-xs text-ink-muted">
                 Total: {form.dimension_weights.skills + form.dimension_weights.experience + form.dimension_weights.progression + form.dimension_weights.tenure}%
               </p>
             </div>
@@ -981,7 +981,7 @@ export function CampaignWizard({
             {/* Minimum score threshold */}
             <div>
               <label className={labelClass}>Minimum Score Threshold</label>
-              <p className="mb-2 text-xs text-txt-muted">
+              <p className="mb-2 text-xs text-ink-muted">
                 Candidates who score below this threshold after follow-up will be automatically rejected. Scale: 1–10.
               </p>
               <div className="flex items-center gap-3">
@@ -995,9 +995,9 @@ export function CampaignWizard({
                     const v = Math.max(1, Math.min(10, parseFloat(e.target.value) || 1));
                     updateForm({ min_score: v });
                   }}
-                  className="h-10 w-24 rounded-lg border border-border bg-cream/40 px-3 text-center font-mono text-sm text-charcoal outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20"
+                  className="h-10 w-24 rounded-lg border border-rule bg-canvas/40 px-3 text-center font-mono text-sm text-ink outline-none transition-colors focus:border-cobalt focus:ring-1 focus:ring-cobalt/20"
                 />
-                <span className="text-sm text-txt-muted">out of 10</span>
+                <span className="text-sm text-ink-muted">out of 10</span>
               </div>
               {errors.min_score && <p className="mt-1.5 text-xs text-red">{errors.min_score}</p>}
               {form.min_score >= form.max_auto_advance_score && (
@@ -1028,7 +1028,7 @@ export function CampaignWizard({
             {/* Auto-advance score threshold (high-water mark) */}
             <div>
               <label className={labelClass}>Auto-Advance Threshold</label>
-              <p className="mb-2 text-xs text-txt-muted">
+              <p className="mb-2 text-xs text-ink-muted">
                 Candidates scoring at or above this value skip the follow-up chat and are marked as scored automatically — they&apos;re strong enough that a chat wouldn&apos;t change the outcome. Must be higher than the minimum score.
               </p>
               <div className="flex items-center gap-3">
@@ -1042,9 +1042,9 @@ export function CampaignWizard({
                     const v = Math.max(1, Math.min(10, parseFloat(e.target.value) || 1));
                     updateForm({ max_auto_advance_score: v });
                   }}
-                  className="h-10 w-24 rounded-lg border border-border bg-cream/40 px-3 text-center font-mono text-sm text-charcoal outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20"
+                  className="h-10 w-24 rounded-lg border border-rule bg-canvas/40 px-3 text-center font-mono text-sm text-ink outline-none transition-colors focus:border-cobalt focus:ring-1 focus:ring-cobalt/20"
                 />
-                <span className="text-sm text-txt-muted">out of 10</span>
+                <span className="text-sm text-ink-muted">out of 10</span>
               </div>
               {errors.max_auto_advance_score && (
                 <p className="mt-1.5 text-xs text-red">{errors.max_auto_advance_score}</p>
@@ -1054,7 +1054,7 @@ export function CampaignWizard({
             {/* Follow-up chat window (ghost handling) */}
             <div>
               <label className={labelClass}>Follow-Up Chat Window</label>
-              <p className="mb-2 text-xs text-txt-muted">
+              <p className="mb-2 text-xs text-ink-muted">
                 How long to wait for a ghosting candidate to respond before closing their application. A reminder email fires 3 days before this cutoff.
               </p>
               <div className="flex items-center gap-3">
@@ -1068,14 +1068,14 @@ export function CampaignWizard({
                     const v = Math.max(4, Math.min(30, parseInt(e.target.value) || 4));
                     updateForm({ ghost_ttl_days: v });
                   }}
-                  className="h-10 w-24 rounded-lg border border-border bg-cream/40 px-3 text-center font-mono text-sm text-charcoal outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20"
+                  className="h-10 w-24 rounded-lg border border-rule bg-canvas/40 px-3 text-center font-mono text-sm text-ink outline-none transition-colors focus:border-cobalt focus:ring-1 focus:ring-cobalt/20"
                 />
-                <span className="text-sm text-txt-muted">days</span>
+                <span className="text-sm text-ink-muted">days</span>
               </div>
               {errors.ghost_ttl_days && (
                 <p className="mt-1.5 text-xs text-red">{errors.ghost_ttl_days}</p>
               )}
-              <p className="mt-1.5 text-[0.7rem] text-txt-muted">
+              <p className="mt-1.5 text-[0.7rem] text-ink-muted">
                 Ghost candidates transition to <span className="font-mono">no_response</span> — a blameless terminal state, distinct from <span className="font-mono">rejected</span>, with its own email template.
               </p>
             </div>
@@ -1083,7 +1083,7 @@ export function CampaignWizard({
             {/* Scoring intelligence (model tier) */}
             <div>
               <label className={labelClass}>Scoring Intelligence</label>
-              <p className="mb-2 text-xs text-txt-muted">
+              <p className="mb-2 text-xs text-ink-muted">
                 Which AI model scores this campaign&apos;s candidates. Higher tiers
                 reason more deeply and draw more credits per candidate from your
                 monthly allowance. Follow-up chats always run on Essential.
@@ -1101,20 +1101,20 @@ export function CampaignWizard({
                       onClick={() => updateForm({ selected_model_tier: opt.value })}
                       className={`flex flex-col rounded-lg border p-3.5 text-left transition-colors ${
                         selected
-                          ? "border-accent bg-accent/5 ring-1 ring-accent/20"
-                          : "border-border bg-cream/40 hover:border-accent/50"
-                      } ${locked ? "cursor-not-allowed opacity-50 hover:border-border" : ""}`}
+                          ? "border-cobalt bg-cobalt/5 ring-1 ring-cobalt/20"
+                          : "border-rule bg-canvas/40 hover:border-cobalt/50"
+                      } ${locked ? "cursor-not-allowed opacity-50 hover:border-rule" : ""}`}
                     >
                       <div className="flex items-baseline justify-between gap-2">
-                        <span className="text-sm font-medium text-charcoal">{opt.label}</span>
+                        <span className="text-sm font-medium text-ink">{opt.label}</span>
                         {opt.value === "professional" && (
-                          <span className="rounded-full bg-charcoal/5 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-txt-muted">
+                          <span className="rounded-full bg-ink/5 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.1em] text-ink-muted">
                             Default
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 text-xs leading-snug text-txt-muted">{opt.blurb}</p>
-                      <span className="mt-2 font-mono text-[0.7rem] text-charcoal/70">
+                      <p className="mt-1 text-xs leading-snug text-ink-muted">{opt.blurb}</p>
+                      <span className="mt-2 font-mono text-[0.7rem] text-ink/70">
                         {locked ? "Upgrade plan to unlock" : opt.perCandidate}
                       </span>
                     </button>
@@ -1156,7 +1156,7 @@ export function CampaignWizard({
         {/* ── Step 4: Review ───────────────────────────────────── */}
         {step === 4 && (
           <div className="space-y-6">
-            <h2 className="text-base font-semibold text-charcoal">
+            <h2 className="text-base font-semibold text-ink">
               {mode === "edit" ? "Review & Save" : "Review & Publish"}
             </h2>
 
@@ -1165,33 +1165,33 @@ export function CampaignWizard({
             )}
 
             {/* Basics summary */}
-            <div className="rounded-lg border border-border p-4 space-y-2">
-              <h3 className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-txt-muted">Basics</h3>
+            <div className="rounded-lg border border-rule p-4 space-y-2">
+              <h3 className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-ink-muted">Basics</h3>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-                <div><span className="text-txt-muted">Brand:</span> <span className="text-charcoal">{clients.find((c) => c.id === form.client_id)?.name ?? "—"}</span></div>
-                <div><span className="text-txt-muted">Role:</span> <span className="text-charcoal">{form.role_title || "—"}</span></div>
-                <div><span className="text-txt-muted">Slug:</span> <span className="font-mono text-xs text-charcoal">{form.slug || "—"}</span></div>
-                <div><span className="text-txt-muted">Type:</span> <span className="text-charcoal">{form.employment_type || "—"}</span></div>
-                <div><span className="text-txt-muted">Location:</span> <span className="text-charcoal">{form.location || "—"}</span></div>
-                <div><span className="text-txt-muted">Department:</span> <span className="text-charcoal">{form.department || "—"}</span></div>
+                <div><span className="text-ink-muted">Brand:</span> <span className="text-ink">{clients.find((c) => c.id === form.client_id)?.name ?? "—"}</span></div>
+                <div><span className="text-ink-muted">Role:</span> <span className="text-ink">{form.role_title || "—"}</span></div>
+                <div><span className="text-ink-muted">Slug:</span> <span className="font-mono text-xs text-ink">{form.slug || "—"}</span></div>
+                <div><span className="text-ink-muted">Type:</span> <span className="text-ink">{form.employment_type || "—"}</span></div>
+                <div><span className="text-ink-muted">Location:</span> <span className="text-ink">{form.location || "—"}</span></div>
+                <div><span className="text-ink-muted">Department:</span> <span className="text-ink">{form.department || "—"}</span></div>
               </div>
               {form.role_description && (
-                <div className="mt-2 border-t border-border pt-2 text-sm">
-                  <span className="text-txt-muted">Description:</span>{" "}
-                  <span className="text-charcoal">{form.role_description.length} characters</span>
+                <div className="mt-2 border-t border-rule pt-2 text-sm">
+                  <span className="text-ink-muted">Description:</span>{" "}
+                  <span className="text-ink">{form.role_description.length} characters</span>
                 </div>
               )}
             </div>
 
             {/* Gating summary */}
-            <div className="rounded-lg border border-border p-4 space-y-2">
-              <h3 className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-txt-muted">
+            <div className="rounded-lg border border-rule p-4 space-y-2">
+              <h3 className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-ink-muted">
                 Gating Questions ({form.gating_config.length})
               </h3>
               {form.gating_config.map((q, i) => (
-                <div key={q.id} className="text-sm text-charcoal">
-                  <span className="text-txt-muted">{i + 1}.</span> {q.label}{" "}
-                  <span className="text-xs text-txt-muted">
+                <div key={q.id} className="text-sm text-ink">
+                  <span className="text-ink-muted">{i + 1}.</span> {q.label}{" "}
+                  <span className="text-xs text-ink-muted">
                     ({q.options.length} options, {q.pass_criteria.length} pass)
                   </span>
                 </div>
@@ -1199,27 +1199,27 @@ export function CampaignWizard({
             </div>
 
             {/* Rubric summary */}
-            <div className="rounded-lg border border-border p-4 space-y-2">
-              <h3 className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-txt-muted">Scoring Rubric</h3>
+            <div className="rounded-lg border border-rule p-4 space-y-2">
+              <h3 className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-ink-muted">Scoring Rubric</h3>
               <div className="text-sm space-y-1">
-                <p><span className="text-txt-muted">Must-haves:</span> <span className="text-charcoal">{form.must_haves.filter((s) => s.trim()).length} items</span></p>
-                <p><span className="text-txt-muted">Nice-to-haves:</span> <span className="text-charcoal">{form.nice_to_haves.filter((s) => s.trim()).length} items</span></p>
-                <p><span className="text-txt-muted">Dealbreakers:</span> <span className="text-charcoal">{form.dealbreakers.filter((s) => s.trim()).length} items</span></p>
-                <p className="font-mono text-xs text-txt-muted">
+                <p><span className="text-ink-muted">Must-haves:</span> <span className="text-ink">{form.must_haves.filter((s) => s.trim()).length} items</span></p>
+                <p><span className="text-ink-muted">Nice-to-haves:</span> <span className="text-ink">{form.nice_to_haves.filter((s) => s.trim()).length} items</span></p>
+                <p><span className="text-ink-muted">Dealbreakers:</span> <span className="text-ink">{form.dealbreakers.filter((s) => s.trim()).length} items</span></p>
+                <p className="font-mono text-xs text-ink-muted">
                   Weights: Skills {form.dimension_weights.skills}% · Experience {form.dimension_weights.experience}% · Progression {form.dimension_weights.progression}% · Tenure {form.dimension_weights.tenure}%
                 </p>
-                <p><span className="text-txt-muted">Min. score threshold:</span> <span className="text-charcoal font-mono">{form.min_score}</span><span className="text-txt-muted"> / 10</span>{form.min_score > 8 && <span className="ml-2 text-xs font-medium text-amber-600">Very high</span>}</p>
-                <p><span className="text-txt-muted">Auto-advance threshold:</span> <span className="text-charcoal font-mono">{form.max_auto_advance_score}</span><span className="text-txt-muted"> / 10 (skips chat)</span></p>
-                <p><span className="text-txt-muted">Follow-up chat window:</span> <span className="text-charcoal font-mono">{form.ghost_ttl_days}</span><span className="text-txt-muted"> days (nudge at day {form.ghost_ttl_days - 3})</span></p>
-                <p><span className="text-txt-muted">Scoring intelligence:</span> <span className="text-charcoal">{MODEL_TIER_OPTIONS.find((o) => o.value === form.selected_model_tier)?.label}</span><span className="text-txt-muted"> ({MODEL_TIER_OPTIONS.find((o) => o.value === form.selected_model_tier)?.perCandidate})</span></p>
+                <p><span className="text-ink-muted">Min. score threshold:</span> <span className="text-ink font-mono">{form.min_score}</span><span className="text-ink-muted"> / 10</span>{form.min_score > 8 && <span className="ml-2 text-xs font-medium text-amber-600">Very high</span>}</p>
+                <p><span className="text-ink-muted">Auto-advance threshold:</span> <span className="text-ink font-mono">{form.max_auto_advance_score}</span><span className="text-ink-muted"> / 10 (skips chat)</span></p>
+                <p><span className="text-ink-muted">Follow-up chat window:</span> <span className="text-ink font-mono">{form.ghost_ttl_days}</span><span className="text-ink-muted"> days (nudge at day {form.ghost_ttl_days - 3})</span></p>
+                <p><span className="text-ink-muted">Scoring intelligence:</span> <span className="text-ink">{MODEL_TIER_OPTIONS.find((o) => o.value === form.selected_model_tier)?.label}</span><span className="text-ink-muted"> ({MODEL_TIER_OPTIONS.find((o) => o.value === form.selected_model_tier)?.perCandidate})</span></p>
               </div>
             </div>
 
             {/* Theme summary */}
-            <div className="rounded-lg border border-border p-4">
-              <h3 className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-txt-muted">Theme</h3>
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-charcoal">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green">
+            <div className="rounded-lg border border-rule p-4">
+              <h3 className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-ink-muted">Theme</h3>
+              <p className="mt-1 flex items-center gap-1.5 text-sm text-ink">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-moss-deep">
                   <path d="M3 7.5L5.5 10l5.5-6" />
                 </svg>
                 {resolvedTheme?.name ?? "Brand default"} — landing page and emails themed from it
@@ -1229,17 +1229,17 @@ export function CampaignWizard({
         )}
 
         {/* ── Navigation ──────────────────────────────────────── */}
-        <div className="mt-8 flex items-center justify-between border-t border-border pt-5">
+        <div className="mt-8 flex items-center justify-between border-t border-rule pt-5">
           {step > 0 ? (
             <button
               onClick={goBack}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg px-4 text-[0.8rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg px-4 text-[0.8rem] font-medium text-ink-soft transition-colors hover:bg-canvas hover:text-ink cursor-pointer"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M8.5 3L4.5 7l4 4" /></svg>
               Back
             </button>
           ) : (
-            <Link href={cancelHref} className="inline-flex h-9 items-center rounded-lg px-4 text-[0.8rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal">
+            <Link href={cancelHref} className="inline-flex h-9 items-center rounded-lg px-4 text-[0.8rem] font-medium text-ink-soft transition-colors hover:bg-canvas hover:text-ink">
               Cancel
             </Link>
           )}
@@ -1247,7 +1247,7 @@ export function CampaignWizard({
           {step < STEPS.length - 1 ? (
             <button
               onClick={goNext}
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-charcoal px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-charcoal-light cursor-pointer"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-ink px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-ink-light cursor-pointer"
             >
               Next
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M5.5 3L9.5 7l-4 4" /></svg>
@@ -1257,14 +1257,14 @@ export function CampaignWizard({
               <button
                 onClick={() => submit("draft")}
                 disabled={submitting}
-                className="inline-flex h-9 items-center rounded-lg border border-border px-4 text-[0.8rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                className="inline-flex h-9 items-center rounded-lg border border-rule px-4 text-[0.8rem] font-medium text-ink-soft transition-colors hover:bg-canvas hover:text-ink disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
                 {mode === "edit" ? "Save Changes" : "Save as Draft"}
               </button>
               <button
                 onClick={() => submit("active")}
                 disabled={submitting}
-                className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                className="inline-flex h-9 items-center gap-2 rounded-lg bg-cobalt px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-cobalt-deep disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
               >
                 {submitting && (
                   <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -1281,59 +1281,59 @@ export function CampaignWizard({
 
       {/* ── Markdown help dialog ──────────────────────────────── */}
       {showMarkdownHelp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/30 backdrop-blur-sm" onClick={() => setShowMarkdownHelp(false)}>
-          <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-charcoal">Markdown Formatting Guide</h3>
-            <p className="mt-1 text-xs text-txt-muted">Use these patterns in the description field.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 backdrop-blur-sm" onClick={() => setShowMarkdownHelp(false)}>
+          <div className="w-full max-w-md rounded-xl border border-rule bg-surface p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-ink">Markdown Formatting Guide</h3>
+            <p className="mt-1 text-xs text-ink-muted">Use these patterns in the description field.</p>
             <table className="mt-4 w-full text-sm">
               <thead>
-                <tr className="border-b border-border text-left text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-txt-muted">
+                <tr className="border-b border-rule text-left text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-ink-muted">
                   <th className="pb-2 pr-4">You type</th>
                   <th className="pb-2">Result</th>
                 </tr>
               </thead>
-              <tbody className="text-charcoal">
-                <tr className="border-b border-border/50">
-                  <td className="py-2 pr-4 font-mono text-xs text-txt-secondary"># Heading</td>
+              <tbody className="text-ink">
+                <tr className="border-b border-rule/50">
+                  <td className="py-2 pr-4 font-mono text-xs text-ink-soft"># Heading</td>
                   <td className="py-2 font-semibold">Heading</td>
                 </tr>
-                <tr className="border-b border-border/50">
-                  <td className="py-2 pr-4 font-mono text-xs text-txt-secondary">## Subheading</td>
+                <tr className="border-b border-rule/50">
+                  <td className="py-2 pr-4 font-mono text-xs text-ink-soft">## Subheading</td>
                   <td className="py-2 font-semibold text-[0.85rem]">Subheading</td>
                 </tr>
-                <tr className="border-b border-border/50">
-                  <td className="py-2 pr-4 font-mono text-xs text-txt-secondary">**bold text**</td>
+                <tr className="border-b border-rule/50">
+                  <td className="py-2 pr-4 font-mono text-xs text-ink-soft">**bold text**</td>
                   <td className="py-2 font-bold">bold text</td>
                 </tr>
-                <tr className="border-b border-border/50">
-                  <td className="py-2 pr-4 font-mono text-xs text-txt-secondary">*italic text*</td>
+                <tr className="border-b border-rule/50">
+                  <td className="py-2 pr-4 font-mono text-xs text-ink-soft">*italic text*</td>
                   <td className="py-2 italic">italic text</td>
                 </tr>
-                <tr className="border-b border-border/50">
-                  <td className="py-2 pr-4 font-mono text-xs text-txt-secondary">[link text](url)</td>
-                  <td className="py-2 text-accent underline">link text</td>
+                <tr className="border-b border-rule/50">
+                  <td className="py-2 pr-4 font-mono text-xs text-ink-soft">[link text](url)</td>
+                  <td className="py-2 text-cobalt underline">link text</td>
                 </tr>
-                <tr className="border-b border-border/50">
-                  <td className="py-2 pr-4 font-mono text-xs text-txt-secondary whitespace-pre">- item one{"\n"}- item two</td>
+                <tr className="border-b border-rule/50">
+                  <td className="py-2 pr-4 font-mono text-xs text-ink-soft whitespace-pre">- item one{"\n"}- item two</td>
                   <td className="py-2">
                     <span className="mr-1.5">&#x2022;</span>item one<br />
                     <span className="mr-1.5">&#x2022;</span>item two
                   </td>
                 </tr>
-                <tr className="border-b border-border/50">
-                  <td className="py-2 pr-4 font-mono text-xs text-txt-secondary whitespace-pre">1. first{"\n"}2. second</td>
+                <tr className="border-b border-rule/50">
+                  <td className="py-2 pr-4 font-mono text-xs text-ink-soft whitespace-pre">1. first{"\n"}2. second</td>
                   <td className="py-2">1. first<br />2. second</td>
                 </tr>
                 <tr>
-                  <td className="py-2 pr-4 font-mono text-xs text-txt-secondary">&gt; quote text</td>
-                  <td className="py-2 border-l-2 border-txt-muted pl-2 italic text-txt-secondary">quote text</td>
+                  <td className="py-2 pr-4 font-mono text-xs text-ink-soft">&gt; quote text</td>
+                  <td className="py-2 border-l-2 border-ink-muted pl-2 italic text-ink-soft">quote text</td>
                 </tr>
               </tbody>
             </table>
             <div className="mt-5 flex justify-end">
               <button
                 onClick={() => setShowMarkdownHelp(false)}
-                className="inline-flex h-9 items-center rounded-lg bg-charcoal px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-charcoal-light cursor-pointer"
+                className="inline-flex h-9 items-center rounded-lg bg-ink px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-ink-light cursor-pointer"
               >
                 Got it
               </button>
@@ -1361,11 +1361,11 @@ function ClientBrandingSummary({ client }: { client: Client | undefined }) {
 
   if (!hasAnyBranding) {
     return (
-      <div className="rounded-lg border border-dashed border-border bg-cream/40 p-4 text-xs text-txt-muted">
-        <p className="font-medium text-txt-secondary">No branding set for {client.name}</p>
+      <div className="rounded-lg border border-dashed border-rule bg-canvas/40 p-4 text-xs text-ink-muted">
+        <p className="font-medium text-ink-soft">No branding set for {client.name}</p>
         <p className="mt-1">
           Add a logo and brand colours on the{" "}
-          <a href={`/clients/${client.id}/edit`} className="text-cobalt-deep underline hover:text-charcoal">
+          <a href={`/clients/${client.id}/edit`} className="text-cobalt-deep underline hover:text-ink">
             brand edit page
           </a>{" "}
           so campaign landing pages can match this brand&apos;s colours.
@@ -1390,18 +1390,18 @@ function ClientBrandingSummary({ client }: { client: Client | undefined }) {
     .join(", ");
 
   return (
-    <div className="rounded-lg border border-border bg-cream/40 p-4">
-      <p className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-txt-muted">
+    <div className="rounded-lg border border-rule bg-canvas/40 p-4">
+      <p className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-ink-muted">
         {client.name} — Brand Kit
       </p>
-      <p className="mt-1 text-xs text-txt-secondary">
+      <p className="mt-1 text-xs text-ink-soft">
         This campaign will inherit this brand&apos;s branding. The AI prompt will include these colours automatically.
       </p>
 
       <div className="mt-3 flex items-center gap-3">
         {client.branding_logo_url && (
           <div
-            className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded border border-border"
+            className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded border border-rule"
             style={bgStyle}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1414,13 +1414,13 @@ function ClientBrandingSummary({ client }: { client: Client | undefined }) {
         )}
         <div className="flex flex-wrap gap-2">
           {swatches.map((s) => (
-            <div key={s.label} className="flex items-center gap-2 rounded-md border border-border bg-paper px-2 py-1">
+            <div key={s.label} className="flex items-center gap-2 rounded-md border border-rule bg-surface px-2 py-1">
               <span
-                className="h-4 w-4 rounded border border-border"
+                className="h-4 w-4 rounded border border-rule"
                 style={{ backgroundColor: s.value ?? undefined }}
               />
-              <span className="text-[0.65rem] font-medium text-charcoal">{s.label}</span>
-              <span className="font-mono text-[0.65rem] text-txt-muted">{s.value}</span>
+              <span className="text-[0.65rem] font-medium text-ink">{s.label}</span>
+              <span className="font-mono text-[0.65rem] text-ink-muted">{s.value}</span>
             </div>
           ))}
         </div>
@@ -1428,13 +1428,13 @@ function ClientBrandingSummary({ client }: { client: Client | undefined }) {
 
       {promptSnippet && (
         <div className="mt-3 flex items-center gap-2">
-          <code className="flex-1 truncate rounded border border-border bg-paper px-2.5 py-1.5 font-mono text-[0.65rem] text-charcoal">
+          <code className="flex-1 truncate rounded border border-rule bg-surface px-2.5 py-1.5 font-mono text-[0.65rem] text-ink">
             {promptSnippet}
           </code>
           <button
             type="button"
             onClick={() => navigator.clipboard?.writeText(promptSnippet)}
-            className="inline-flex h-7 items-center rounded-md border border-border bg-paper px-2.5 text-[0.65rem] font-medium text-txt-secondary transition-colors hover:bg-cream cursor-pointer"
+            className="inline-flex h-7 items-center rounded-md border border-rule bg-surface px-2.5 text-[0.65rem] font-medium text-ink-soft transition-colors hover:bg-canvas cursor-pointer"
           >
             Copy
           </button>
@@ -1526,8 +1526,8 @@ function ThemeSection({
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-base font-semibold text-charcoal">Email Theme</h2>
-        <p className="mt-1 text-xs text-txt-muted">
+        <h2 className="text-base font-semibold text-ink">Email Theme</h2>
+        <p className="mt-1 text-xs text-ink-muted">
           The look applied to this campaign&apos;s emails. Inherit your brand default or pick a ready-made theme.
         </p>
       </div>
@@ -1567,8 +1567,8 @@ function ThemeSection({
                   sendState === "error"
                     ? "text-red"
                     : sendState === "sent"
-                      ? "text-green"
-                      : "text-txt-muted"
+                      ? "text-moss-deep"
+                      : "text-ink-muted"
                 }`}
               >
                 {sendState === "sending" ? "Sending…" : sendMessage}
@@ -1578,7 +1578,7 @@ function ThemeSection({
               type="button"
               onClick={sendTest}
               disabled={sendState === "sending" || !brandId}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-cream/40 px-3 text-[0.72rem] font-medium text-charcoal transition-colors hover:bg-cream hover:border-txt-muted disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rule bg-canvas/40 px-3 text-[0.72rem] font-medium text-ink transition-colors hover:bg-canvas hover:border-ink-muted disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
             >
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="1.5" y="3" width="13" height="10" rx="1.5" />
@@ -1588,19 +1588,19 @@ function ThemeSection({
             </button>
           </div>
         </div>
-        <div className="flex justify-center rounded-lg border border-border bg-cream/40 p-4">
+        <div className="flex justify-center rounded-lg border border-rule bg-canvas/40 p-4">
           {previewHtml ? (
             <iframe
               srcDoc={previewHtml}
               sandbox="allow-same-origin"
               title="Email theme preview"
-              className={`rounded-lg border border-border bg-white transition-opacity ${
+              className={`rounded-lg border border-rule bg-white transition-opacity ${
                 previewLoading ? "opacity-60" : "opacity-100"
               }`}
               style={{ width: "100%", maxWidth: 540, height: 520 }}
             />
           ) : (
-            <div className="flex h-[520px] w-full max-w-[540px] items-center justify-center rounded-lg border border-dashed border-border bg-white text-xs text-txt-muted">
+            <div className="flex h-[520px] w-full max-w-[540px] items-center justify-center rounded-lg border border-dashed border-rule bg-white text-xs text-ink-muted">
               {previewLoading ? "Rendering preview…" : "Select a brand to preview the themed email"}
             </div>
           )}
@@ -1637,8 +1637,8 @@ function ThemeLandingDefault({
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-base font-semibold text-charcoal">Landing Page</h2>
-        <p className="mt-1 text-xs text-txt-muted">
+        <h2 className="text-base font-semibold text-ink">Landing Page</h2>
+        <p className="mt-1 text-xs text-ink-muted">
           This campaign&apos;s landing page is generated from its theme — nothing to
           paste. To change the look, pick a different theme above (a bespoke theme
           carries its own hand-built landing).
@@ -1646,18 +1646,18 @@ function ThemeLandingDefault({
       </div>
 
       {/* Theme-provides-landing banner */}
-      <div className="flex items-start gap-3 rounded-xl border border-accent/30 bg-accent/10 px-4 py-3.5">
-        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
+      <div className="flex items-start gap-3 rounded-xl border border-cobalt/30 bg-cobalt/10 px-4 py-3.5">
+        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cobalt/15 text-cobalt">
           <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2.5" y="3.5" width="15" height="13" rx="2" />
             <path d="M2.5 7.5h15M6 3.5v4" />
           </svg>
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-medium text-charcoal">
+          <p className="text-sm font-medium text-ink">
             Landing page from {themeName ?? "your theme"}
           </p>
-          <p className="mt-0.5 text-xs leading-relaxed text-txt-secondary">
+          <p className="mt-0.5 text-xs leading-relaxed text-ink-soft">
             The colours, logo, and type come from your theme. Edit the theme to restyle every campaign that uses it.
           </p>
         </div>
@@ -1673,7 +1673,7 @@ function ThemeLandingDefault({
           setPreviewDevice={setPreviewDevice}
         />
       ) : (
-        <div className="flex h-[200px] items-center justify-center rounded-lg border border-dashed border-border bg-cream/40 text-xs text-txt-muted">
+        <div className="flex h-[200px] items-center justify-center rounded-lg border border-dashed border-rule bg-canvas/40 text-xs text-ink-muted">
           {loading ? "Rendering preview…" : "Select a brand to preview the landing page"}
         </div>
       )}
@@ -1720,14 +1720,14 @@ function TemplatePreview({
     <div>
       <div className="mb-2 flex items-center justify-between">
         <label className={labelClass}>Preview</label>
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-cream/40 p-0.5">
+        <div className="flex items-center gap-1 rounded-lg border border-rule bg-canvas/40 p-0.5">
           <button
             type="button"
             onClick={() => setPreviewDevice("desktop")}
             className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[0.65rem] font-medium transition-colors cursor-pointer ${
               previewDevice === "desktop"
-                ? "bg-surface text-charcoal shadow-sm"
-                : "text-txt-muted hover:text-txt-secondary"
+                ? "bg-surface text-ink shadow-sm"
+                : "text-ink-muted hover:text-ink-soft"
             }`}
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1741,8 +1741,8 @@ function TemplatePreview({
             onClick={() => setPreviewDevice("mobile")}
             className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[0.65rem] font-medium transition-colors cursor-pointer ${
               previewDevice === "mobile"
-                ? "bg-surface text-charcoal shadow-sm"
-                : "text-txt-muted hover:text-txt-secondary"
+                ? "bg-surface text-ink shadow-sm"
+                : "text-ink-muted hover:text-ink-soft"
             }`}
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1753,12 +1753,12 @@ function TemplatePreview({
           </button>
         </div>
       </div>
-      <div className="flex justify-center rounded-lg border border-border bg-cream/40 p-4">
+      <div className="flex justify-center rounded-lg border border-rule bg-canvas/40 p-4">
         <iframe
           srcDoc={processed}
           sandbox="allow-same-origin"
           title="Template preview"
-          className="rounded-lg border border-border bg-white"
+          className="rounded-lg border border-rule bg-white"
           style={{
             width: previewDevice === "mobile" ? 375 : "100%",
             height: 600,

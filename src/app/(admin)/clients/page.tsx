@@ -3,6 +3,8 @@
 import { TierBadge } from "@/components/admin/tier-badge";
 import { canManageOrg, useTenant } from "@/components/admin/tenant-provider";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -73,8 +75,8 @@ export default function ClientsPage() {
       {/* Page header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-charcoal">Brands</h1>
-          <p className="mt-0.5 text-xs text-txt-muted">
+          <h1 className="text-lg font-semibold text-ink">Brands</h1>
+          <p className="mt-0.5 text-xs text-ink-muted">
             {loading
               ? "Loading..."
               : hasActiveFilters
@@ -83,10 +85,7 @@ export default function ClientsPage() {
           </p>
         </div>
         {canCreate && (
-          <Link
-            href="/clients/new"
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light"
-          >
+          <Link href="/clients/new" className={buttonVariants()}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M7 2v10M2 7h10" />
             </svg>
@@ -107,7 +106,7 @@ export default function ClientsPage() {
             stroke="currentColor"
             strokeWidth="1.5"
             strokeLinecap="round"
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-txt-muted pointer-events-none"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none"
           >
             <circle cx="6" cy="6" r="4" />
             <path d="M9 9l3 3" />
@@ -117,12 +116,12 @@ export default function ClientsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name, contact, email..."
-            className="h-9 w-full rounded-lg border border-border bg-surface pl-8 pr-3 text-[0.78rem] text-charcoal outline-none placeholder:text-txt-muted focus:border-accent"
+            className="h-9 w-full rounded-lg border border-rule bg-surface pl-8 pr-3 text-[0.78rem] text-ink outline-none placeholder:text-ink-muted focus:border-cobalt"
           />
           {search && (
             <button
               onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-txt-muted hover:text-charcoal cursor-pointer"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-ink-muted hover:text-ink cursor-pointer"
               aria-label="Clear search"
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
@@ -136,7 +135,7 @@ export default function ClientsPage() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
-          className="h-9 rounded-lg border border-border bg-surface px-2.5 text-[0.78rem] font-medium text-txt-secondary outline-none focus:border-accent cursor-pointer"
+          className="h-9 rounded-lg border border-rule bg-surface px-2.5 text-[0.78rem] font-medium text-ink-soft outline-none focus:border-cobalt cursor-pointer"
         >
           <option value="all">All statuses</option>
           <option value="active">Active</option>
@@ -146,7 +145,7 @@ export default function ClientsPage() {
         {hasActiveFilters && (
           <button
             onClick={clearFilters}
-            className="h-9 rounded-lg border border-transparent px-2.5 text-[0.78rem] font-medium text-txt-muted hover:text-charcoal cursor-pointer"
+            className="h-9 rounded-lg border border-transparent px-2.5 text-[0.78rem] font-medium text-ink-muted hover:text-ink cursor-pointer"
           >
             Clear filters
           </button>
@@ -155,7 +154,7 @@ export default function ClientsPage() {
 
       {/* Table */}
       {loading ? (
-        <div className="rounded-xl border border-border bg-surface py-20 text-center text-sm text-txt-muted">
+        <div className="rounded-xl border border-rule bg-surface py-20 text-center text-sm text-ink-muted">
           Loading brands...
         </div>
       ) : clients.length === 0 ? (
@@ -167,42 +166,42 @@ export default function ClientsPage() {
           actionHref={canCreate ? "/clients/new" : undefined}
         />
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-border bg-surface py-20 text-center">
-          <p className="text-sm text-txt-secondary">No brands match your filters</p>
+        <div className="rounded-xl border border-rule bg-surface py-20 text-center">
+          <p className="text-sm text-ink-soft">No brands match your filters</p>
           <button
             onClick={clearFilters}
-            className="mt-2 text-[0.78rem] font-medium text-accent hover:underline cursor-pointer"
+            className="mt-2 text-[0.78rem] font-medium text-cobalt hover:underline cursor-pointer"
           >
             Clear filters
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="overflow-hidden rounded-xl border border-rule bg-surface">
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-border">
-                <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
+              <tr className="border-b border-rule">
+                <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-ink-muted">
                   Name
                 </th>
-                <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
+                <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-ink-muted">
                   Contact
                 </th>
-                <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
+                <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-ink-muted">
                   Email
                 </th>
-                <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted text-center">
+                <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-ink-muted text-center">
                   Campaigns
                 </th>
-                <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
+                <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-ink-muted">
                   Status
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-rule">
               {paged.map((client) => (
                 <tr
                   key={client.id}
-                  className="group cursor-pointer transition-colors hover:bg-cream/60"
+                  className="group cursor-pointer transition-colors hover:bg-canvas/60"
                   onClick={(e) => {
                     if ((e.target as HTMLElement).closest("a")) return;
                     router.push(`/clients/${client.id}`);
@@ -211,32 +210,25 @@ export default function ClientsPage() {
                   <td className="px-5 py-3">
                     <Link
                       href={`/clients/${client.id}`}
-                      className="inline-flex items-center gap-2 text-sm font-medium text-charcoal group-hover:text-accent"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-ink group-hover:text-cobalt"
                     >
                       <span className="text-[0.95rem] font-medium text-ink">{client.name}</span>
                       <TierBadge tier={tenant.orgTier} />
                     </Link>
                   </td>
-                  <td className="px-5 py-3 text-sm text-txt-secondary">
-                    {client.contact_name || <span className="text-txt-muted">&mdash;</span>}
+                  <td className="px-5 py-3 text-sm text-ink-soft">
+                    {client.contact_name || <span className="text-ink-muted">&mdash;</span>}
                   </td>
-                  <td className="px-5 py-3 font-mono text-xs text-txt-secondary">
-                    {client.contact_email || <span className="text-txt-muted">&mdash;</span>}
+                  <td className="px-5 py-3 font-mono text-xs text-ink-soft">
+                    {client.contact_email || <span className="text-ink-muted">&mdash;</span>}
                   </td>
-                  <td className="px-5 py-3 text-center font-mono text-xs text-txt-secondary">
+                  <td className="px-5 py-3 text-center font-mono text-xs text-ink-soft">
                     {client.campaigns?.length ?? 0}
                   </td>
                   <td className="px-5 py-3">
-                    <span className="inline-flex items-center gap-1.5 text-xs">
-                      <span
-                        className={`inline-block h-1.5 w-1.5 rounded-full ${
-                          client.is_active !== false ? "bg-green" : "bg-red"
-                        }`}
-                      />
-                      <span className="text-txt-secondary">
-                        {client.is_active !== false ? "Active" : "Inactive"}
-                      </span>
-                    </span>
+                    <Badge tone={client.is_active !== false ? "moss" : "neutral"} dot>
+                      {client.is_active !== false ? "Active" : "Inactive"}
+                    </Badge>
                   </td>
                 </tr>
               ))}
@@ -245,15 +237,16 @@ export default function ClientsPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-border px-5 py-3">
-              <span className="text-xs text-txt-muted">
+            <div className="flex items-center justify-between border-t border-rule px-5 py-3">
+              <span className="text-xs text-ink-muted">
                 Showing {page * PAGE_SIZE + 1}&ndash;{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
               </span>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setPage(page - 1)}
                   disabled={page === 0}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-txt-muted transition-colors hover:bg-cream hover:text-charcoal disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                  aria-label="Previous page"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-canvas hover:text-ink disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M8.5 3L4.5 7l4 4" /></svg>
                 </button>
@@ -267,10 +260,12 @@ export default function ClientsPage() {
                     <button
                       key={pageNum}
                       onClick={() => setPage(pageNum)}
+                      aria-label={`Page ${pageNum + 1}`}
+                      aria-current={pageNum === page || undefined}
                       className={`h-8 w-8 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                         pageNum === page
-                          ? "bg-charcoal text-white"
-                          : "text-txt-muted hover:bg-cream hover:text-charcoal"
+                          ? "bg-ink text-white"
+                          : "text-ink-muted hover:bg-canvas hover:text-ink"
                       }`}
                     >
                       {pageNum + 1}
@@ -280,7 +275,8 @@ export default function ClientsPage() {
                 <button
                   onClick={() => setPage(page + 1)}
                   disabled={page >= totalPages - 1}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-txt-muted transition-colors hover:bg-cream hover:text-charcoal disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                  aria-label="Next page"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-canvas hover:text-ink disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
                 >
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M5.5 3L9.5 7l-4 4" /></svg>
                 </button>

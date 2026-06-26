@@ -1,6 +1,8 @@
 "use client";
 
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { Modal } from "@/components/ui/modal";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast-provider";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -34,7 +36,7 @@ const META: Record<
     path: "suspend",
     label: "Suspend",
     button:
-      "border border-warning/40 text-warning hover:bg-warning-light/60",
+      "border border-saffron/40 text-saffron-deep hover:bg-saffron-soft/60",
     title: "Suspend this organisation?",
     description: (n) =>
       `${n}'s users are signed out on their next request and its public careers pages stop accepting applications. Fully reversible — restore at any time.`,
@@ -45,7 +47,7 @@ const META: Record<
     path: "restore",
     label: "Restore",
     button:
-      "border border-cobalt/40 text-cobalt hover:bg-cobalt-tint",
+      "border border-cobalt/40 text-cobalt-deep hover:bg-cobalt-tint",
     title: "Restore this organisation?",
     description: (n) =>
       `${n}'s users regain access and its careers pages reopen.`,
@@ -140,7 +142,7 @@ export function LifecycleActions({
   const slugMatches = confirmText.trim() === orgSlug;
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-6">
+    <div className="rounded-xl border border-rule bg-surface p-6">
       <h2 className="font-serif text-lg text-ink">Lifecycle</h2>
       <p className="mt-0.5 text-xs text-ink-muted">
         Suspend, soft-delete, or permanently purge this tenant. Suspend and
@@ -152,7 +154,7 @@ export function LifecycleActions({
         {reversible.map((kind) => (
           <div
             key={kind}
-            className="flex items-center justify-between gap-4 rounded-lg border border-border bg-cream/40 px-4 py-3"
+            className="flex items-center justify-between gap-4 rounded-lg border border-rule bg-canvas/40 px-4 py-3"
           >
             <p className="text-[0.8rem] leading-snug text-ink-soft">
               {META[kind].description(orgName)}
@@ -222,53 +224,44 @@ export function LifecycleActions({
       )}
 
       {/* Typed-slug purge confirmation */}
-      {purgeOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/30 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-xl">
-            <h3 className="text-base font-semibold text-charcoal">
-              Permanently delete {orgName}?
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-txt-secondary">
-              This permanently deletes all brands, campaigns, candidates, CVs,
-              and chat data for {orgName}, and removes every stored file. This{" "}
-              <strong className="text-charcoal">cannot be undone</strong>.
-            </p>
-            <label className="mt-4 block text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-ink-muted">
-              Type{" "}
-              <span className="font-mono normal-case tracking-normal text-red">
-                {orgSlug}
-              </span>{" "}
-              to confirm
-            </label>
-            <input
-              autoFocus
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && slugMatches && !purging) runPurge();
-              }}
-              placeholder={orgSlug}
-              className="mt-1.5 h-10 w-full rounded-lg border border-border bg-cream/40 px-3.5 font-mono text-sm text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-faint focus:border-red focus:ring-1 focus:ring-red/20"
-            />
-            <div className="mt-5 flex items-center justify-end gap-3">
-              <button
-                onClick={() => setPurgeOpen(false)}
-                disabled={purging}
-                className="inline-flex h-9 items-center rounded-lg px-4 text-[0.78rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={runPurge}
-                disabled={!slugMatches || purging}
-                className="inline-flex h-9 items-center rounded-lg bg-red px-4 text-[0.78rem] font-medium text-white transition-colors hover:bg-red/90 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {purging ? "Purging…" : "Delete permanently"}
-              </button>
-            </div>
-          </div>
+      <Modal
+        open={purgeOpen}
+        onClose={() => setPurgeOpen(false)}
+        title={`Permanently delete ${orgName}?`}
+        size="md"
+        dismissible={!purging}
+      >
+        <p className="text-sm leading-relaxed text-ink-soft">
+          This permanently deletes all brands, campaigns, candidates, CVs, and
+          chat data for {orgName}, and removes every stored file. This{" "}
+          <strong className="text-ink">cannot be undone</strong>.
+        </p>
+        <label htmlFor="purge-confirm" className="mt-4 block text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-ink-muted">
+          Type{" "}
+          <span className="font-mono normal-case tracking-normal text-red">
+            {orgSlug}
+          </span>{" "}
+          to confirm
+        </label>
+        <input
+          id="purge-confirm"
+          value={confirmText}
+          onChange={(e) => setConfirmText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && slugMatches && !purging) runPurge();
+          }}
+          placeholder={orgSlug}
+          className="mt-1.5 h-10 w-full rounded-lg border border-rule bg-canvas/40 px-3.5 font-mono text-sm text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-muted focus:border-red focus:ring-1 focus:ring-red/20"
+        />
+        <div className="mt-5 flex items-center justify-end gap-3">
+          <Button variant="ghost" onClick={() => setPurgeOpen(false)} disabled={purging}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={runPurge} disabled={!slugMatches} loading={purging}>
+            Delete permanently
+          </Button>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

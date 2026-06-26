@@ -330,7 +330,7 @@ function BrandStep({
           placeholder="Acme Corp"
           maxLength={80}
           aria-label="Brand name"
-          className="w-full border-b-2 border-border bg-transparent pb-3 text-center font-display text-3xl text-ink outline-none transition-colors placeholder:text-ink-faint/50 focus:border-cobalt sm:text-4xl"
+          className="w-full border-b-2 border-border bg-transparent pb-3 text-center font-display text-3xl text-ink outline-none transition-colors placeholder:text-ink-muted/50 focus:border-cobalt sm:text-4xl"
         />
         <p className="mt-4 text-center font-mono text-[0.78rem] text-ink-faint">
           {slug || "your-brand"}

@@ -20,7 +20,7 @@ export function OperatorLogout() {
     <button
       onClick={handleLogout}
       disabled={loading}
-      className="inline-flex h-7 items-center gap-1.5 rounded-md border border-white/15 px-2.5 text-[0.7rem] font-medium text-paper/70 transition-colors hover:border-vermillion/60 hover:text-paper disabled:opacity-50 cursor-pointer"
+      className="inline-flex h-7 items-center gap-1.5 rounded-md border border-white/15 px-2.5 text-[0.7rem] font-medium text-white/70 transition-colors hover:border-vermillion/60 hover:text-white disabled:opacity-50 cursor-pointer"
     >
       <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M6 2H4a2 2 0 00-2 2v8a2 2 0 002 2h2M10.5 11.5L14 8l-3.5-3.5M14 8H6" />

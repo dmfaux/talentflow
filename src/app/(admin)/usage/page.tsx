@@ -325,7 +325,7 @@ function CeilingControls({ current, onSaved }: { current: number | null; onSaved
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="No cap"
-          className="h-10 w-44 rounded-lg border border-rule bg-canvas px-3.5 font-mono text-sm text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-faint focus:border-cobalt"
+          className="h-10 w-44 rounded-lg border border-rule bg-canvas px-3.5 font-mono text-sm text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-muted focus:border-cobalt"
         />
         <span className="text-[0.8rem] text-ink-faint">credits / month</span>
         <button

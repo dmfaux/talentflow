@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { Textarea } from "@/components/ui/field";
 
 interface Props {
   candidateId: string;
@@ -28,31 +29,29 @@ export function CandidateNotes({
     }, 500);
   }
 
-  const textareaClass =
-    "w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none";
   const labelClass =
-    "mb-1.5 flex items-center justify-between text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted";
+    "mb-1.5 flex items-center justify-between text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-ink-muted";
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-5 space-y-4">
+    <div className="rounded-xl border border-rule bg-surface p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-charcoal">Admin Notes</h3>
+        <h3 className="text-sm font-semibold text-ink">Admin notes</h3>
         {saving && (
-          <span className="text-[0.65rem] text-txt-muted">Saving...</span>
+          <span className="text-[0.65rem] text-ink-muted">Saving...</span>
         )}
       </div>
 
       <div>
-        <label className={labelClass}>
-          <span>Shortlist Notes</span>
+        <label htmlFor="shortlist-notes" className={labelClass}>
+          <span>Shortlist notes</span>
         </label>
-        <textarea
+        <Textarea
+          id="shortlist-notes"
           rows={3}
           value={shortlist}
           onChange={(e) => setShortlist(e.target.value)}
           onBlur={() => save("shortlist_notes", shortlist)}
           placeholder="Notes for shortlisting decision..."
-          className={textareaClass}
         />
       </div>
 

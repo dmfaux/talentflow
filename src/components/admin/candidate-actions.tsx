@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "@/components/ui/toast-provider";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/field";
+import { Callout } from "@/components/ui/callout";
 
 interface Props {
   candidateId: string;
@@ -157,97 +160,100 @@ export function CandidateActions({ candidateId, status, hasCv, canManage = true 
       <div className="flex flex-wrap items-center gap-2">
         {canManage && canDecideRejection && (
           <>
-            <button
-              onClick={() => { setDecision("accept"); setDecisionReason(""); setNotifyCandidate(false); }}
+            <Button
+              variant="danger"
+              size="sm"
               disabled={!!loading}
-              className="inline-flex h-8 items-center rounded-lg bg-red px-3 text-[0.75rem] font-medium text-white transition-colors hover:bg-red/90 cursor-pointer disabled:opacity-50"
+              onClick={() => { setDecision("accept"); setDecisionReason(""); setNotifyCandidate(false); }}
             >
               Accept rejection
-            </button>
-            <button
-              onClick={() => { setDecision("dismiss"); setDecisionReason(""); }}
+            </Button>
+            <Button
+              size="sm"
               disabled={!!loading}
-              className="inline-flex h-8 items-center rounded-lg bg-accent px-3 text-[0.75rem] font-medium text-white transition-colors hover:bg-accent-light cursor-pointer disabled:opacity-50"
+              onClick={() => { setDecision("dismiss"); setDecisionReason(""); }}
             >
               Dismiss — keep candidate
-            </button>
+            </Button>
           </>
         )}
         {canManage && canOpenChat && (
-          <button
-            onClick={openChat}
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={loading === "open-chat"}
             disabled={!!loading}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-[0.75rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer disabled:opacity-50"
+            onClick={openChat}
           >
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 10a1.5 1.5 0 01-1.5 1.5H5L2 14V3.5A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5z" />
             </svg>
-            {loading === "open-chat" ? "..." : "Open Chat"}
-          </button>
+            Open chat
+          </Button>
         )}
         {canManage && canShortlist && (
-          <button
-            onClick={() => updateStatus("shortlisted")}
+          <Button
+            size="sm"
+            loading={loading === "shortlisted"}
             disabled={!!loading}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 text-[0.75rem] font-medium text-white transition-colors hover:bg-accent-light cursor-pointer disabled:opacity-50"
+            onClick={() => updateStatus("shortlisted")}
           >
-            {loading === "shortlisted" ? "..." : "Add to Shortlist"}
-          </button>
+            Add to shortlist
+          </Button>
         )}
         {canManage && canReject && (
-          <button
-            onClick={() => setConfirmReject(true)}
-            disabled={!!loading}
-            className="inline-flex h-8 items-center rounded-lg border border-border px-3 text-[0.75rem] font-medium text-red transition-colors hover:bg-red-light cursor-pointer disabled:opacity-50"
-          >
+          <Button variant="danger" size="sm" disabled={!!loading} onClick={() => setConfirmReject(true)}>
             Reject
-          </button>
+          </Button>
         )}
         {hasCv && (
-          <button
-            onClick={downloadCv}
+          <Button
+            variant="secondary"
+            size="sm"
+            loading={loading === "cv"}
             disabled={!!loading}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-[0.75rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer disabled:opacity-50"
+            onClick={downloadCv}
           >
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M8 2v9M4.5 7.5L8 11l3.5-3.5M3 14h10" />
             </svg>
             CV
-          </button>
+          </Button>
         )}
       </div>
 
       {confirmReject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/30 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-xl">
-            <h3 className="text-base font-semibold text-charcoal">Reject Candidate</h3>
-            <p className="mt-2 text-sm leading-relaxed text-txt-secondary">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl border border-rule bg-surface p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-ink">Reject candidate</h3>
+            <p className="mt-2 text-sm leading-relaxed text-ink-soft">
               {status === "follow_up"
                 ? "This will post a closing message in the candidate's chat and send a confirmation email. Please provide a reason — it will be shared with the candidate verbatim if you fill it in."
                 : "Please provide a reason for rejecting this candidate."}
             </p>
-            <textarea
+            <Textarea
               rows={3}
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
               placeholder={status === "follow_up" ? "Reason (will be shared with the candidate)..." : "Reason for rejection..."}
-              className="mt-3 w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none"
+              className="mt-3"
             />
             <div className="mt-4 flex items-center justify-end gap-3">
-              <button
-                onClick={() => { setConfirmReject(false); setRejectionReason(""); }}
+              <Button
+                variant="ghost"
                 disabled={loading === "rejected"}
-                className="inline-flex h-9 items-center rounded-lg px-4 text-[0.78rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer disabled:opacity-50"
+                onClick={() => { setConfirmReject(false); setRejectionReason(""); }}
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="danger"
+                loading={loading === "rejected"}
+                disabled={!rejectionReason.trim()}
                 onClick={() => updateStatus("rejected", { rejection_reason: rejectionReason.trim() })}
-                disabled={loading === "rejected" || !rejectionReason.trim()}
-                className="inline-flex h-9 items-center rounded-lg px-4 text-[0.78rem] font-medium bg-red text-white transition-colors hover:bg-red/90 cursor-pointer disabled:opacity-50"
               >
-                {loading === "rejected" ? "Processing..." : "Reject"}
-              </button>
+                Reject
+              </Button>
             </div>
           </div>
         </div>
@@ -255,14 +261,14 @@ export function CandidateActions({ candidateId, status, hasCv, canManage = true 
 
       {/* Accept the AI's rejection recommendation. */}
       {decision === "accept" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/30 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-xl">
-            <h3 className="text-base font-semibold text-charcoal">Accept rejection</h3>
-            <p className="mt-2 text-sm leading-relaxed text-txt-secondary">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-xl border border-rule bg-surface p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-ink">Accept rejection</h3>
+            <p className="mt-2 text-sm leading-relaxed text-ink-soft">
               This rejects the candidate and sends them a rejection email. Add an
               optional note — it stays internal unless you choose to share it.
             </p>
-            <textarea
+            <Textarea
               rows={3}
               value={decisionReason}
               onChange={(e) => {
@@ -270,11 +276,11 @@ export function CandidateActions({ candidateId, status, hasCv, canManage = true 
                 if (!e.target.value.trim()) setNotifyCandidate(false);
               }}
               placeholder="Reason for rejection (optional)…"
-              className="mt-3 w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none"
+              className="mt-3"
             />
             <label
               className={`mt-3 flex items-start gap-2.5 text-sm ${
-                decisionReason.trim() ? "text-charcoal cursor-pointer" : "text-txt-muted cursor-not-allowed"
+                decisionReason.trim() ? "text-ink cursor-pointer" : "text-ink-muted cursor-not-allowed"
               }`}
             >
               <input
@@ -282,38 +288,44 @@ export function CandidateActions({ candidateId, status, hasCv, canManage = true 
                 checked={notifyCandidate}
                 disabled={!decisionReason.trim()}
                 onChange={(e) => setNotifyCandidate(e.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 rounded border-border accent-accent cursor-[inherit]"
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-rule accent-cobalt cursor-[inherit]"
               />
               <span>Also send this note to the candidate</span>
             </label>
             {notifyCandidate && (
-              <div className="mt-3 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning-light px-3.5 py-2.5">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="mt-0.5 shrink-0 text-warning">
-                  <path d="M8 1.5L15 14H1z" />
-                  <path d="M8 6.5v3M8 11.5v.5" />
-                </svg>
-                <p className="text-[0.78rem] leading-relaxed text-charcoal">
+              <Callout
+                tone="warning"
+                className="mt-3"
+                icon={
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M8 1.5L15 14H1z" />
+                    <path d="M8 6.5v3M8 11.5v.5" />
+                  </svg>
+                }
+              >
+                <p className="text-[0.78rem] leading-relaxed">
                   Your note will appear in the candidate&rsquo;s rejection email
                   exactly as written. Keep it professional — don&rsquo;t include
                   internal comments.
                 </p>
-              </div>
+              </Callout>
             )}
             <div className="mt-5 flex items-center justify-end gap-3">
-              <button
-                onClick={() => { setDecision(null); setDecisionReason(""); setNotifyCandidate(false); }}
+              <Button
+                variant="ghost"
                 disabled={decisionBusy}
-                className="inline-flex h-9 items-center rounded-lg px-4 text-[0.78rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer disabled:opacity-50"
+                onClick={() => { setDecision(null); setDecisionReason(""); setNotifyCandidate(false); }}
               >
                 Cancel
-              </button>
-              <button
-                onClick={() => submitDecision("accept")}
+              </Button>
+              <Button
+                variant="danger"
+                loading={loading === "decision-accept"}
                 disabled={decisionBusy}
-                className="inline-flex h-9 items-center rounded-lg px-4 text-[0.78rem] font-medium bg-red text-white transition-colors hover:bg-red/90 cursor-pointer disabled:opacity-50"
+                onClick={() => submitDecision("accept")}
               >
-                {loading === "decision-accept" ? "Processing..." : "Reject candidate"}
-              </button>
+                Reject candidate
+              </Button>
             </div>
           </div>
         </div>
@@ -321,36 +333,36 @@ export function CandidateActions({ candidateId, status, hasCv, canManage = true 
 
       {/* Dismiss the recommendation and keep the candidate. */}
       {decision === "dismiss" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/30 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-xl">
-            <h3 className="text-base font-semibold text-charcoal">Keep candidate</h3>
-            <p className="mt-2 text-sm leading-relaxed text-txt-secondary">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-xl border border-rule bg-surface p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-ink">Keep candidate</h3>
+            <p className="mt-2 text-sm leading-relaxed text-ink-soft">
               This dismisses the AI&rsquo;s rejection recommendation and returns
               the candidate to scored. Add an optional note for the record —
               it&rsquo;s internal only.
             </p>
-            <textarea
+            <Textarea
               rows={3}
               value={decisionReason}
               onChange={(e) => setDecisionReason(e.target.value)}
               placeholder="Reason (optional, internal)…"
-              className="mt-3 w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none"
+              className="mt-3"
             />
             <div className="mt-5 flex items-center justify-end gap-3">
-              <button
-                onClick={() => { setDecision(null); setDecisionReason(""); }}
+              <Button
+                variant="ghost"
                 disabled={decisionBusy}
-                className="inline-flex h-9 items-center rounded-lg px-4 text-[0.78rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer disabled:opacity-50"
+                onClick={() => { setDecision(null); setDecisionReason(""); }}
               >
                 Cancel
-              </button>
-              <button
-                onClick={() => submitDecision("dismiss")}
+              </Button>
+              <Button
+                loading={loading === "decision-dismiss"}
                 disabled={decisionBusy}
-                className="inline-flex h-9 items-center rounded-lg px-4 text-[0.78rem] font-medium bg-accent text-white transition-colors hover:bg-accent-light cursor-pointer disabled:opacity-50"
+                onClick={() => submitDecision("dismiss")}
               >
-                {loading === "decision-dismiss" ? "Processing..." : "Keep candidate"}
-              </button>
+                Keep candidate
+              </Button>
             </div>
           </div>
         </div>

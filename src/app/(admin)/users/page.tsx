@@ -1,10 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ReactNode, useCallback, useEffect, useState } from "react";
 import { canManageOrg, useTenant } from "@/components/admin/tenant-provider";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useToast } from "@/components/ui/toast-provider";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/card";
+import { Callout } from "@/components/ui/callout";
+import { Modal } from "@/components/ui/modal";
+import { Field, Input, Select } from "@/components/ui/field";
 
 // NOTE (S8): this is the Members experience. The route is still /users (the
 // nav label is "Members"); S14 completes the rename to /members. The legacy
@@ -38,6 +45,9 @@ const BRAND_ROLE_LABEL: Record<string, string> = {
   viewer: "Viewer",
 };
 
+const thClass =
+  "px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-ink-muted";
+
 export default function MembersPage() {
   const router = useRouter();
   const tenant = useTenant();
@@ -70,15 +80,12 @@ export default function MembersPage() {
           </p>
         </div>
         {canManage && (
-          <button
-            onClick={() => setInviteOpen(true)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-cobalt px-4 text-[0.8rem] font-medium text-paper transition-colors hover:bg-cobalt-deep cursor-pointer"
-          >
+          <Button onClick={() => setInviteOpen(true)}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M7 2v10M2 7h10" />
             </svg>
             Invite member
-          </button>
+          </Button>
         )}
       </div>
 
@@ -94,15 +101,12 @@ export default function MembersPage() {
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-rule bg-paper">
+        <div className="overflow-hidden rounded-xl border border-rule bg-surface">
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-rule">
                 {["Name", "Email", "Org role", "Brands", "Status"].map((h) => (
-                  <th
-                    key={h}
-                    className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-ink-muted"
-                  >
+                  <th key={h} scope="col" className={thClass}>
                     {h}
                   </th>
                 ))}
@@ -110,29 +114,40 @@ export default function MembersPage() {
             </thead>
             <tbody className="divide-y divide-rule">
               {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-5 py-10 text-center text-sm text-ink-muted">
-                    Loading members…
-                  </td>
-                </tr>
+                Array.from({ length: 4 }).map((_, i) => (
+                  <tr key={i}>
+                    <td className="px-5 py-3"><Skeleton className="h-4 w-32" /></td>
+                    <td className="px-5 py-3"><Skeleton className="h-4 w-44" /></td>
+                    <td className="px-5 py-3"><Skeleton className="h-5 w-20 rounded-full" /></td>
+                    <td className="px-5 py-3"><Skeleton className="h-4 w-28" /></td>
+                    <td className="px-5 py-3"><Skeleton className="h-5 w-16 rounded-full" /></td>
+                  </tr>
+                ))
               ) : (
                 members.map((m) => (
                   <tr
                     key={m.id}
                     className="group cursor-pointer transition-colors hover:bg-canvas/70"
-                    onClick={() => router.push(`/users/${m.id}`)}
+                    onClick={(e) => {
+                      // Let the name link own keyboard / modifier clicks.
+                      if ((e.target as HTMLElement).closest("a")) return;
+                      router.push(`/users/${m.id}`);
+                    }}
                   >
-                    <td className="px-5 py-3 text-sm font-medium text-ink group-hover:text-cobalt">
-                      {m.first_name} {m.last_name}
+                    <td className="px-5 py-3">
+                      <Link
+                        href={`/users/${m.id}`}
+                        className="text-sm font-medium text-ink transition-colors group-hover:text-cobalt"
+                      >
+                        {m.first_name} {m.last_name}
+                      </Link>
                     </td>
                     <td className="px-5 py-3 font-mono text-xs text-ink-soft">
                       {m.email}
                     </td>
                     <td className="px-5 py-3">
                       {m.org_role ? (
-                        <span className="inline-flex items-center rounded-full bg-cobalt-tint px-2 py-0.5 text-[0.68rem] font-semibold text-cobalt-deep">
-                          {ORG_ROLE_LABEL[m.org_role] ?? m.org_role}
-                        </span>
+                        <Badge tone="cobalt">{ORG_ROLE_LABEL[m.org_role] ?? m.org_role}</Badge>
                       ) : (
                         <span className="text-ink-muted">—</span>
                       )}
@@ -141,16 +156,9 @@ export default function MembersPage() {
                       <BrandCell member={m} />
                     </td>
                     <td className="px-5 py-3">
-                      <span className="inline-flex items-center gap-1.5 text-xs">
-                        <span
-                          className={`inline-block h-1.5 w-1.5 rounded-full ${
-                            m.is_active ? "bg-moss" : "bg-red"
-                          }`}
-                        />
-                        <span className="text-ink-soft">
-                          {m.is_active ? "Active" : "Inactive"}
-                        </span>
-                      </span>
+                      <Badge tone={m.is_active ? "moss" : "neutral"} dot>
+                        {m.is_active ? "Active" : "Inactive"}
+                      </Badge>
                     </td>
                   </tr>
                 ))
@@ -263,145 +271,114 @@ function InviteModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 px-4 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-xl border border-rule bg-paper p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-base font-semibold text-ink">Invite a member</h3>
-        <p className="mt-1 text-xs text-ink-muted">
-          They&rsquo;ll receive an email to set a password and join your organisation.
-        </p>
+    <Modal open onClose={onClose} title="Invite a member" size="md" dismissible={!submitting}>
+      <p className="text-xs text-ink-muted">
+        They&rsquo;ll receive an email to set a password and join your organisation.
+      </p>
 
-        <div className="mt-5 space-y-4">
-          <div>
-            <label htmlFor="invite-email" className={labelClass}>
-              Email
-            </label>
-            <input
-              id="invite-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="colleague@company.com"
-              autoFocus
-              className={inputClass}
+      <div className="mt-5 space-y-4">
+        <Field label="Email" htmlFor="invite-email">
+          <Input
+            id="invite-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="colleague@company.com"
+          />
+        </Field>
+
+        {/* Access type toggle */}
+        <div>
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <span className={controlLabel}>Access</span>
+            <HelpPopover label="About access types">
+              <AccessHelp />
+            </HelpPopover>
+          </div>
+          <div className="flex gap-1 rounded-lg border border-rule bg-canvas p-0.5">
+            <SegBtn
+              active={accessType === "brand"}
+              onClick={() => setAccessType("brand")}
+              label="Brand role"
+            />
+            <SegBtn
+              active={accessType === "org"}
+              onClick={() => setAccessType("org")}
+              label="Org-level"
             />
           </div>
+        </div>
 
-          {/* Access type toggle */}
-          <div>
-            <div className="mb-1.5 flex items-center gap-1.5">
-              <span className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-ink-muted">
-                Access
-              </span>
-              <HelpPopover label="About access types">
-                <AccessHelp />
-              </HelpPopover>
-            </div>
-            <div className="flex gap-1 rounded-lg border border-rule bg-canvas p-0.5">
-              <SegBtn
-                active={accessType === "brand"}
-                onClick={() => setAccessType("brand")}
-                label="Brand role"
-              />
-              <SegBtn
-                active={accessType === "org"}
-                onClick={() => setAccessType("org")}
-                label="Org-level"
-              />
+        {accessType === "brand" ? (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Brand" htmlFor="invite-brand">
+              <Select
+                id="invite-brand"
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                disabled={noBrands}
+              >
+                {noBrands && <option value="">No brands yet</option>}
+                {tenant.brands.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <div>
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <label htmlFor="invite-brand-role" className={controlLabel}>
+                  Brand role
+                </label>
+                <HelpPopover label="About brand roles" align="right">
+                  <BrandRolesHelp />
+                </HelpPopover>
+              </div>
+              <Select
+                id="invite-brand-role"
+                value={brandRole}
+                onChange={(e) => setBrandRole(e.target.value)}
+              >
+                <option value="brand_admin">Brand Admin</option>
+                <option value="recruiter">Recruiter</option>
+                <option value="viewer">Viewer</option>
+              </Select>
             </div>
           </div>
-
-          {accessType === "brand" ? (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="invite-brand" className={labelClass}>
-                  Brand
-                </label>
-                <select
-                  id="invite-brand"
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
-                  className={inputClass}
-                  disabled={noBrands}
-                >
-                  {noBrands && <option value="">No brands yet</option>}
-                  {tenant.brands.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <div className="mb-1.5 flex items-center gap-1.5">
-                  <label
-                    htmlFor="invite-brand-role"
-                    className="text-[0.7rem] font-medium uppercase tracking-[0.12em] text-ink-muted"
-                  >
-                    Brand role
-                  </label>
-                  <HelpPopover label="About brand roles" align="right">
-                    <BrandRolesHelp />
-                  </HelpPopover>
-                </div>
-                <select
-                  id="invite-brand-role"
-                  value={brandRole}
-                  onChange={(e) => setBrandRole(e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="brand_admin">Brand Admin</option>
-                  <option value="recruiter">Recruiter</option>
-                  <option value="viewer">Viewer</option>
-                </select>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <label htmlFor="invite-org-role" className={labelClass}>
-                Org role
-              </label>
-              <select
-                id="invite-org-role"
-                value={orgRole}
-                onChange={(e) => setOrgRole(e.target.value)}
-                className={inputClass}
-              >
-                <option value="org_admin">Org Admin</option>
-                {canGrantOwner && <option value="owner">Owner</option>}
-              </select>
-              <p className="mt-1.5 text-[0.7rem] text-ink-muted">
-                Org-level members can manage every brand in the organisation.
-              </p>
-            </div>
-          )}
-
-          {error && <p className="text-xs text-red">{error}</p>}
-        </div>
-
-        <div className="mt-6 flex items-center justify-end gap-3">
-          <button
-            onClick={onClose}
-            disabled={submitting}
-            className="inline-flex h-9 items-center rounded-lg px-4 text-[0.78rem] font-medium text-ink-soft transition-colors hover:bg-canvas hover:text-ink cursor-pointer disabled:opacity-50"
+        ) : (
+          <Field
+            label="Org role"
+            htmlFor="invite-org-role"
+            helper="Org-level members can manage every brand in the organisation."
           >
-            Cancel
-          </button>
-          <button
-            onClick={submit}
-            disabled={submitting || (accessType === "brand" && noBrands)}
-            className="inline-flex h-9 items-center rounded-lg bg-cobalt px-4 text-[0.78rem] font-medium text-paper transition-colors hover:bg-cobalt-deep cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {submitting ? "Sending…" : "Send invitation"}
-          </button>
-        </div>
+            <Select
+              id="invite-org-role"
+              value={orgRole}
+              onChange={(e) => setOrgRole(e.target.value)}
+            >
+              <option value="org_admin">Org Admin</option>
+              {canGrantOwner && <option value="owner">Owner</option>}
+            </Select>
+          </Field>
+        )}
+
+        {error && <Callout tone="error">{error}</Callout>}
       </div>
-    </div>
+
+      <div className="mt-6 flex items-center justify-end gap-3">
+        <Button variant="ghost" onClick={onClose} disabled={submitting}>
+          Cancel
+        </Button>
+        <Button
+          onClick={submit}
+          loading={submitting}
+          disabled={accessType === "brand" && noBrands}
+        >
+          Send invitation
+        </Button>
+      </div>
+    </Modal>
   );
 }
 
@@ -418,8 +395,9 @@ function SegBtn({
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={`flex-1 rounded-md px-3 py-1.5 text-[0.75rem] font-medium transition-colors cursor-pointer ${
-        active ? "bg-paper text-ink shadow-sm" : "text-ink-muted hover:text-ink-soft"
+        active ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink-soft"
       }`}
     >
       {label}
@@ -459,7 +437,7 @@ function HelpPopover({
           <div
             role="dialog"
             aria-label={label}
-            className={`absolute top-6 z-20 w-72 rounded-lg border border-rule bg-paper p-3.5 text-left shadow-xl ${
+            className={`absolute top-6 z-20 w-72 rounded-lg border border-rule bg-surface p-3.5 text-left shadow-xl ${
               align === "right" ? "right-0" : "left-0"
             }`}
           >
@@ -523,7 +501,4 @@ function AccessHelp() {
   );
 }
 
-const inputClass =
-  "h-10 w-full rounded-lg border border-rule bg-canvas/60 px-3.5 text-sm text-ink placeholder:text-ink-muted outline-none transition-colors focus:border-cobalt focus:ring-1 focus:ring-cobalt/20";
-const labelClass =
-  "mb-1.5 block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-ink-muted";
+const controlLabel = "text-[0.8rem] font-medium text-ink-soft";

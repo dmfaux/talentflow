@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTenant } from "@/components/admin/tenant-provider";
 import { BrandPicker } from "@/components/admin/brand-picker";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -59,10 +60,10 @@ function MorphingDocumentAnimation() {
       {/* Document + scan + float */}
       <div className="relative">
         {/* Document frame */}
-        <div className="relative w-56 overflow-hidden rounded-xl border border-border bg-white p-6 shadow-lg">
+        <div className="relative w-56 overflow-hidden rounded-xl border border-rule bg-white p-6 shadow-lg">
           {/* Scanning line */}
           <div
-            className="pointer-events-none absolute left-0 h-0.5 w-full bg-accent/40"
+            className="pointer-events-none absolute left-0 h-0.5 w-full bg-cobalt/40"
             style={{
               animation: "scanLine 2.5s ease-in-out infinite",
             }}
@@ -76,7 +77,7 @@ function MorphingDocumentAnimation() {
                 className="h-2 rounded-full"
                 style={{
                   width: `${60 + ((i * 17) % 40)}%`,
-                  backgroundColor: "var(--color-border)",
+                  backgroundColor: "var(--color-rule)",
                   animation: `shimmer 2s ease-in-out infinite, floatUp 1s ease-in ${3 + i * 0.15}s forwards`,
                   animationFillMode: "forwards",
                 }}
@@ -91,11 +92,11 @@ function MorphingDocumentAnimation() {
         {fields.map((i) => (
           <div
             key={i}
-            className="h-9 w-28 rounded-lg border-2 border-dashed border-accent/30"
+            className="h-9 w-28 rounded-lg border-2 border-dashed border-cobalt/30"
             style={{ animation: `fadeIn 0.4s ease-out ${4.4 + i * 0.2}s both` }}
           >
             <div
-              className="mx-auto mt-2.5 h-2 w-12 rounded-full bg-accent/20"
+              className="mx-auto mt-2.5 h-2 w-12 rounded-full bg-cobalt/20"
               style={{ animation: `float 2s ease-in-out ${i * 0.3}s infinite` }}
             />
           </div>
@@ -104,7 +105,7 @@ function MorphingDocumentAnimation() {
 
       {/* Status message */}
       <p
-        className="text-sm text-txt-muted animate-[pulse-subtle_1.5s_ease-in-out_infinite]"
+        className="text-sm text-ink-muted animate-[pulse-subtle_1.5s_ease-in-out_infinite]"
         key={messageIdx}
         style={{ animation: "fadeIn 0.3s ease-out" }}
       >
@@ -200,25 +201,25 @@ export default function FromJobSpecPage() {
   return (
     <div className="mx-auto max-w-2xl">
       {/* Breadcrumb */}
-      <div className="mb-6 flex items-center gap-2 text-xs text-txt-muted">
-        <Link href="/campaigns" className="hover:text-charcoal transition-colors">
+      <div className="mb-6 flex items-center gap-2 text-xs text-ink-muted">
+        <Link href="/campaigns" className="hover:text-ink transition-colors">
           Campaigns
         </Link>
         <span>/</span>
-        <Link href="/campaigns/new" className="hover:text-charcoal transition-colors">
-          New Campaign
+        <Link href="/campaigns/new" className="hover:text-ink transition-colors">
+          New campaign
         </Link>
         <span>/</span>
-        <span className="text-txt-secondary">From Job Spec</span>
+        <span className="text-ink-soft">From job spec</span>
       </div>
 
       {/* ── Upload phase ──────────────────────────────────────────── */}
       {phase === "upload" && (
         <div className="animate-[fadeIn_0.3s_ease-out]">
-          <h1 className="mb-1 text-lg font-semibold text-charcoal">
-            Create Campaign from Job Spec
+          <h1 className="mb-1 text-lg font-semibold text-ink">
+            Create campaign from a job spec
           </h1>
-          <p className="mb-8 text-sm text-txt-muted">
+          <p className="mb-8 text-sm text-ink-muted">
             Upload a job specification and our AI will extract the campaign
             details, screening questions, and scoring rubric for you.
           </p>
@@ -231,8 +232,8 @@ export default function FromJobSpecPage() {
 
             {/* File drop zone */}
             <div>
-              <label className="mb-1.5 block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
-                Job Specification
+              <label className="mb-1.5 block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-ink-muted">
+                Job specification
               </label>
               <div
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -241,10 +242,10 @@ export default function FromJobSpecPage() {
                 onClick={() => fileInputRef.current?.click()}
                 className={`flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed px-6 py-10 transition-colors ${
                   dragOver
-                    ? "border-accent bg-accent/5"
+                    ? "border-cobalt bg-cobalt/5"
                     : file
-                      ? "border-accent/40 bg-accent/5"
-                      : "border-border bg-cream/30 hover:border-accent/30 hover:bg-cream/50"
+                      ? "border-cobalt/40 bg-cobalt/5"
+                      : "border-rule bg-canvas/30 hover:border-cobalt/30 hover:bg-canvas/50"
                 }`}
               >
                 <input
@@ -260,31 +261,31 @@ export default function FromJobSpecPage() {
 
                 {file ? (
                   <>
-                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="var(--color-accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="var(--color-cobalt)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M16 3H7a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V10l-7-7z" />
                       <path d="M16 3v7h7" />
                       <path d="M10 16l2.5 3L17 13" />
                     </svg>
                     <div className="text-center">
-                      <p className="text-sm font-medium text-charcoal">{file.name}</p>
-                      <p className="mt-0.5 text-xs text-txt-muted">
+                      <p className="text-sm font-medium text-ink">{file.name}</p>
+                      <p className="mt-0.5 text-xs text-ink-muted">
                         {(file.size / 1024).toFixed(0)} KB &middot; Click or drop to replace
                       </p>
                     </div>
                   </>
                 ) : (
                   <>
-                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-txt-muted">
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-ink-muted">
                       <path d="M16 3H7a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V10l-7-7z" />
                       <path d="M16 3v7h7" />
                       <path d="M14 14v6M11 17h6" />
                     </svg>
                     <div className="text-center">
-                      <p className="text-sm text-txt-secondary">
+                      <p className="text-sm text-ink-soft">
                         Drop your job spec here, or{" "}
-                        <span className="font-medium text-accent">browse</span>
+                        <span className="font-medium text-cobalt">browse</span>
                       </p>
-                      <p className="mt-0.5 text-xs text-txt-muted">
+                      <p className="mt-0.5 text-xs text-ink-muted">
                         PDF, DOC, or DOCX up to 10MB
                       </p>
                     </div>
@@ -297,23 +298,24 @@ export default function FromJobSpecPage() {
             </div>
 
             {/* Submit */}
-            <button
+            <Button
               onClick={handleSubmit}
               disabled={!tenant.activeBrandId || !file}
-              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-accent px-5 text-sm font-medium text-white transition-colors hover:bg-accent-light disabled:opacity-40 disabled:cursor-not-allowed"
+              size="lg"
+              className="w-full"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 10v3a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-3" />
                 <path d="M4.5 5.5L8 2l3.5 3.5" />
                 <path d="M8 2v9" />
               </svg>
-              Process Job Spec
-            </button>
+              Process job spec
+            </Button>
 
-            <p className="text-center text-xs text-txt-muted">
+            <p className="text-center text-xs text-ink-muted">
               Or{" "}
-              <Link href="/campaigns/new" className="text-accent hover:underline">
-                create with the Campaign Wizard
+              <Link href="/campaigns/new" className="text-cobalt hover:underline">
+                create with the campaign wizard
               </Link>{" "}
               instead
             </p>
@@ -324,7 +326,7 @@ export default function FromJobSpecPage() {
       {/* ── Processing phase ──────────────────────────────────────── */}
       {phase === "processing" && (
         <div className="animate-[fadeIn_0.3s_ease-out]">
-          <div className="rounded-xl border border-border bg-white p-8 text-center shadow-sm">
+          <div className="rounded-xl border border-rule bg-white p-8 text-center shadow-sm">
             <MorphingDocumentAnimation />
           </div>
         </div>
@@ -342,25 +344,22 @@ export default function FromJobSpecPage() {
               </svg>
             </div>
 
-            <h2 className="mb-2 text-base font-semibold text-charcoal">
+            <h2 className="mb-2 text-base font-semibold text-ink">
               Something went wrong
             </h2>
-            <p className="mx-auto mb-6 max-w-md text-sm text-txt-secondary">
+            <p className="mx-auto mb-6 max-w-md text-sm text-ink-soft">
               {errorMessage}
             </p>
 
             <div className="flex items-center justify-center gap-3">
-              <button
-                onClick={handleRetry}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light"
-              >
-                Try Again
-              </button>
+              <Button onClick={handleRetry} size="md">
+                Try again
+              </Button>
               <Link
                 href="/campaigns/new"
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-white px-4 text-[0.8rem] font-medium text-charcoal transition-colors hover:bg-cream"
+                className={buttonVariants({ variant: "secondary", size: "md" })}
               >
-                Use Campaign Wizard
+                Use campaign wizard
               </Link>
             </div>
           </div>

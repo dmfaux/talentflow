@@ -14,9 +14,9 @@ const TREATMENT: Record<
   string,
   { bar: string; tone: "light" | "dark"; pill: string }
 > = {
-  active: { bar: "bg-cobalt text-paper", tone: "light", pill: "bg-paper/15" },
-  suspended: { bar: "bg-warning text-ink", tone: "dark", pill: "bg-ink/10" },
-  deleted: { bar: "bg-red text-paper", tone: "light", pill: "bg-paper/15" },
+  active: { bar: "bg-cobalt text-white", tone: "light", pill: "bg-white/15" },
+  suspended: { bar: "bg-saffron text-ink", tone: "dark", pill: "bg-ink/10" },
+  deleted: { bar: "bg-red text-white", tone: "light", pill: "bg-white/15" },
 };
 
 export function ActingAsBanner({

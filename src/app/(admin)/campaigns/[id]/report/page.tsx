@@ -11,11 +11,12 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
+// AA-safe soft-tint verdict pills (deep text on its own soft tint).
 const RECOMMENDATION_LABELS: Record<string, { label: string; style: string }> = {
-  strong_recommend: { label: "Strong Recommend", style: "bg-green-light text-green" },
-  recommend: { label: "Recommend", style: "bg-green-light text-accent" },
-  recommend_with_caveats: { label: "Recommend with Caveats", style: "bg-warning-light text-warning" },
-  borderline: { label: "Borderline", style: "bg-warning-light text-warning" },
+  strong_recommend: { label: "Strong Recommend", style: "bg-moss-soft text-moss-deep" },
+  recommend: { label: "Recommend", style: "bg-cobalt-tint text-cobalt-deep" },
+  recommend_with_caveats: { label: "Recommend with Caveats", style: "bg-saffron-soft text-saffron-deep" },
+  borderline: { label: "Borderline", style: "bg-saffron-soft text-saffron-deep" },
   reject: { label: "Not Recommended", style: "bg-red-light text-red" },
 };
 
@@ -106,53 +107,53 @@ export default async function ReportPage({ params }: Props) {
   ].filter(Boolean) as string[];
 
   return (
-    <div className="min-h-screen bg-cream print:bg-white">
+    <div className="min-h-screen bg-canvas print:bg-white">
       <ReportToolbar campaignId={id} />
 
       <div className="mx-auto max-w-4xl px-8 py-12 print:py-8">
         {/* ── Header ───────────────────────────────────────────── */}
         <header>
           <div className="flex items-baseline justify-between">
-            <p className="eyebrow text-txt-muted">
+            <p className="eyebrow text-ink-muted">
               Confidential · Shortlist Report
             </p>
-            <p className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-txt-muted">
+            <p className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-ink-muted">
               {reportDate}
             </p>
           </div>
 
-          <h1 className="mt-5 font-serif text-[2.25rem] italic leading-[1.1] text-charcoal">
+          <h1 className="mt-5 font-serif text-[2.25rem] italic leading-[1.1] text-ink">
             {campaign.role_title}
           </h1>
 
           {metaParts.length > 0 && (
-            <p className="mt-3 text-[0.9rem] text-txt-secondary">
+            <p className="mt-3 text-[0.9rem] text-ink-soft">
               {metaParts.map((part, i) => (
                 <span key={`${i}-${part}`}>
-                  {i > 0 && <span className="mx-2 text-txt-muted">·</span>}
+                  {i > 0 && <span className="mx-2 text-ink-muted">·</span>}
                   {part}
                 </span>
               ))}
             </p>
           )}
 
-          <div className="mt-8 border-t border-border" />
+          <div className="mt-8 border-t border-rule" />
         </header>
 
         {/* ── Summary stats ────────────────────────────────────── */}
         <section className="mt-8">
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             {[
-              { label: "Applied", value: totalApplied, accent: "text-charcoal" },
-              { label: "Passed Screening", value: totalPassed, accent: "text-charcoal" },
-              { label: "AI Scored", value: totalScored, accent: "text-charcoal" },
-              { label: "Shortlisted", value: shortlisted.length, accent: "text-moss" },
+              { label: "Applied", value: totalApplied, accent: "text-ink" },
+              { label: "Passed Screening", value: totalPassed, accent: "text-ink" },
+              { label: "AI Scored", value: totalScored, accent: "text-ink" },
+              { label: "Shortlisted", value: shortlisted.length, accent: "text-moss-deep" },
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="rounded-xl border border-border bg-surface p-5"
+                className="rounded-xl border border-rule bg-surface p-5"
               >
-                <p className="eyebrow text-txt-muted">{stat.label}</p>
+                <p className="eyebrow text-ink-muted">{stat.label}</p>
                 <p className={`mt-2 font-mono text-2xl ${stat.accent}`}>
                   {stat.value}
                 </p>
@@ -164,10 +165,10 @@ export default async function ReportPage({ params }: Props) {
         {/* ── Shortlisted candidates ───────────────────────────── */}
         <section className="mt-12">
           <div className="mb-6 flex items-baseline justify-between">
-            <h2 className="eyebrow text-txt-secondary">
+            <h2 className="eyebrow text-ink-soft">
               Shortlisted Candidates
             </h2>
-            <span className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-txt-muted">
+            <span className="font-mono text-[0.7rem] uppercase tracking-[0.14em] text-ink-muted">
               {shortlisted.length} ranked
             </span>
           </div>
@@ -179,25 +180,25 @@ export default async function ReportPage({ params }: Props) {
               const recMeta = RECOMMENDATION_LABELS[rec] ?? RECOMMENDATION_LABELS.borderline;
               const scoreColour =
                 c.ai_score === null
-                  ? "text-txt-muted"
+                  ? "text-ink-muted"
                   : c.ai_score >= 8.5
-                    ? "text-moss"
+                    ? "text-moss-deep"
                     : c.ai_score >= 7.5
-                      ? "text-charcoal"
-                      : "text-txt-secondary";
+                      ? "text-ink"
+                      : "text-ink-soft";
 
               return (
                 <article
                   key={c.id}
-                  className="rounded-xl border border-border bg-surface p-7 print:break-inside-avoid print:shadow-none"
+                  className="rounded-xl border border-rule bg-surface p-7 print:break-inside-avoid print:shadow-none"
                 >
                   {/* ── Candidate header ──────────────────────── */}
                   <div className="mb-6 flex items-start justify-between gap-4">
                     <div className="flex items-center gap-4">
-                      <span className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-paper font-serif text-[0.95rem] italic text-charcoal">
+                      <span className="flex h-10 w-10 items-center justify-center rounded-full border border-rule bg-surface font-serif text-[0.95rem] italic text-ink">
                         {rank}
                       </span>
-                      <h3 className="font-serif text-xl italic text-charcoal">
+                      <h3 className="font-serif text-xl italic text-ink">
                         {c.name}
                       </h3>
                     </div>
@@ -218,25 +219,27 @@ export default async function ReportPage({ params }: Props) {
                     {Object.entries(DIMENSION_LABELS).map(([key, label]) => {
                       const value = dims[key] ?? null;
                       const pct = value !== null ? (value / 10) * 100 : 0;
+                      // AA-safe fill scale (the gold token is the teal misnomer —
+                      // too faint as a bar fill, so the upper-mid band reads cobalt).
                       const barTone =
                         value === null
-                          ? "bg-cream"
+                          ? "bg-canvas-2"
                           : value >= 8
                             ? "bg-moss"
                             : value >= 6
-                              ? "bg-gold"
+                              ? "bg-cobalt"
                               : value >= 4
                                 ? "bg-saffron"
                                 : "bg-red";
                       return (
                         <div key={key}>
                           <div className="mb-1.5 flex items-center justify-between">
-                            <span className="text-[0.7rem] text-txt-muted">{label}</span>
-                            <span className="font-mono text-[0.72rem] text-charcoal">
+                            <span className="text-[0.7rem] text-ink-muted">{label}</span>
+                            <span className="font-mono text-[0.72rem] text-ink">
                               {value !== null ? value.toFixed(1) : "—"}
                             </span>
                           </div>
-                          <div className="h-[5px] overflow-hidden rounded-full bg-cream">
+                          <div className="h-[5px] overflow-hidden rounded-full bg-canvas">
                             <div
                               className={`h-full rounded-full ${barTone}`}
                               style={{ width: `${pct}%` }}
@@ -247,22 +250,22 @@ export default async function ReportPage({ params }: Props) {
                     })}
                   </div>
 
-                  {/* ── Rationale ──────────────────────────────── */}
+                  {/* ── Rationale (AI) — thin typographic quote rule, not a coloured stripe ── */}
                   {c.ai_rationale && (
-                    <blockquote className="mb-5 border-l-[3px] border-accent pl-5">
-                      <p className="font-serif text-[1rem] italic leading-relaxed text-txt-secondary">
+                    <blockquote className="mb-5 border-l border-rule pl-5">
+                      <p className="font-serif text-[1rem] italic leading-relaxed text-ink-soft">
                         {c.ai_rationale}
                       </p>
                     </blockquote>
                   )}
 
-                  {/* ── Assessor notes ─────────────────────────── */}
+                  {/* ── Assessor note (human) — tinted well to distinguish it from the AI quote ── */}
                   {c.shortlist_notes && (
-                    <div className="mb-2 border-l-2 border-border pl-4 py-0.5">
-                      <p className="eyebrow mb-1 text-txt-muted">
+                    <div className="mb-2 rounded-lg bg-canvas/60 px-4 py-3">
+                      <p className="eyebrow mb-1 text-ink-muted">
                         Assessor Note
                       </p>
-                      <p className="text-[0.88rem] leading-relaxed text-txt-secondary">
+                      <p className="text-[0.88rem] leading-relaxed text-ink-soft">
                         {c.shortlist_notes}
                       </p>
                     </div>
@@ -276,8 +279,8 @@ export default async function ReportPage({ params }: Props) {
                       expandedByDefault={idx < INLINE_PREVIEW_LIMIT}
                     />
                   ) : (
-                    <div className="mt-5 border-t border-border pt-4">
-                      <p className="eyebrow text-txt-muted">
+                    <div className="mt-5 border-t border-rule pt-4">
+                      <p className="eyebrow text-ink-muted">
                         CV not on file
                       </p>
                     </div>
@@ -289,10 +292,10 @@ export default async function ReportPage({ params }: Props) {
         </section>
 
         {/* ── Footer ───────────────────────────────────────────── */}
-        <footer className="mt-14 border-t border-border pt-6 print:mt-10">
-          <div className="space-y-3 text-[0.72rem] leading-relaxed text-txt-muted">
+        <footer className="mt-14 border-t border-rule pt-6 print:mt-10">
+          <div className="space-y-3 text-[0.72rem] leading-relaxed text-ink-muted">
             <p>
-              <span className="eyebrow text-txt-secondary">POPIA Compliance</span>
+              <span className="eyebrow text-ink-soft">POPIA Compliance</span>
               <br />
               Candidate data is processed with explicit consent and stored in South
               Africa under a 12-month retention policy. Under Section 72 of POPIA,
@@ -303,7 +306,7 @@ export default async function ReportPage({ params }: Props) {
               request access, correction, or deletion at any time.
             </p>
             <p>
-              <span className="eyebrow text-txt-secondary">AI Transparency</span>
+              <span className="eyebrow text-ink-soft">AI Transparency</span>
               <br />
               Scores and recommendations were generated with AI-assisted assessment.
               These outputs are decision-support, not substitutes for human
@@ -312,9 +315,9 @@ export default async function ReportPage({ params }: Props) {
             </p>
           </div>
 
-          <div className="mt-6 flex items-baseline justify-between border-t border-border pt-4">
-            <p className="eyebrow text-txt-muted">TalentStream · Shortlist Report</p>
-            <p className="font-mono text-[0.65rem] uppercase tracking-[0.14em] text-txt-muted">
+          <div className="mt-6 flex items-baseline justify-between border-t border-rule pt-4">
+            <p className="eyebrow text-ink-muted">TalentStream · Shortlist Report</p>
+            <p className="font-mono text-[0.65rem] uppercase tracking-[0.14em] text-ink-muted">
               Generated {generatedStamp}
             </p>
           </div>

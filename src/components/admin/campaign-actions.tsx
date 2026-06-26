@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useToast } from "@/components/ui/toast-provider";
 
@@ -57,53 +58,37 @@ export function CampaignActions({ campaignId, status, canManage = true }: Props)
           <>
             <Link
               href={`/campaigns/${campaignId}/edit`}
-              className="inline-flex h-8 items-center rounded-lg border border-border px-3 text-[0.75rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal"
+              className={buttonVariants({ variant: "secondary", size: "sm" })}
             >
               Edit
             </Link>
-            <button
-              onClick={() => updateStatus("active")}
-              disabled={loading}
-              className="inline-flex h-8 items-center rounded-lg bg-accent px-3 text-[0.75rem] font-medium text-white transition-colors hover:bg-accent-light cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <Button size="sm" loading={loading} onClick={() => updateStatus("active")}>
               Publish
-            </button>
+            </Button>
           </>
         )}
         {status === "active" && (
-          <button
-            onClick={() => updateStatus("paused")}
-            disabled={loading}
-            className="inline-flex h-8 items-center rounded-lg border border-border px-3 text-[0.75rem] font-medium text-warning transition-colors hover:bg-warning-light cursor-pointer disabled:opacity-50"
-          >
+          <Button variant="secondary" size="sm" loading={loading} onClick={() => updateStatus("paused")}>
             Pause
-          </button>
+          </Button>
         )}
         {status === "paused" && (
-          <button
-            onClick={() => updateStatus("active")}
-            disabled={loading}
-            className="inline-flex h-8 items-center rounded-lg border border-border px-3 text-[0.75rem] font-medium text-green transition-colors hover:bg-green-light cursor-pointer disabled:opacity-50"
-          >
+          <Button size="sm" loading={loading} onClick={() => updateStatus("active")}>
             Resume
-          </button>
+          </Button>
         )}
         {(status === "active" || status === "paused") && (
-          <button
-            onClick={() => setConfirmClose(true)}
-            disabled={loading}
-            className="inline-flex h-8 items-center rounded-lg border border-border px-3 text-[0.75rem] font-medium text-red transition-colors hover:bg-red-light cursor-pointer disabled:opacity-50"
-          >
+          <Button variant="danger" size="sm" disabled={loading} onClick={() => setConfirmClose(true)}>
             Close
-          </button>
+          </Button>
         )}
       </div>
 
       <ConfirmModal
         open={confirmClose}
-        title="Close Campaign"
+        title="Close campaign"
         description="Closing this campaign will stop accepting new applications. Existing candidates will not be affected. This can be reversed by an admin."
-        confirmLabel="Close Campaign"
+        confirmLabel="Close campaign"
         variant="danger"
         loading={loading}
         onConfirm={() => updateStatus("closed")}

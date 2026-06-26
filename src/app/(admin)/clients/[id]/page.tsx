@@ -2,6 +2,13 @@
 
 import { TierBadge } from "@/components/admin/tier-badge";
 import { useTenant } from "@/components/admin/tenant-provider";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/card";
+import { Callout } from "@/components/ui/callout";
+import { Modal } from "@/components/ui/modal";
+import { Field, Input, Textarea } from "@/components/ui/field";
 import Link from "next/link";
 import { useEffect, useState, FormEvent } from "react";
 import { useParams } from "next/navigation";
@@ -35,12 +42,15 @@ interface Client {
 
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  draft: "bg-cream text-txt-secondary",
-  active: "bg-green-light text-green",
-  paused: "bg-warning-light text-warning",
-  closed: "bg-red-light text-red",
-  archived: "bg-cream text-txt-muted",
+// Campaign status → Badge tone — the shared map used across the campaigns and
+// candidates clusters (draft/archived neutral, active moss, paused saffron,
+// closed red).
+const STATUS_TONE: Record<string, BadgeTone> = {
+  draft: "neutral",
+  active: "moss",
+  paused: "saffron",
+  closed: "red",
+  archived: "neutral",
 };
 
 export default function ClientDetailPage() {
@@ -109,14 +119,28 @@ export default function ClientDetailPage() {
 
   if (loading) {
     return (
-      <div className="py-20 text-center text-sm text-txt-muted">Loading...</div>
+      <div>
+        <Skeleton className="mb-6 h-4 w-40" />
+        <Skeleton className="mb-8 h-44 rounded-xl" />
+        <Skeleton className="mb-8 h-48 rounded-xl" />
+        <Skeleton className="h-40 rounded-xl" />
+      </div>
     );
   }
 
   if (error || !client) {
     return (
-      <div className="py-20 text-center text-sm text-red">
-        {error || "Brand not found"}
+      <div className="py-20 text-center">
+        <p className="text-sm font-medium text-ink">{error || "Brand not found"}</p>
+        <p className="mt-1 text-sm text-ink-muted">
+          This brand may have been removed, or you don&rsquo;t have access to it.
+        </p>
+        <Link
+          href="/clients"
+          className={`${buttonVariants({ variant: "secondary", size: "sm" })} mt-5`}
+        >
+          Back to brands
+        </Link>
       </div>
     );
   }
@@ -128,61 +152,42 @@ export default function ClientDetailPage() {
     { label: "Billing", value: client.billing_email, mono: true },
   ];
 
-  const inputClass =
-    "h-9 w-full rounded-lg border border-border bg-cream/40 px-3 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20";
-  const labelClass =
-    "mb-1 block text-[0.65rem] font-medium uppercase tracking-[0.12em] text-txt-muted";
-
   return (
     <div>
       {/* Breadcrumb */}
-      <div className="mb-6 flex items-center gap-2 text-xs text-txt-muted">
-        <Link href="/clients" className="hover:text-charcoal transition-colors">
+      <div className="mb-6 flex items-center gap-2 text-xs text-ink-muted">
+        <Link href="/clients" className="hover:text-ink transition-colors">
           Brands
         </Link>
         <span>/</span>
-        <span className="text-txt-secondary">{client.name}</span>
+        <span className="text-ink-soft">{client.name}</span>
       </div>
 
       {/* Brand info card */}
-      <div className="mb-8 rounded-xl border border-border bg-surface p-6">
+      <Card className="mb-8">
         <div className="mb-4 flex items-start justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-lg font-semibold text-charcoal">
-                {client.name}
-              </h1>
+              <h1 className="text-lg font-semibold text-ink">{client.name}</h1>
               <TierBadge tier={tenant.orgTier} size="md" />
             </div>
-            <div className="mt-1 flex items-center gap-2 text-xs">
-              <span
-                className={`inline-block h-1.5 w-1.5 rounded-full ${
-                  client.is_active !== false ? "bg-green" : "bg-red"
-                }`}
-              />
-              <span className="text-txt-secondary">
+            <div className="mt-1.5 flex items-center gap-2 text-xs">
+              <Badge tone={client.is_active !== false ? "moss" : "neutral"} dot>
                 {client.is_active !== false ? "Active" : "Inactive"}
-              </span>
-              <span className="text-txt-muted">&middot;</span>
-              <span className="font-mono text-txt-muted">
+              </Badge>
+              <span className="font-mono text-ink-muted">
                 {new Date(client.created_at).toLocaleDateString("en-ZA")}
               </span>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setEditing(true)}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-[0.75rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer"
-            >
+            <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M11.5 2.5l2 2L5 13H3v-2L11.5 2.5z" />
               </svg>
               Quick edit
-            </button>
-            <Link
-              href={`/clients/${id}/edit`}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-cobalt px-3 text-[0.75rem] font-medium text-white transition-colors hover:bg-cobalt-deep cursor-pointer"
-            >
+            </Button>
+            <Link href={`/clients/${id}/edit`} className={buttonVariants({ size: "sm" })}>
               Edit branding
             </Link>
           </div>
@@ -191,180 +196,150 @@ export default function ClientDetailPage() {
         <div className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
           {infoItems.map((item) => (
             <div key={item.label}>
-              <p className="text-[0.65rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
+              <p className="text-[0.65rem] font-medium uppercase tracking-[0.12em] text-ink-muted">
                 {item.label}
               </p>
               <p
                 className={`mt-0.5 text-sm ${
                   item.mono ? "font-mono text-xs" : ""
-                } ${item.value ? "text-charcoal" : "text-txt-muted"}`}
+                } ${item.value ? "text-ink" : "text-ink-muted"}`}
               >
-                {item.value || "\u2014"}
+                {item.value || "—"}
               </p>
             </div>
           ))}
         </div>
 
         {client.notes && (
-          <div className="mt-4 rounded-lg bg-cream/60 px-4 py-2.5 text-sm text-txt-secondary">
+          <div className="mt-4 rounded-lg bg-canvas/60 px-4 py-2.5 text-sm text-ink-soft">
             {client.notes}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Branding */}
       <BrandingDisplay client={client} />
 
       {/* Edit modal */}
-      {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/30 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-xl border border-border bg-surface p-6 shadow-xl">
-            <h2 className="mb-5 text-base font-semibold text-charcoal">
-              Edit Brand
-            </h2>
+      <Modal
+        open={editing}
+        onClose={() => {
+          setEditing(false);
+          setSaveError("");
+        }}
+        title="Edit brand"
+        size="lg"
+        dismissible={!saving}
+      >
+        {saveError && (
+          <Callout tone="error" className="mb-4">
+            {saveError}
+          </Callout>
+        )}
 
-            {saveError && (
-              <div className="mb-4 rounded-lg bg-red-light px-4 py-2 text-sm text-red">
-                {saveError}
-              </div>
-            )}
+        <form onSubmit={handleSave} className="space-y-4">
+          <Field label="Company name" htmlFor="edit-name" required>
+            <Input id="edit-name" name="name" type="text" required defaultValue={client.name} />
+          </Field>
 
-            <form onSubmit={handleSave} className="space-y-4">
-              <div>
-                <label htmlFor="edit-name" className={labelClass}>
-                  Company Name <span className="text-red">*</span>
-                </label>
-                <input
-                  id="edit-name"
-                  name="name"
-                  type="text"
-                  required
-                  defaultValue={client.name}
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="edit-contact_name" className={labelClass}>Contact Name</label>
-                  <input id="edit-contact_name" name="contact_name" type="text" defaultValue={client.contact_name ?? ""} className={inputClass} />
-                </div>
-                <div>
-                  <label htmlFor="edit-contact_email" className={labelClass}>Contact Email</label>
-                  <input id="edit-contact_email" name="contact_email" type="email" defaultValue={client.contact_email ?? ""} className={inputClass} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label htmlFor="edit-contact_phone" className={labelClass}>Phone</label>
-                  <input id="edit-contact_phone" name="contact_phone" type="tel" defaultValue={client.contact_phone ?? ""} className={inputClass} />
-                </div>
-                <div>
-                  <label htmlFor="edit-billing_email" className={labelClass}>Billing Email</label>
-                  <input id="edit-billing_email" name="billing_email" type="email" defaultValue={client.billing_email ?? ""} className={inputClass} />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="edit-notes" className={labelClass}>Notes</label>
-                <textarea
-                  id="edit-notes"
-                  name="notes"
-                  rows={3}
-                  defaultValue={client.notes ?? ""}
-                  className="w-full rounded-lg border border-border bg-cream/40 px-3 py-2 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 resize-none"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-1">
-                <button
-                  type="button"
-                  onClick={() => { setEditing(false); setSaveError(""); }}
-                  className="inline-flex h-9 items-center rounded-lg px-4 text-[0.8rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-                >
-                  {saving && (
-                    <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                  )}
-                  Save Changes
-                </button>
-              </div>
-            </form>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Contact name" htmlFor="edit-contact_name">
+              <Input id="edit-contact_name" name="contact_name" type="text" defaultValue={client.contact_name ?? ""} />
+            </Field>
+            <Field label="Contact email" htmlFor="edit-contact_email">
+              <Input id="edit-contact_email" name="contact_email" type="email" defaultValue={client.contact_email ?? ""} />
+            </Field>
           </div>
-        </div>
-      )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Phone" htmlFor="edit-contact_phone">
+              <Input id="edit-contact_phone" name="contact_phone" type="tel" defaultValue={client.contact_phone ?? ""} />
+            </Field>
+            <Field label="Billing email" htmlFor="edit-billing_email">
+              <Input id="edit-billing_email" name="billing_email" type="email" defaultValue={client.billing_email ?? ""} />
+            </Field>
+          </div>
+
+          <Field label="Notes" htmlFor="edit-notes">
+            <Textarea id="edit-notes" name="notes" rows={3} defaultValue={client.notes ?? ""} />
+          </Field>
+
+          <div className="flex items-center justify-end gap-3 pt-1">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setEditing(false);
+                setSaveError("");
+              }}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" loading={saving}>
+              Save changes
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Campaigns */}
       <div className="mt-8">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-charcoal">
+          <h2 className="text-sm font-semibold text-ink">
             Campaigns
-            <span className="ml-2 font-mono text-xs font-normal text-txt-muted">
+            <span className="ml-2 font-mono text-xs font-normal text-ink-muted">
               {client.campaigns.length}
             </span>
           </h2>
         </div>
 
         {client.campaigns.length === 0 ? (
-          <div className="rounded-xl border border-border bg-surface px-5 py-10 text-center text-sm text-txt-muted">
+          <div className="rounded-xl border border-rule bg-surface px-5 py-10 text-center text-sm text-ink-muted">
             No campaigns yet
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-border bg-surface">
+          <div className="overflow-hidden rounded-xl border border-rule bg-surface">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-border">
-                  <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
+                <tr className="border-b border-rule">
+                  <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-ink-muted">
                     Role
                   </th>
-                  <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
+                  <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-ink-muted">
                     Slug
                   </th>
-                  <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
+                  <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-ink-muted">
                     Status
                   </th>
-                  <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
+                  <th className="px-5 py-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-ink-muted">
                     Created
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y divide-rule">
                 {client.campaigns.map((campaign) => (
                   <tr
                     key={campaign.id}
-                    className="group cursor-pointer transition-colors hover:bg-cream/60"
+                    className="group cursor-pointer transition-colors hover:bg-canvas/60"
                   >
                     <td className="px-5 py-3">
                       <Link
                         href={`/campaigns/${campaign.id}`}
-                        className="text-sm font-medium text-charcoal group-hover:text-accent"
+                        className="text-sm font-medium text-ink group-hover:text-cobalt"
                       >
                         {campaign.role_title}
                       </Link>
                     </td>
-                    <td className="px-5 py-3 font-mono text-xs text-txt-secondary">
+                    <td className="px-5 py-3 font-mono text-xs text-ink-soft">
                       {campaign.slug}
                     </td>
                     <td className="px-5 py-3">
-                      <span
-                        className={`inline-block rounded-full px-2.5 py-0.5 text-[0.7rem] font-medium ${
-                          STATUS_STYLES[campaign.status] ?? STATUS_STYLES.draft
-                        }`}
-                      >
+                      <Badge tone={STATUS_TONE[campaign.status] ?? "neutral"} dot uppercase>
                         {campaign.status}
-                      </span>
+                      </Badge>
                     </td>
-                    <td className="px-5 py-3 font-mono text-xs text-txt-muted">
+                    <td className="px-5 py-3 font-mono text-xs text-ink-muted">
                       {new Date(campaign.created_at).toLocaleDateString("en-ZA")}
                     </td>
                   </tr>
@@ -398,6 +373,8 @@ function BrandingDisplay({ client }: { client: Client }) {
   const logoBg = client.logo_background ?? "light";
   const logoPosition = client.logo_position ?? "top-left";
 
+  // Literal hex values below render the logo-preview surfaces (light/dark card
+  // backgrounds + the transparency checkerboard) — real colours, not theme tokens.
   const bgStyle =
     logoBg === "transparent"
       ? {
@@ -409,17 +386,17 @@ function BrandingDisplay({ client }: { client: Client }) {
       : { backgroundColor: logoBg === "light" ? "#ffffff" : "#11123c" };
 
   return (
-    <div className="mb-8 rounded-xl border border-border bg-surface p-6">
-      <h2 className="mb-4 text-sm font-semibold text-charcoal">Branding</h2>
+    <Card className="mb-8">
+      <h2 className="mb-4 text-sm font-semibold text-ink">Branding</h2>
 
       <div className="grid gap-6 md:grid-cols-[auto_1fr]">
         {/* Logo */}
         <div>
-          <p className="mb-2 text-[0.65rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
+          <p className="mb-2 text-[0.65rem] font-medium uppercase tracking-[0.12em] text-ink-muted">
             Logo
           </p>
           <div
-            className={`relative flex h-28 w-40 items-center overflow-hidden rounded-lg border border-border ${
+            className={`relative flex h-28 w-40 items-center overflow-hidden rounded-lg border border-rule ${
               logoPosition === "top-centre" ? "justify-center" : "justify-start pl-4"
             }`}
             style={bgStyle}
@@ -432,27 +409,27 @@ function BrandingDisplay({ client }: { client: Client }) {
                 className="max-h-[70%] max-w-[80%] object-contain"
               />
             ) : (
-              <span className="font-mono text-[0.7rem] text-txt-muted">no logo</span>
+              <span className="font-mono text-[0.7rem] text-ink-muted">no logo</span>
             )}
           </div>
-          <p className="mt-2 font-mono text-[0.65rem] text-txt-muted">
+          <p className="mt-2 font-mono text-[0.65rem] text-ink-muted">
             {logoBg} · {logoPosition}
           </p>
         </div>
 
         {/* Colour swatches */}
         <div>
-          <p className="mb-2 text-[0.65rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
+          <p className="mb-2 text-[0.65rem] font-medium uppercase tracking-[0.12em] text-ink-muted">
             Colours
           </p>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {colors.map((c) => (
               <div
                 key={c.label}
-                className="rounded-lg border border-border bg-cream/30 p-3"
+                className="rounded-lg border border-rule bg-canvas/30 p-3"
               >
                 <div
-                  className="h-10 w-full rounded-md border border-border"
+                  className="h-10 w-full rounded-md border border-rule"
                   style={{
                     backgroundColor: c.value ?? "transparent",
                     ...(c.value
@@ -465,10 +442,10 @@ function BrandingDisplay({ client }: { client: Client }) {
                         }),
                   }}
                 />
-                <p className="mt-2 text-[0.7rem] font-medium text-charcoal">
+                <p className="mt-2 text-[0.7rem] font-medium text-ink">
                   {c.label}
                 </p>
-                <p className="font-mono text-[0.65rem] text-txt-muted">
+                <p className="font-mono text-[0.65rem] text-ink-muted">
                   {c.value ?? "—"}
                 </p>
               </div>
@@ -476,6 +453,6 @@ function BrandingDisplay({ client }: { client: Client }) {
           </div>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }

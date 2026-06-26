@@ -37,7 +37,7 @@ export function CampaignUrl({ url }: Props) {
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="font-mono text-accent hover:underline"
+        className="font-mono text-cobalt hover:underline"
       >
         {display}
       </a>
@@ -46,10 +46,10 @@ export function CampaignUrl({ url }: Props) {
         onClick={copy}
         aria-label="Copy landing page URL"
         title={copied ? "Copied" : "Copy landing page URL"}
-        className="inline-flex h-5 w-5 items-center justify-center rounded text-txt-muted transition-colors hover:bg-cream hover:text-charcoal cursor-pointer"
+        className="inline-flex h-5 w-5 items-center justify-center rounded text-ink-muted transition-colors hover:bg-canvas hover:text-ink cursor-pointer"
       >
         {copied ? (
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#067340" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="text-moss">
             <path d="M3 7.5L6 10l5-6" />
           </svg>
         ) : (

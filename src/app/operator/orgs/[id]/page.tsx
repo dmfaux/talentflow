@@ -6,6 +6,8 @@ import { LifecycleActions } from "@/components/operator/lifecycle-actions";
 import { OperatorInvoicesCard } from "@/components/operator/invoices-card";
 import { ThemesCard, type ThemeBrand } from "@/components/operator/themes-card";
 import { useToast } from "@/components/ui/toast-provider";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -79,10 +81,10 @@ const isModelTierValue = (v: string): v is ModelTier =>
   v === "essential" || v === "professional" || v === "executive";
 const zar = (n: number) => "R" + Math.round(n).toLocaleString("en-ZA");
 
-const STATUS_BADGE: Record<string, string> = {
-  active: "bg-green-light text-green",
-  suspended: "bg-warning-light text-warning",
-  deleted: "bg-red-light text-red",
+const STATUS_TONE: Record<string, BadgeTone> = {
+  active: "moss",
+  suspended: "saffron",
+  deleted: "red",
 };
 
 function normaliseTier(v: string): Tier {
@@ -236,9 +238,9 @@ export default function OperatorOrgDetailPage() {
           <div className="flex items-center gap-3">
             <h1 className="font-serif text-2xl text-ink">{org.name}</h1>
             <TierBadge tier={org.tier} size="md" />
-            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.68rem] font-semibold uppercase tracking-[0.1em] ${STATUS_BADGE[org.status] ?? "bg-canvas-2 text-ink-muted"}`}>
+            <Badge tone={STATUS_TONE[org.status] ?? "neutral"} uppercase>
               {org.status}
-            </span>
+            </Badge>
           </div>
           <p className="mt-1.5 font-mono text-xs text-ink-muted">
             {org.slug} · created {new Date(org.created_at).toLocaleDateString("en-ZA")}
@@ -250,7 +252,7 @@ export default function OperatorOrgDetailPage() {
       {/* Counts */}
       <div className="mb-6 grid grid-cols-3 gap-3">
         {counts.map((c) => (
-          <div key={c.label} className="rounded-xl border border-border bg-surface p-4">
+          <div key={c.label} className="rounded-xl border border-rule bg-surface p-4">
             <p className="text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-ink-muted">{c.label}</p>
             <p className="mt-1 font-mono text-2xl text-ink">{c.value}</p>
           </div>
@@ -258,7 +260,7 @@ export default function OperatorOrgDetailPage() {
       </div>
 
       {/* Onboarding — accepted Owner vs pending invite + resend (S9) */}
-      <div className="mb-6 rounded-xl border border-border bg-surface p-6">
+      <div className="mb-6 rounded-xl border border-rule bg-surface p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="font-serif text-lg text-ink">Onboarding</h2>
@@ -267,21 +269,19 @@ export default function OperatorOrgDetailPage() {
             </p>
           </div>
           {org.owner ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-green-light px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-green">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-green" />
+            <Badge tone="moss" dot uppercase>
               Owner active
-            </span>
+            </Badge>
           ) : org.pendingInvite ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-light px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-warning">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-warning" />
+            <Badge tone="saffron" dot uppercase>
               Invite pending
-            </span>
+            </Badge>
           ) : null}
         </div>
 
         <div className="mt-4">
           {org.owner ? (
-            <div className="flex items-center justify-between rounded-lg border border-border bg-cream/40 px-4 py-3">
+            <div className="flex items-center justify-between rounded-lg border border-rule bg-canvas/40 px-4 py-3">
               <div>
                 <p className="text-sm font-medium text-ink">
                   {`${org.owner.first_name} ${org.owner.last_name}`.trim() || "Owner"}
@@ -290,7 +290,7 @@ export default function OperatorOrgDetailPage() {
               </div>
             </div>
           ) : org.pendingInvite ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-cream/40 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-rule bg-canvas/40 px-4 py-3">
               <div>
                 <p className="font-mono text-sm text-ink">{org.pendingInvite.email}</p>
                 <p className="mt-0.5 text-[0.7rem] text-ink-muted">
@@ -298,22 +298,12 @@ export default function OperatorOrgDetailPage() {
                   {new Date(org.pendingInvite.expires_at).toLocaleDateString("en-ZA")}
                 </p>
               </div>
-              <button
-                onClick={resendInvite}
-                disabled={resending}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-4 text-[0.8rem] font-medium text-ink-soft transition-colors hover:bg-canvas disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-              >
-                {resending && (
-                  <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                )}
+              <Button variant="secondary" onClick={resendInvite} loading={resending}>
                 Resend invite
-              </button>
+              </Button>
             </div>
           ) : (
-            <p className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-ink-muted">
+            <p className="rounded-lg border border-dashed border-rule px-4 py-3 text-sm text-ink-muted">
               No owner has been provisioned for this organisation yet.
             </p>
           )}
@@ -322,7 +312,7 @@ export default function OperatorOrgDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         {/* Billing / tier */}
-        <div className="rounded-xl border border-border bg-surface p-6">
+        <div className="rounded-xl border border-rule bg-surface p-6">
           <h2 className="font-serif text-lg text-ink">Plan & billing</h2>
           <p className="mt-0.5 text-xs text-ink-muted">
             Tier is operator-set on the organisation (the authoritative copy).
@@ -339,7 +329,7 @@ export default function OperatorOrgDetailPage() {
                     type="button"
                     onClick={() => setTier(opt.value)}
                     className={`flex flex-col gap-1.5 rounded-lg border px-3 py-2.5 text-left transition-colors cursor-pointer ${
-                      selected ? "border-cobalt bg-cobalt-tint" : "border-border bg-paper hover:border-border-strong"
+                      selected ? "border-cobalt bg-cobalt-tint" : "border-rule bg-surface hover:border-rule-strong"
                     }`}
                   >
                     <span className="text-[0.8rem] font-semibold text-ink">{opt.label}</span>
@@ -360,7 +350,7 @@ export default function OperatorOrgDetailPage() {
               value={billingEmail}
               onChange={(e) => setBillingEmail(e.target.value)}
               placeholder="billing@example.com"
-              className="h-10 w-full rounded-lg border border-border bg-cream/40 px-3.5 font-mono text-sm text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20"
+              className="h-10 w-full rounded-lg border border-rule bg-canvas/40 px-3.5 font-mono text-sm text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20"
             />
           </div>
 
@@ -379,7 +369,7 @@ export default function OperatorOrgDetailPage() {
                     className={`rounded-lg border px-3 py-2 text-[0.8rem] font-medium transition-colors cursor-pointer ${
                       selected
                         ? "border-cobalt bg-cobalt-tint text-ink"
-                        : "border-border bg-paper text-ink-soft hover:border-border-strong"
+                        : "border-rule bg-surface text-ink-soft hover:border-rule-strong"
                     }`}
                   >
                     {opt.label}
@@ -404,7 +394,7 @@ export default function OperatorOrgDetailPage() {
               value={hardCeiling}
               onChange={(e) => setHardCeiling(e.target.value)}
               placeholder="No ceiling"
-              className="h-10 w-full rounded-lg border border-border bg-cream/40 px-3.5 font-mono text-sm text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20"
+              className="h-10 w-full rounded-lg border border-rule bg-canvas/40 px-3.5 font-mono text-sm text-ink outline-none transition-colors placeholder:font-sans placeholder:text-ink-muted focus:border-cobalt focus:ring-1 focus:ring-cobalt/20"
             />
             <p className="mt-1.5 text-[0.68rem] text-ink-muted">
               New candidate intake pauses past this. Blank = uncapped (plan default).
@@ -412,24 +402,14 @@ export default function OperatorOrgDetailPage() {
           </div>
 
           <div className="mt-5 flex justify-end">
-            <button
-              onClick={save}
-              disabled={!dirty || saving}
-              className="inline-flex h-9 items-center gap-2 rounded-lg bg-cobalt px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-cobalt-deep disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-            >
-              {saving && (
-                <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              )}
+            <Button onClick={save} disabled={!dirty} loading={saving}>
               Save changes
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Usage (S10) — per-org AI token + volume metering */}
-        <div className="rounded-xl border border-border bg-surface p-6">
+        <div className="rounded-xl border border-rule bg-surface p-6">
           <div className="flex items-center justify-between">
             <h2 className="font-serif text-lg text-ink">Usage</h2>
             <span className="rounded-full bg-canvas-2 px-2 py-0.5 font-mono text-[0.6rem] uppercase tracking-[0.1em] text-ink-muted">
@@ -439,7 +419,7 @@ export default function OperatorOrgDetailPage() {
 
           {/* AI tokens — the headline cost signal */}
           <div className="mt-5 grid grid-cols-2 gap-3">
-            <div className="rounded-lg border border-border bg-cream/40 p-3.5">
+            <div className="rounded-lg border border-rule bg-canvas/40 p-3.5">
               <p className="text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-ink-muted">
                 Input tokens
               </p>
@@ -447,7 +427,7 @@ export default function OperatorOrgDetailPage() {
                 {nf(usage.tokens.input)}
               </p>
             </div>
-            <div className="rounded-lg border border-border bg-cream/40 p-3.5">
+            <div className="rounded-lg border border-rule bg-canvas/40 p-3.5">
               <p className="text-[0.6rem] font-semibold uppercase tracking-[0.14em] text-ink-muted">
                 Output tokens
               </p>
@@ -463,7 +443,7 @@ export default function OperatorOrgDetailPage() {
           </p>
 
           {/* Operator-only: billed spend vs raw model cost (last 30 days). */}
-          <div className="mt-4 rounded-lg border border-border bg-cream/40 p-3.5">
+          <div className="mt-4 rounded-lg border border-rule bg-canvas/40 p-3.5">
             <div className="flex items-center justify-between">
               <span className="text-[0.7rem] text-ink-soft">Billed (ex VAT)</span>
               <span className="font-mono text-sm tabular-nums text-ink">{zar(spend.billedExVat)}</span>
@@ -472,9 +452,9 @@ export default function OperatorOrgDetailPage() {
               <span className="text-[0.7rem] text-ink-soft">Raw model cost</span>
               <span className="font-mono text-sm tabular-nums text-ink-soft">{zar(spend.rawCostZar)}</span>
             </div>
-            <div className="mt-1.5 flex items-center justify-between border-t border-border pt-1.5">
+            <div className="mt-1.5 flex items-center justify-between border-t border-rule pt-1.5">
               <span className="text-[0.7rem] font-semibold text-ink">Margin</span>
-              <span className="font-mono text-sm tabular-nums text-green">
+              <span className="font-mono text-sm tabular-nums text-moss-deep">
                 {zar(spend.marginZar)}
                 <span className="text-ink-muted"> · {Math.round(spend.marginPct * 100)}%</span>
               </span>
@@ -485,7 +465,7 @@ export default function OperatorOrgDetailPage() {
           </div>
 
           {/* Per-kind volume */}
-          <dl className="mt-5 space-y-2.5 border-t border-border pt-4">
+          <dl className="mt-5 space-y-2.5 border-t border-rule pt-4">
             {usageRows.map((row) => (
               <div key={row.label} className="flex items-center justify-between">
                 <dt className="text-[0.8rem] text-ink-soft">{row.label}</dt>
@@ -497,7 +477,7 @@ export default function OperatorOrgDetailPage() {
           </dl>
 
           {!hasUsage && (
-            <p className="mt-4 rounded-lg border border-dashed border-border px-4 py-3 text-center text-[0.78rem] text-ink-muted">
+            <p className="mt-4 rounded-lg border border-dashed border-rule px-4 py-3 text-center text-[0.78rem] text-ink-muted">
               No usage recorded in the last 30 days.
             </p>
           )}

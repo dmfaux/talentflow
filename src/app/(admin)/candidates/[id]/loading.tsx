@@ -13,7 +13,7 @@ export default function CandidateDetailLoading() {
       <div className="flex gap-6 items-start">
         {/* Left column */}
         <div className="w-80 shrink-0 space-y-4">
-          <div className="rounded-xl border border-border bg-surface p-5">
+          <div className="rounded-xl border border-rule bg-surface p-5">
             <Sk className="h-3 w-20 mb-3" />
             <Sk className="h-10 w-16 mb-5" />
             {Array.from({ length: 4 }, (_, i) => (
@@ -26,7 +26,7 @@ export default function CandidateDetailLoading() {
               </div>
             ))}
           </div>
-          <div className="rounded-xl border border-border bg-surface p-5">
+          <div className="rounded-xl border border-rule bg-surface p-5">
             {Array.from({ length: 5 }, (_, i) => (
               <div key={i} className="flex justify-between mb-2 last:mb-0">
                 <Sk className="h-3 w-20" />
@@ -37,21 +37,21 @@ export default function CandidateDetailLoading() {
         </div>
         {/* Right column */}
         <div className="flex-1 space-y-6">
-          <div className="rounded-xl border border-border bg-surface p-5">
+          <div className="rounded-xl border border-rule bg-surface p-5">
             <Sk className="h-3 w-24 mb-3" />
             <Sk className="h-4 w-full mb-2" />
             <Sk className="h-4 w-3/4" />
           </div>
-          <div className="rounded-xl border border-border bg-surface p-5">
+          <div className="rounded-xl border border-rule bg-surface p-5">
             <Sk className="h-4 w-36 mb-4" />
             {Array.from({ length: 3 }, (_, i) => (
-              <div key={i} className="rounded-lg border border-border p-3 mb-2">
+              <div key={i} className="rounded-lg border border-rule p-3 mb-2">
                 <Sk className="h-3 w-48 mb-1" />
                 <Sk className="h-3 w-32" />
               </div>
             ))}
           </div>
-          <div className="rounded-xl border border-border bg-surface p-5">
+          <div className="rounded-xl border border-rule bg-surface p-5">
             <Sk className="h-4 w-28 mb-4" />
             <Sk className="h-16 w-full rounded-lg mb-3" />
             <Sk className="h-16 w-full rounded-lg" />

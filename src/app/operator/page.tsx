@@ -2,6 +2,8 @@
 
 import { TierBadge } from "@/components/admin/tier-badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -20,10 +22,10 @@ const TIERS = ["all", "standard", "premium", "enterprise"] as const;
 const STATUSES = ["all", "active", "suspended", "deleted"] as const;
 const PAGE_SIZE = 50;
 
-const STATUS_DOT: Record<string, string> = {
-  active: "bg-green",
-  suspended: "bg-warning",
-  deleted: "bg-red",
+const STATUS_TONE: Record<string, BadgeTone> = {
+  active: "moss",
+  suspended: "saffron",
+  deleted: "red",
 };
 
 export default function OperatorOrganizationsPage() {
@@ -89,10 +91,7 @@ export default function OperatorOrganizationsPage() {
             {loading ? "Loading…" : `${total} ${total === 1 ? "org" : "orgs"}${hasFilters ? " matching filters" : " total"}`}
           </p>
         </div>
-        <Link
-          href="/operator/orgs/new"
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-cobalt px-4 text-[0.8rem] font-medium text-white transition-colors hover:bg-cobalt-deep"
-        >
+        <Link href="/operator/orgs/new" className={buttonVariants()}>
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M7 2v10M2 7h10" />
           </svg>
@@ -114,14 +113,14 @@ export default function OperatorOrganizationsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name or slug…"
-            className="h-9 w-full rounded-lg border border-border bg-surface pl-8 pr-3 font-mono text-[0.78rem] text-ink outline-none placeholder:text-ink-muted placeholder:font-sans focus:border-cobalt"
+            className="h-9 w-full rounded-lg border border-rule bg-surface pl-8 pr-3 font-mono text-[0.78rem] text-ink outline-none placeholder:text-ink-muted placeholder:font-sans focus:border-cobalt"
           />
         </div>
 
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value as (typeof STATUSES)[number])}
-          className="h-9 cursor-pointer rounded-lg border border-border bg-surface px-2.5 text-[0.78rem] font-medium capitalize text-ink-soft outline-none focus:border-cobalt"
+          className="h-9 cursor-pointer rounded-lg border border-rule bg-surface px-2.5 text-[0.78rem] font-medium capitalize text-ink-soft outline-none focus:border-cobalt"
         >
           {STATUSES.map((s) => (
             <option key={s} value={s}>{s === "all" ? "All statuses" : s}</option>
@@ -131,7 +130,7 @@ export default function OperatorOrganizationsPage() {
         <select
           value={tier}
           onChange={(e) => setTier(e.target.value as (typeof TIERS)[number])}
-          className="h-9 cursor-pointer rounded-lg border border-border bg-surface px-2.5 text-[0.78rem] font-medium capitalize text-ink-soft outline-none focus:border-cobalt"
+          className="h-9 cursor-pointer rounded-lg border border-rule bg-surface px-2.5 text-[0.78rem] font-medium capitalize text-ink-soft outline-none focus:border-cobalt"
         >
           {TIERS.map((t) => (
             <option key={t} value={t}>{t === "all" ? "All tiers" : t}</option>
@@ -150,7 +149,7 @@ export default function OperatorOrganizationsPage() {
 
       {/* Table */}
       {loading && orgs.length === 0 ? (
-        <div className="rounded-xl border border-border bg-surface py-20 text-center text-sm text-ink-muted">
+        <div className="rounded-xl border border-rule bg-surface py-20 text-center text-sm text-ink-muted">
           Loading organisations…
         </div>
       ) : orgs.length === 0 ? (
@@ -160,10 +159,10 @@ export default function OperatorOrganizationsPage() {
           description={hasFilters ? "Try clearing the filters above." : "Provisioned organisations will appear here."}
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-surface">
+        <div className="overflow-hidden rounded-xl border border-rule bg-surface">
           <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-border bg-canvas/60">
+              <tr className="border-b border-rule bg-canvas/60">
                 <th className="px-5 py-3 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-ink-muted">Organisation</th>
                 <th className="px-5 py-3 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-ink-muted">Slug</th>
                 <th className="px-5 py-3 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-ink-muted">Tier</th>
@@ -171,7 +170,7 @@ export default function OperatorOrganizationsPage() {
                 <th className="px-5 py-3 text-right text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-ink-muted">Created</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-rule">
               {orgs.map((org) => (
                 <tr
                   key={org.id}
@@ -192,10 +191,9 @@ export default function OperatorOrganizationsPage() {
                   <td className="px-5 py-3 font-mono text-xs text-ink-muted">{org.slug}</td>
                   <td className="px-5 py-3"><TierBadge tier={org.tier} /></td>
                   <td className="px-5 py-3">
-                    <span className="inline-flex items-center gap-1.5 text-xs">
-                      <span className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_DOT[org.status] ?? "bg-ink-muted"}`} />
-                      <span className="capitalize text-ink-soft">{org.status}</span>
-                    </span>
+                    <Badge tone={STATUS_TONE[org.status] ?? "neutral"} dot className="capitalize">
+                      {org.status}
+                    </Badge>
                   </td>
                   <td className="px-5 py-3 text-right font-mono text-xs text-ink-muted">
                     {new Date(org.created_at).toLocaleDateString("en-ZA")}
@@ -206,7 +204,7 @@ export default function OperatorOrganizationsPage() {
           </table>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-border px-5 py-3">
+            <div className="flex items-center justify-between border-t border-rule px-5 py-3">
               <span className="font-mono text-xs text-ink-muted">
                 {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
               </span>
@@ -214,14 +212,14 @@ export default function OperatorOrganizationsPage() {
                 <button
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   disabled={page === 0}
-                  className="inline-flex h-8 items-center rounded-lg border border-border px-3 text-xs font-medium text-ink-soft transition-colors hover:bg-canvas disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                  className="inline-flex h-8 items-center rounded-lg border border-rule px-3 text-xs font-medium text-ink-soft transition-colors hover:bg-canvas disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
                 >
                   Prev
                 </button>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                   disabled={page >= totalPages - 1}
-                  className="inline-flex h-8 items-center rounded-lg border border-border px-3 text-xs font-medium text-ink-soft transition-colors hover:bg-canvas disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+                  className="inline-flex h-8 items-center rounded-lg border border-rule px-3 text-xs font-medium text-ink-soft transition-colors hover:bg-canvas disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
                 >
                   Next
                 </button>

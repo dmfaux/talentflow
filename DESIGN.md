@@ -245,7 +245,7 @@ The vocabulary is **tactile and confident**: solid, present primary actions that
 - **Internal Padding:** 24px (`p-6`) default; 20px in denser contexts.
 
 ### Inputs / Fields
-- **Style:** Full-width, `rounded-lg`, 1px Border, faint Cool-Slate fill (`bg-cream/40` ≈ `#f0f3f766`), Midnight-Indigo text, Ink-Faint placeholder, `px-3 py-2` (larger auth fields `h-12 px-4`).
+- **Style:** Full-width, `rounded-lg`, 1px Border, faint Cool-Slate fill (`bg-cream/40` ≈ `#f0f3f766`), Midnight-Indigo text, **Ink-Muted placeholder** (`#5a6b7a` — placeholders are load-bearing text and must clear ≥4.5:1; never Ink-Faint), `px-3 py-2` (larger auth fields `h-12 px-4`).
 - **Focus:** Border shifts to Cobalt + a 1–2px Cobalt ring at ~20% (`focus:ring-1 focus:ring-cobalt/20`); larger fields brighten the fill to white. No glow.
 - **Error:** Border + ring shift to Red; helper text in Red Deep.
 
@@ -255,6 +255,26 @@ The vocabulary is **tactile and confident**: solid, present primary actions that
 
 ### Logo (Signature)
 A 32px mark: four descending Cobalt bars (a candidate pool narrowing to a shortlist) with a single Electric-Teal **pulse dot** beside the last bar — "the hire." Wordmark is lowercase `talent` + Cobalt `stream`, tight tracking (−0.035em). The dot's pulse is the only ambient animation in the brand and the literal source of the North Star.
+
+### Shared primitives (`src/components/ui/`)
+
+The canonical implementations of the vocabulary above. New product surfaces **compose these rather than re-rolling markup** — this is what keeps "the same save button" the same everywhere. All use the canonical Signal-Desk tokens (`cobalt` / `ink` / `rule` / `surface`), so adopting them never changes the rendered colour, only the source of truth.
+
+- **`Button` + `buttonVariants()`** (`button.tsx`) — variants `primary` (Cobalt) / `secondary` (neutral outline) / `ghost` / `danger`; sizes `sm` (h-8) / `md` (h-9, default) / `lg` (h-11); built-in `loading` spinner + disabled. `buttonVariants()` returns the class string so `<Link>` CTAs wear identical styles. Retires the h-8/h-9/h-10 × `bg-accent`/`bg-cobalt`/`bg-charcoal` button sprawl.
+- **`Field` + `Input` / `Textarea` / `Select`** (`field.tsx`) — one fill (`bg-canvas/40`), one focus (Cobalt border + ring — never the teal signal), one error state. `Field` renders an AA-safe label (Ink Soft) + helper (Ink Muted) and wires `aria-describedby` onto its control automatically.
+- **`Badge`** (`badge.tsx`) — the soft-tint formula (tint + matching `-deep` text + thin matching-hue border) with tones `neutral` / `cobalt` / `moss` / `saffron` / `red` / `teal`, an optional reinforcing `dot`, and an `uppercase` treatment for tier/label chips. Always carries a text label, so status is never colour-alone. `admin/tier-badge.tsx` is a thin wrapper over it.
+- **`Card`** (`card.tsx`) — flat at rest (1px `rule` border, no ambient shadow), one padding scale, never nested.
+- **`SectionHeading`** (`card.tsx`) — a real semantic heading (Instrument Sans), to retire the `.eyebrow` being misused *as* a section heading.
+- **`Stat`** (`card.tsx`) — a deliberately restrained metric (label + mono value + one evidence line). The antidote to the hero-metric template: small, for a compact row inside a decision-led layout — never a 4-up KPI wall.
+- **`Skeleton`** (`card.tsx`) — a tone-based loading block (`canvas-2`); skeletons, not spinners.
+
+### Token aliases & known misnomers
+
+The CSS exposes legacy alias tokens kept for back-compat during the rebrand. They map to the correct Signal-Desk values, so they are **naming debt, not colour bugs** — migrate names opportunistically per surface; never reintroduce them in new code.
+
+- `accent` → Cobalt · `charcoal` → Ink · `cream`/`warm-white` → Canvas · `paper` → Surface · `green` → Moss · `warning` → Saffron · `txt-secondary` → Ink Soft.
+- **`txt-muted` now aliases Ink Muted (`#5a6b7a`), not Ink Faint.** It was historically `#9fb5c4` (Ink Faint, fails AA) while used as load-bearing label/table/helper text in ~375 places; the token value was corrected at source. Decorative faint text uses `ink-faint` directly.
+- **`--font-fraunces` is Instrument Serif**, not Fraunces — a variable-name misnomer kept for compatibility (the display font loaded in `layout.tsx` is Instrument Serif). Mirrors `--color-vermillion`, which is Electric Teal. Prefer `--font-display` / `--font-serif` in new code.
 
 ## 6. Do's and Don'ts
 

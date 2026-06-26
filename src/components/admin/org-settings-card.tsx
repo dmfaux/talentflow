@@ -3,6 +3,9 @@
 import { TierBadge } from "@/components/admin/tier-badge";
 import { canManageOrg, useTenant } from "@/components/admin/tenant-provider";
 import { useToast } from "@/components/ui/toast-provider";
+import { Card, SectionHeading } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Field, Input } from "@/components/ui/field";
 import { FormEvent, useEffect, useState } from "react";
 
 interface OrgSettings {
@@ -85,101 +88,81 @@ export function OrgSettingsCard() {
     }
   }
 
-  const inputClass =
-    "h-10 w-full rounded-lg border border-border bg-cream/40 px-3.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20";
-  const labelClass =
-    "mb-1.5 block text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted";
+  // Read-only data labels for the operator-owned plan/billing well.
+  const dataLabel =
+    "mb-1.5 block text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-ink-muted";
 
   return (
-    <div className="mb-6 rounded-xl border border-border bg-surface p-6">
-      <div className="mb-5 flex items-center gap-2">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1b4332" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="2" y="3" width="12" height="10" rx="1.5" />
-          <path d="M5 6.5h6M5 9.5h4" />
-        </svg>
-        <h2 className="text-sm font-semibold text-charcoal">Organisation</h2>
-      </div>
+    <Card className="mb-6">
+      <SectionHeading
+        className="mb-5"
+        title="Organisation"
+        icon={
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="12" height="10" rx="1.5" />
+            <path d="M5 6.5h6M5 9.5h4" />
+          </svg>
+        }
+      />
 
       {loading ? (
-        <p className="text-sm text-txt-muted">Loading…</p>
+        <p className="text-sm text-ink-muted">Loading…</p>
       ) : !org ? (
-        <p className="text-sm text-txt-muted">Could not load organisation settings.</p>
+        <p className="text-sm text-ink-muted">Could not load organisation settings.</p>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label htmlFor="org-name" className={labelClass}>
-              Organisation Name
-            </label>
-            <input
+          <Field label="Organisation name" htmlFor="org-name" required>
+            <Input
               id="org-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className={inputClass}
             />
-          </div>
+          </Field>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="org-contact-name" className={labelClass}>
-                Contact Name
-              </label>
-              <input
+            <Field label="Contact name" htmlFor="org-contact-name">
+              <Input
                 id="org-contact-name"
                 type="text"
                 value={contactName}
                 onChange={(e) => setContactName(e.target.value)}
                 placeholder="Jane Smith"
-                className={inputClass}
               />
-            </div>
-            <div>
-              <label htmlFor="org-contact-email" className={labelClass}>
-                Contact Email
-              </label>
-              <input
+            </Field>
+            <Field label="Contact email" htmlFor="org-contact-email">
+              <Input
                 id="org-contact-email"
                 type="email"
                 value={contactEmail}
                 onChange={(e) => setContactEmail(e.target.value)}
                 placeholder="jane@org.com"
-                className={inputClass}
               />
-            </div>
+            </Field>
           </div>
 
           {/* Read-only plan + billing (operator-owned) */}
-          <div className="grid grid-cols-2 gap-4 rounded-lg bg-cream/60 px-4 py-3">
+          <div className="grid grid-cols-2 gap-4 rounded-lg bg-canvas/60 px-4 py-3">
             <div>
-              <p className={labelClass}>Plan</p>
+              <p className={dataLabel}>Plan</p>
               <TierBadge tier={org.tier} size="md" />
             </div>
             <div>
-              <p className={labelClass}>Billing Email</p>
-              <p className="font-mono text-sm text-txt-secondary">
-                {org.billing_email || <span className="text-txt-muted">&mdash;</span>}
+              <p className={dataLabel}>Billing email</p>
+              <p className="font-mono text-sm text-ink-soft">
+                {org.billing_email || <span className="text-ink-muted">&mdash;</span>}
               </p>
-              <p className="mt-1 text-[0.62rem] text-txt-muted">Managed by TalentStream</p>
+              <p className="mt-1 text-[0.62rem] text-ink-muted">Managed by TalentStream</p>
             </div>
           </div>
 
           <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={!dirty || !name.trim() || saving}
-              className="inline-flex h-9 items-center gap-2 rounded-lg bg-accent px-5 text-[0.78rem] font-medium text-white transition-colors hover:bg-accent-light disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-            >
-              {saving && (
-                <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              )}
+            <Button type="submit" disabled={!dirty || !name.trim()} loading={saving}>
               Save changes
-            </button>
+            </Button>
           </div>
         </form>
       )}
-    </div>
+    </Card>
   );
 }

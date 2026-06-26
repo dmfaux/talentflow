@@ -4,6 +4,11 @@ import { FormEvent, useState } from "react";
 import { OrgSettingsCard } from "@/components/admin/org-settings-card";
 import { ActiveBrandCard } from "@/components/admin/active-brand-card";
 import { SpendAlertCard } from "@/components/admin/spend-alert-card";
+import { Card, SectionHeading } from "@/components/ui/card";
+import { Input } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 
 interface AccessRecord {
   candidate_id: string;
@@ -13,6 +18,26 @@ interface AccessRecord {
   ai_assessment: { score: number | null; confidence: string | null; rationale: string | null };
   consent: { popia_consent_at: string | null; data_purge_at: string | null; purged_at: string | null };
 }
+
+// Section icons — stroke="currentColor" so they inherit Ink Muted from SectionHeading.
+const DocIcon = (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="2" width="10" height="12" rx="1.5" />
+    <path d="M6 5h4M6 8h4M6 11h2" />
+  </svg>
+);
+const ClockIcon = (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="8" cy="8" r="6" />
+    <path d="M8 5v3l2 1.5" />
+  </svg>
+);
+const PersonIcon = (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="8" cy="5" r="2.5" />
+    <path d="M3 14c0-3 2.2-4.5 5-4.5s5 1.5 5 4.5" />
+  </svg>
+);
 
 export default function SettingsPage() {
   const [lookupEmail, setLookupEmail] = useState("");
@@ -91,13 +116,10 @@ export default function SettingsPage() {
     }
   }
 
-  const inputClass =
-    "h-10 w-full rounded-lg border border-border bg-cream/40 px-3.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20";
-
   return (
     <div className="max-w-2xl">
-      <h1 className="mb-1 text-lg font-semibold text-charcoal">Settings</h1>
-      <p className="mb-8 text-xs text-txt-muted">
+      <h1 className="mb-1 text-lg font-semibold text-ink">Settings</h1>
+      <p className="mb-8 text-xs text-ink-muted">
         Organisation, brand, data privacy, and compliance controls
       </p>
 
@@ -108,81 +130,65 @@ export default function SettingsPage() {
       {/* ── Spend alerts (usage-based pricing, Phase 5) ───────── */}
       <SpendAlertCard />
 
-      {/* ── POPIA Data Requests ─────────────────────────────── */}
-      <div className="mb-6 rounded-xl border border-border bg-surface p-6">
-        <div className="mb-5 flex items-center gap-2">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1b4332" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="2" width="10" height="12" rx="1.5" />
-            <path d="M6 5h4M6 8h4M6 11h2" />
-          </svg>
-          <h2 className="text-sm font-semibold text-charcoal">
-            POPIA Data Requests
-          </h2>
-        </div>
+      {/* ── POPIA data requests ─────────────────────────────── */}
+      <Card className="mb-6">
+        <SectionHeading title="POPIA data requests" icon={DocIcon} className="mb-5" />
 
         {/* Lookup */}
         <form onSubmit={handleLookup} className="mb-5">
-          <label className="mb-1.5 block text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
-            Look Up Candidate Data
+          <label htmlFor="popia-lookup" className="mb-1.5 block text-[0.8rem] font-medium text-ink-soft">
+            Look up candidate data
           </label>
           <div className="flex gap-2">
-            <input
+            <Input
+              id="popia-lookup"
               type="email"
               value={lookupEmail}
               onChange={(e) => setLookupEmail(e.target.value)}
               placeholder="candidate@example.com"
-              className={inputClass}
             />
-            <button
-              type="submit"
-              disabled={lookupLoading || !lookupEmail}
-              className="inline-flex h-10 shrink-0 items-center rounded-lg bg-accent px-4 text-[0.78rem] font-medium text-white transition-colors hover:bg-accent-light disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-            >
-              {lookupLoading ? "Looking up..." : "Look Up"}
-            </button>
+            <Button type="submit" loading={lookupLoading} disabled={!lookupEmail} className="shrink-0">
+              Look up
+            </Button>
           </div>
-          <p className="mt-1.5 text-[0.65rem] text-txt-muted">
+          <p className="mt-1.5 text-xs text-ink-muted">
             Returns all personal data held for this email across all campaigns
           </p>
         </form>
 
         {lookupError && (
-          <div className="mb-4 rounded-lg bg-cream px-4 py-2.5 text-sm text-txt-secondary">
+          <Callout tone="warning" className="mb-4">
             {lookupError}
-          </div>
+          </Callout>
         )}
 
         {lookupResult && (
           <div className="mb-5 space-y-3">
-            <p className="text-xs font-medium text-txt-secondary">
+            <p className="text-xs font-medium text-ink-soft">
               Found {lookupResult.records.length} record(s)
             </p>
             {lookupResult.records.map((r) => (
               <div
                 key={r.candidate_id}
-                className="rounded-lg border border-border p-4 text-xs space-y-2"
+                className="space-y-2 rounded-lg bg-canvas/40 p-4 text-xs"
               >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-charcoal">
-                    {r.campaign.role_title}
-                  </span>
-                  <span className="text-txt-muted">
-                    {r.campaign.client_name}
-                  </span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium text-ink">{r.campaign.role_title}</span>
+                  <span className="text-ink-muted">{r.campaign.client_name}</span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-txt-secondary">
+                <div className="grid grid-cols-3 gap-2 text-ink-soft">
                   <div>
-                    <span className="text-txt-muted">Name: </span>
+                    <span className="text-ink-muted">Name: </span>
                     {r.personal_data.name}
                   </div>
                   <div>
-                    <span className="text-txt-muted">Status: </span>
+                    <span className="text-ink-muted">Status: </span>
                     {r.application_data.status}
                   </div>
                   <div>
-                    <span className="text-txt-muted">Score: </span>
+                    <span className="text-ink-muted">Score: </span>
                     <span className="font-mono">
-                      {r.ai_assessment.score?.toFixed(1) ?? "\u2014"}
+                      {r.ai_assessment.score?.toFixed(1) ?? "—"}
                     </span>
                   </div>
                 </div>
@@ -198,151 +204,125 @@ export default function SettingsPage() {
         )}
 
         {/* Deletion */}
-        <div className="border-t border-border pt-5">
-          <label className="mb-1.5 block text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-txt-muted">
-            Delete All Data for Candidate
+        <div className="border-t border-rule pt-5">
+          <label htmlFor="popia-delete" className="mb-1.5 block text-[0.8rem] font-medium text-ink-soft">
+            Delete all data for a candidate
           </label>
           <div className="flex gap-2">
-            <input
+            <Input
+              id="popia-delete"
               type="email"
               value={deleteEmail}
               onChange={(e) => setDeleteEmail(e.target.value)}
               placeholder="candidate@example.com"
-              className={inputClass}
             />
-            <button
-              type="button"
+            <Button
+              variant="danger"
               onClick={() => setShowDeleteConfirm(true)}
               disabled={!deleteEmail}
-              className="inline-flex h-10 shrink-0 items-center rounded-lg border border-red/20 px-4 text-[0.78rem] font-medium text-red transition-colors hover:bg-red-light disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+              className="shrink-0"
             >
-              Delete All Data
-            </button>
+              Delete all data
+            </Button>
           </div>
-          <p className="mt-1.5 text-[0.65rem] text-txt-muted">
+          <p className="mt-1.5 text-xs text-ink-muted">
             Permanently purges PII, CVs, messages, and scoring logs. Non-reversible.
           </p>
           {deleteResult && (
-            <p className="mt-2 text-xs text-txt-secondary">{deleteResult}</p>
+            <Callout tone="success" className="mt-3">
+              {deleteResult}
+            </Callout>
           )}
         </div>
-      </div>
+      </Card>
 
-      {/* ── Data Retention ──────────────────────────────────── */}
-      <div className="mb-6 rounded-xl border border-border bg-surface p-6">
-        <div className="mb-5 flex items-center gap-2">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1b4332" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="8" cy="8" r="6" />
-            <path d="M8 5v3l2 1.5" />
-          </svg>
-          <h2 className="text-sm font-semibold text-charcoal">
-            Data Retention
-          </h2>
-        </div>
+      {/* ── Data retention ──────────────────────────────────── */}
+      <Card className="mb-6">
+        <SectionHeading title="Data retention" icon={ClockIcon} className="mb-5" />
 
-        <div className="mb-4 flex items-center justify-between rounded-lg bg-cream/60 px-4 py-3">
+        <div className="mb-4 flex items-center justify-between gap-4 rounded-lg bg-canvas/60 px-4 py-3">
           <div>
-            <p className="text-sm text-charcoal">Default Retention Period</p>
-            <p className="text-[0.65rem] text-txt-muted">
+            <p className="text-sm text-ink">Default retention period</p>
+            <p className="text-xs text-ink-muted">
               Candidate data is automatically purged after this period
             </p>
           </div>
-          <span className="font-mono text-sm font-semibold text-charcoal">
-            12 months
-          </span>
+          <span className="shrink-0 font-mono text-sm font-semibold text-ink">12 months</span>
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm text-charcoal">Manual Purge</p>
-            <p className="text-[0.65rem] text-txt-muted">
+            <p className="text-sm text-ink">Manual purge</p>
+            <p className="text-xs text-ink-muted">
               Process all candidates past their retention date now
             </p>
           </div>
-          <button
+          <Button
+            variant="secondary"
             onClick={handlePurge}
-            disabled={purgeLoading}
-            className="inline-flex h-9 items-center rounded-lg border border-border px-4 text-[0.78rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            loading={purgeLoading}
+            className="shrink-0"
           >
-            {purgeLoading ? "Running..." : "Run Purge Now"}
-          </button>
+            Run purge
+          </Button>
         </div>
         {purgeResult && (
-          <p className="mt-3 text-xs text-txt-secondary">{purgeResult}</p>
+          <Callout tone="success" className="mt-3">
+            {purgeResult}
+          </Callout>
         )}
-      </div>
+      </Card>
 
-      {/* ── Information Officer ──────────────────────────────── */}
-      <div className="rounded-xl border border-border bg-surface p-6">
-        <div className="mb-5 flex items-center gap-2">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#1b4332" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="8" cy="5" r="2.5" />
-            <path d="M3 14c0-3 2.2-4.5 5-4.5s5 1.5 5 4.5" />
-          </svg>
-          <h2 className="text-sm font-semibold text-charcoal">
-            Information Officer
-          </h2>
-        </div>
+      {/* ── Information officer ──────────────────────────────── */}
+      <Card>
+        <SectionHeading title="Information officer" icon={PersonIcon} className="mb-5" />
 
         <div className="space-y-3 text-sm">
-          <div className="flex justify-between">
-            <span className="text-txt-muted">Name</span>
-            <span className="text-charcoal">
+          <div className="flex justify-between gap-4">
+            <span className="text-ink-muted">Name</span>
+            <span className="text-right text-ink">
               {process.env.NEXT_PUBLIC_INFO_OFFICER_NAME ?? "Not configured"}
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-txt-muted">Registration Number</span>
-            <span className="font-mono text-xs text-charcoal">
+          <div className="flex justify-between gap-4">
+            <span className="text-ink-muted">Registration number</span>
+            <span className="text-right font-mono text-xs text-ink">
               {process.env.NEXT_PUBLIC_INFO_OFFICER_REG ?? "Not configured"}
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-txt-muted">Contact</span>
-            <span className="text-charcoal">
+          <div className="flex justify-between gap-4">
+            <span className="text-ink-muted">Contact</span>
+            <span className="text-right text-ink">
               {process.env.NEXT_PUBLIC_INFO_OFFICER_EMAIL ?? "Not configured"}
             </span>
           </div>
         </div>
 
-        <p className="mt-4 text-[0.65rem] leading-relaxed text-txt-muted">
+        <p className="mt-4 text-xs leading-relaxed text-ink-muted">
           As per the Protection of Personal Information Act (POPIA), the Information Officer
           is responsible for ensuring compliance with data protection requirements.
           Contact details should be displayed on all data collection forms.
         </p>
-      </div>
+      </Card>
 
-      {/* Delete confirmation modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal/30 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-xl">
-            <h3 className="text-base font-semibold text-charcoal">
-              Confirm Data Deletion
-            </h3>
-            <p className="mt-2 text-sm text-txt-secondary">
-              This will permanently delete all personal data, CVs, messages, chat
-              conversations, and scoring logs for{" "}
-              <strong className="text-charcoal">{deleteEmail}</strong>. This action
-              cannot be undone.
-            </p>
-            <div className="mt-5 flex items-center justify-end gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="inline-flex h-9 items-center rounded-lg px-4 text-[0.78rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleteLoading}
-                className="inline-flex h-9 items-center rounded-lg bg-red px-4 text-[0.78rem] font-medium text-white transition-colors hover:bg-red/90 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-              >
-                {deleteLoading ? "Deleting..." : "Delete Permanently"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Delete confirmation — shared ConfirmModal, echoes the target email. */}
+      <ConfirmModal
+        open={showDeleteConfirm}
+        title="Confirm data deletion"
+        description={
+          <>
+            This will permanently delete all personal data, CVs, messages, chat
+            conversations, and scoring logs for{" "}
+            <strong className="text-ink">{deleteEmail}</strong>. This action cannot
+            be undone.
+          </>
+        }
+        confirmLabel="Delete permanently"
+        variant="danger"
+        loading={deleteLoading}
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

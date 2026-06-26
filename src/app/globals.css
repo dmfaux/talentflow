@@ -30,7 +30,11 @@
   --color-charcoal-light: #2f3941;
   --color-txt-primary: #11123c;
   --color-txt-secondary: #2f3941;
-  --color-txt-muted: #9fb5c4;
+  /* Aliases Ink Muted (#5a6b7a), NOT Ink Faint. This is the supporting-text floor
+     and must clear WCAG AA (≥4.5:1) — it was historically #9fb5c4 (Ink Faint),
+     which fails AA, and it is used as load-bearing label/helper/table text in
+     ~375 places. Decorative faint text uses --color-ink-faint directly. */
+  --color-txt-muted: #5a6b7a;
 
   /* ── Purposeful colours ── */
   /* Cobalt — primary action, brand, trust */
@@ -118,11 +122,6 @@ body {
   to { opacity: 1; transform: scale(1); }
 }
 
-@keyframes drawLine {
-  from { transform: scaleY(0); }
-  to { transform: scaleY(1); }
-}
-
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
@@ -136,11 +135,6 @@ body {
 @keyframes mask-reveal {
   from { clip-path: inset(0 100% 0 0); }
   to { clip-path: inset(0 0 0 0); }
-}
-
-@keyframes rotate-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 
 @keyframes float {

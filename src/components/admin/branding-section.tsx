@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 
 export type LogoBackground = "light" | "dark" | "transparent";
 export type LogoPosition = "top-left" | "top-centre";
@@ -207,15 +208,15 @@ export function BrandingSection({ clientId, values, onChange }: Props) {
   return (
     <section className="space-y-6">
       <div>
-        <h2 className="font-display text-xl font-medium text-charcoal">Branding</h2>
-        <p className="mt-1 text-xs text-txt-muted">
+        <h2 className="text-xl font-semibold text-ink">Branding</h2>
+        <p className="mt-1 text-xs text-ink-muted">
           This brand&apos;s logo and colours. These drive how its campaign pages appear to candidates.
         </p>
       </div>
 
       {/* ── Logo upload ─────────────────────────────────────────── */}
       <div className="space-y-3">
-        <label className="block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
+        <label className="block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-ink-muted">
           Logo
         </label>
 
@@ -224,19 +225,19 @@ export function BrandingSection({ clientId, values, onChange }: Props) {
 
           <div className="flex-1 space-y-2">
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-paper px-4 text-[0.8rem] font-medium text-charcoal transition-colors hover:bg-cream cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                loading={uploading}
               >
-                {uploading ? "Uploading..." : values.logo_url ? "Replace logo" : "Upload logo"}
-              </button>
+                {values.logo_url ? "Replace logo" : "Upload logo"}
+              </Button>
               {values.logo_url && (
                 <button
                   type="button"
                   onClick={() => onChange({ logo_url: null })}
-                  className="inline-flex h-9 items-center px-3 text-[0.75rem] font-medium text-txt-muted transition-colors hover:text-red cursor-pointer"
+                  className="inline-flex h-9 items-center px-3 text-[0.75rem] font-medium text-ink-muted transition-colors hover:text-red cursor-pointer"
                 >
                   Remove
                 </button>
@@ -249,7 +250,7 @@ export function BrandingSection({ clientId, values, onChange }: Props) {
                 className="hidden"
               />
             </div>
-            <p className="text-[0.7rem] text-txt-muted">PNG, JPG, or SVG. Max 2MB.</p>
+            <p className="text-[0.7rem] text-ink-muted">PNG, JPG, or SVG. Max 2MB.</p>
             {uploadError && <p className="text-xs text-red">{uploadError}</p>}
           </div>
         </div>
@@ -257,10 +258,10 @@ export function BrandingSection({ clientId, values, onChange }: Props) {
 
       {/* ── Logo background ─────────────────────────────────────── */}
       <div className="space-y-2">
-        <label className="block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
+        <label className="block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-ink-muted">
           Logo Background
         </label>
-        <p className="text-[0.7rem] text-txt-muted">{COLOR_HELP.logo_background}</p>
+        <p className="text-[0.7rem] text-ink-muted">{COLOR_HELP.logo_background}</p>
         <div className="grid grid-cols-3 gap-2">
           {(Object.keys(LOGO_BG_SWATCHES) as LogoBackground[]).map((bg) => (
             <button
@@ -270,11 +271,11 @@ export function BrandingSection({ clientId, values, onChange }: Props) {
               className={`group flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors cursor-pointer ${
                 values.logo_background === bg
                   ? "border-cobalt bg-cobalt-tint"
-                  : "border-border bg-paper hover:border-border-strong"
+                  : "border-rule bg-surface hover:border-rule-strong"
               }`}
             >
               <span
-                className="h-6 w-6 shrink-0 rounded border border-border"
+                className="h-6 w-6 shrink-0 rounded border border-rule"
                 style={
                   bg === "transparent"
                     ? {
@@ -286,7 +287,7 @@ export function BrandingSection({ clientId, values, onChange }: Props) {
                     : { backgroundColor: LOGO_BG_SWATCHES[bg] }
                 }
               />
-              <span className="text-[0.8rem] font-medium capitalize text-charcoal">{bg}</span>
+              <span className="text-[0.8rem] font-medium capitalize text-ink">{bg}</span>
             </button>
           ))}
         </div>
@@ -294,7 +295,7 @@ export function BrandingSection({ clientId, values, onChange }: Props) {
 
       {/* ── Logo position ───────────────────────────────────────── */}
       <div>
-        <label className="block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted mb-2">
+        <label className="block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-ink-muted mb-2">
           Logo Position
         </label>
         <div className="grid grid-cols-2 gap-2">
@@ -309,11 +310,11 @@ export function BrandingSection({ clientId, values, onChange }: Props) {
               className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors cursor-pointer ${
                 values.logo_position === opt.value
                   ? "border-cobalt bg-cobalt-tint"
-                  : "border-border bg-paper hover:border-border-strong"
+                  : "border-rule bg-surface hover:border-rule-strong"
               }`}
             >
               <PositionIcon variant={opt.icon} />
-              <span className="text-[0.8rem] font-medium text-charcoal">{opt.label}</span>
+              <span className="text-[0.8rem] font-medium text-ink">{opt.label}</span>
             </button>
           ))}
         </div>
@@ -322,14 +323,14 @@ export function BrandingSection({ clientId, values, onChange }: Props) {
       {/* ── Brand colours ───────────────────────────────────────── */}
       <div className="space-y-4 pt-2">
         <div className="flex items-center justify-between">
-          <label className="block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted">
+          <label className="block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-ink-muted">
             Brand Colours
           </label>
           <button
             type="button"
             onClick={handleSuggestFromLogo}
             disabled={!values.logo_url || suggesting}
-            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-paper px-2.5 text-[0.7rem] font-medium text-charcoal transition-colors hover:bg-cream cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-rule bg-surface px-2.5 text-[0.7rem] font-medium text-ink transition-colors hover:bg-canvas cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             title={values.logo_url ? "Extract dominant colours from the uploaded logo" : "Upload a logo first"}
           >
             <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
@@ -399,14 +400,14 @@ function LogoPreviewBox({
 
   return (
     <div
-      className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border"
+      className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-rule"
       style={bgStyle}
     >
       {logoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={logoUrl} alt="Logo preview" className="max-h-[80%] max-w-[80%] object-contain" />
       ) : (
-        <span className="font-mono text-[0.65rem] text-txt-muted">no logo</span>
+        <span className="font-mono text-[0.65rem] text-ink-muted">no logo</span>
       )}
     </div>
   );
@@ -414,9 +415,9 @@ function LogoPreviewBox({
 
 function PositionIcon({ variant }: { variant: "left" | "centre" }) {
   return (
-    <div className="flex h-5 w-7 items-center overflow-hidden rounded border border-border bg-canvas">
+    <div className="flex h-5 w-7 items-center overflow-hidden rounded border border-rule bg-canvas">
       <div
-        className={`h-1.5 rounded-sm bg-txt-secondary ${
+        className={`h-1.5 rounded-sm bg-ink-soft ${
           variant === "left" ? "ml-0.5 w-2" : "mx-auto w-2"
         }`}
       />
@@ -445,7 +446,7 @@ function ColorInput({
   return (
     <div className="space-y-1.5">
       <div className="flex items-start gap-3">
-        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-border">
+        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-rule">
           <div
             className="absolute inset-0"
             style={{ backgroundColor: isValidHex(value) ? normaliseHex(value) : "#ffffff" }}
@@ -460,9 +461,9 @@ function ColorInput({
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-[0.8rem] font-medium text-charcoal">{label}</span>
+            <span className="text-[0.8rem] font-medium text-ink">{label}</span>
             {optional && (
-              <span className="text-[0.65rem] font-medium uppercase tracking-[0.1em] text-txt-muted">
+              <span className="text-[0.65rem] font-medium uppercase tracking-[0.1em] text-ink-muted">
                 optional
               </span>
             )}
@@ -473,11 +474,11 @@ function ColorInput({
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
             placeholder="#000000"
-            className="mt-1 h-8 w-full rounded-lg border border-border bg-cream/40 px-2.5 font-mono text-xs text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-cobalt focus:ring-1 focus:ring-cobalt/20"
+            className="mt-1 h-8 w-full rounded-lg border border-rule bg-canvas/40 px-2.5 font-mono text-xs text-ink placeholder:text-ink-muted outline-none transition-colors focus:border-cobalt focus:ring-1 focus:ring-cobalt/20"
           />
         </div>
       </div>
-      <p className="text-[0.7rem] text-txt-muted pl-[3.25rem]">{helpText}</p>
+      <p className="text-[0.7rem] text-ink-muted pl-[3.25rem]">{helpText}</p>
     </div>
   );
 }

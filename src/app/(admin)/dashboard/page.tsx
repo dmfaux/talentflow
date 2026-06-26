@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { canManageOrg, useTenant } from "@/components/admin/tenant-provider";
+import { Card, Stat } from "@/components/ui/card";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 
 type Range = "week" | "month" | "quarter" | "year" | "all";
 
@@ -105,12 +108,14 @@ const STATUS_LABELS: Record<string, string> = {
   withdrawn: "WITHDRAWN",
 };
 
-const CAMPAIGN_STATUS_STYLES: Record<string, string> = {
-  draft: "bg-cream text-txt-secondary",
-  active: "bg-green-light text-green",
-  paused: "bg-warning-light text-warning",
-  closed: "bg-red-light text-red",
-  archived: "bg-cream text-txt-muted",
+// Campaign status → Badge tone. The shared Badge renders the soft-tint formula
+// (tint + matching -deep text + border) with a dot, so status is never colour-alone.
+const CAMPAIGN_STATUS_TONE: Record<string, BadgeTone> = {
+  draft: "neutral",
+  active: "moss",
+  paused: "saffron",
+  closed: "red",
+  archived: "neutral",
 };
 
 const BROWSER_COLORS: Record<string, string> = {
@@ -123,12 +128,16 @@ const BROWSER_COLORS: Record<string, string> = {
   other: "#9fb5c4",
 };
 
+// On-palette data hues: Cobalt, Moss, Saffron.
 const DEVICE_COLORS: Record<string, string> = {
   desktop: "#2c5bff",
-  mobile: "#067340",
+  mobile: "#0a8a5a",
   tablet: "#d68a0b",
 };
 
+// KPI cells now use the restrained shared Stat inside a flat Card — the
+// deliberate antidote to the hero-metric template (the old version was an
+// uppercase-tracked label over a text-2xl number, the SaaS cliché).
 function StatCard({
   label,
   value,
@@ -139,15 +148,9 @@ function StatCard({
   sub?: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-surface p-5">
-      <p className="text-xs font-medium text-txt-muted uppercase tracking-wide">
-        {label}
-      </p>
-      <p className="mt-2 font-mono text-2xl font-medium text-charcoal tracking-tight">
-        {value}
-      </p>
-      {sub && <p className="mt-1 text-xs text-txt-secondary">{sub}</p>}
-    </div>
+    <Card padding="sm">
+      <Stat label={label} value={value} sub={sub} />
+    </Card>
   );
 }
 
@@ -497,7 +500,9 @@ function NewCampaignDropdown() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-[0.8rem] font-medium text-white transition-colors hover:bg-accent-light"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={buttonVariants({ size: "md" })}
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <path d="M7 2v10M2 7h10" />
@@ -564,8 +569,6 @@ function DashboardEmptyState({ canManage }: { canManage: boolean }) {
     <div>
       <h1 className="mb-6 text-lg font-semibold text-charcoal">Dashboard</h1>
       <div className="relative overflow-hidden rounded-2xl border border-border bg-surface px-8 py-14 sm:px-14">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-cobalt/[0.07] blur-[120px]" />
-        <div className="pointer-events-none absolute -left-20 bottom-[-30%] h-64 w-64 rounded-full bg-gold/[0.08] blur-[110px]" />
         <div className="relative max-w-xl">
           <p className="eyebrow text-cobalt">Welcome to TalentStream</p>
           <h2 className="mt-4 font-display text-[2rem] font-medium leading-tight tracking-[-0.02em] text-charcoal sm:text-[2.4rem]">
@@ -579,7 +582,7 @@ function DashboardEmptyState({ canManage }: { canManage: boolean }) {
           </p>
           <Link
             href="/onboarding"
-            className="group mt-8 inline-flex h-11 items-center gap-2 rounded-full bg-cobalt px-6 text-[0.88rem] font-medium text-white transition-colors hover:bg-cobalt-deep"
+            className={`group mt-8 ${buttonVariants({ size: "lg" })}`}
           >
             Create your first brand
             <svg
@@ -726,7 +729,7 @@ export default function DashboardPage() {
               {
                 label: "Shortlisted",
                 value: data.status_breakdown.find((s) => s.status === "shortlisted")?.count ?? 0,
-                color: "#067340",
+                color: "#0a8a5a",
               },
               {
                 label: "Scored",
@@ -738,12 +741,12 @@ export default function DashboardPage() {
                 value:
                   (data.status_breakdown.find((s) => s.status === "gating_passed")?.count ?? 0) +
                   (data.status_breakdown.find((s) => s.status === "scoring")?.count ?? 0),
-                color: "#7a87ff",
+                color: "#d68a0b",
               },
               {
                 label: "Rejected",
                 value: data.status_breakdown.find((s) => s.status === "rejected")?.count ?? 0,
-                color: "#05dbd6",
+                color: "#5a6b7a",
               },
               {
                 label: "Gating failed",
@@ -867,13 +870,9 @@ export default function DashboardPage() {
                       </p>
                     </td>
                     <td className="px-3 py-3">
-                      <span
-                        className={`inline-block rounded-full px-2.5 py-0.5 text-[0.68rem] font-medium ${
-                          CAMPAIGN_STATUS_STYLES[c.status] ?? CAMPAIGN_STATUS_STYLES.draft
-                        }`}
-                      >
-                        {c.status}
-                      </span>
+                      <Badge tone={CAMPAIGN_STATUS_TONE[c.status] ?? "neutral"} dot>
+                        {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
+                      </Badge>
                     </td>
                     <td className="px-3 py-3 text-right font-mono text-txt-secondary">
                       {c.total_candidates}
@@ -967,13 +966,13 @@ export default function DashboardPage() {
                   label="Started application"
                   count={analytics.funnel.form_starts}
                   total={analytics.funnel.page_views}
-                  color="bg-[#7a87ff]"
+                  color="bg-saffron"
                 />
                 <FunnelRow
                   label="Submitted application"
                   count={analytics.funnel.form_submits}
                   total={analytics.funnel.page_views}
-                  color="bg-green"
+                  color="bg-moss"
                 />
               </div>
             </div>
@@ -988,7 +987,7 @@ export default function DashboardPage() {
                   labelKey="field"
                   valueKey="count"
                   maxHeight={160}
-                  barColor="bg-vermillion"
+                  barColor="bg-saffron"
                 />
               ) : (
                 <p className="text-sm text-txt-muted py-10 text-center">

@@ -116,7 +116,7 @@ function LoginForm() {
                 required
                 autoFocus
                 autoComplete="email"
-                className="h-12 w-full rounded-lg border border-rule bg-canvas px-4 text-[0.92rem] text-ink placeholder:text-ink-faint outline-none transition-all duration-200 focus:border-cobalt focus:ring-2 focus:ring-cobalt/20 focus:bg-paper"
+                className="h-12 w-full rounded-lg border border-rule bg-canvas px-4 text-[0.92rem] text-ink placeholder:text-ink-muted outline-none transition-all duration-200 focus:border-cobalt focus:ring-2 focus:ring-cobalt/20 focus:bg-paper"
               />
             </div>
 
@@ -135,7 +135,7 @@ function LoginForm() {
                 placeholder="••••••••"
                 required
                 autoComplete="current-password"
-                className="h-12 w-full rounded-lg border border-rule bg-canvas px-4 text-[0.92rem] text-ink placeholder:text-ink-faint outline-none transition-all duration-200 focus:border-cobalt focus:ring-2 focus:ring-cobalt/20 focus:bg-paper"
+                className="h-12 w-full rounded-lg border border-rule bg-canvas px-4 text-[0.92rem] text-ink placeholder:text-ink-muted outline-none transition-all duration-200 focus:border-cobalt focus:ring-2 focus:ring-cobalt/20 focus:bg-paper"
               />
               {error && (
                 <p className="mt-2 text-[0.8rem] text-vermillion flex items-center gap-1.5">

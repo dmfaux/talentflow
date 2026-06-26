@@ -4,6 +4,10 @@ import { BrandingSection, type BrandingValues } from "@/components/admin/brandin
 import { LiveCampaignPreview } from "@/components/admin/live-campaign-preview";
 import { canManageOrg, useTenant } from "@/components/admin/tenant-provider";
 import { TierBadge } from "@/components/admin/tier-badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Callout } from "@/components/ui/callout";
+import { Field, Input, Textarea } from "@/components/ui/field";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
@@ -21,6 +25,9 @@ const INITIAL_BRANDING: BrandingValues = {
   brand_accent_color: "",
   brand_text_color: "#11123c",
 };
+
+// Matches the Field primitive's label treatment for the one hand-built field (slug).
+const controlLabel = "block text-[0.8rem] font-medium text-ink-soft";
 
 export default function NewClientPage() {
   const router = useRouter();
@@ -125,14 +132,14 @@ export default function NewClientPage() {
   if (!canManageOrg(tenant)) {
     return (
       <div className="mx-auto max-w-5xl">
-        <div className="rounded-xl border border-border bg-surface px-5 py-14 text-center">
-          <h1 className="text-sm font-semibold text-charcoal">Not available</h1>
-          <p className="mx-auto mt-1.5 max-w-xs text-xs leading-relaxed text-txt-muted">
+        <div className="rounded-xl border border-rule bg-surface px-5 py-14 text-center">
+          <h1 className="text-sm font-semibold text-ink">Not available</h1>
+          <p className="mx-auto mt-1.5 max-w-xs text-xs leading-relaxed text-ink-muted">
             Only org admins and owners can create brands.
           </p>
           <Link
             href="/clients"
-            className="mt-4 inline-flex h-8 items-center rounded-lg bg-accent px-4 text-[0.75rem] font-medium text-white transition-colors hover:bg-accent-light"
+            className={`${buttonVariants({ variant: "secondary", size: "sm" })} mt-4`}
           >
             Back to brands
           </Link>
@@ -141,39 +148,31 @@ export default function NewClientPage() {
     );
   }
 
-  const inputClass =
-    "h-10 w-full rounded-lg border border-border bg-cream/40 px-3.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-cobalt focus:ring-1 focus:ring-cobalt/20";
-  const labelClass =
-    "mb-1.5 block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted";
-
   return (
     <div className="mx-auto max-w-5xl">
       {/* Breadcrumb */}
-      <div className="mb-6 flex items-center gap-2 text-xs text-txt-muted">
-        <Link href="/clients" className="hover:text-charcoal transition-colors">
+      <div className="mb-6 flex items-center gap-2 text-xs text-ink-muted">
+        <Link href="/clients" className="hover:text-ink transition-colors">
           Brands
         </Link>
         <span>/</span>
-        <span className="text-txt-secondary">New brand</span>
+        <span className="text-ink-soft">New brand</span>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* ── Details ───────────────────────────────────────────── */}
-        <div className="rounded-xl border border-border bg-surface p-8">
-          <h1 className="font-display mb-6 text-xl font-medium text-charcoal">New brand</h1>
+        <Card padding="lg">
+          <h1 className="mb-6 text-xl font-semibold text-ink">New brand</h1>
 
           {error && (
-            <div className="mb-5 rounded-lg bg-red-light px-4 py-2.5 text-sm text-red">
+            <Callout tone="error" className="mb-5">
               {error}
-            </div>
+            </Callout>
           )}
 
           <div className="space-y-5">
-            <div>
-              <label htmlFor="name" className={labelClass}>
-                Company Name <span className="text-red">*</span>
-              </label>
-              <input
+            <Field label="Company name" htmlFor="name" required error={fieldErrors.name}>
+              <Input
                 id="name"
                 name="name"
                 type="text"
@@ -182,16 +181,18 @@ export default function NewClientPage() {
                 value={name}
                 placeholder="Acme Corp"
                 onChange={(e) => handleNameChange(e.target.value)}
-                className={`${inputClass} ${fieldErrors.name ? "border-red focus:border-red focus:ring-red/20" : ""}`}
+                invalid={!!fieldErrors.name}
               />
-              {fieldErrors.name && <p className="mt-1 text-xs text-red">{fieldErrors.name}</p>}
-            </div>
+            </Field>
 
-            <div>
-              <label htmlFor="slug" className={labelClass}>
-                Subdomain <span className="text-red">*</span>
+            <div className="space-y-1.5">
+              <label htmlFor="slug" className={controlLabel}>
+                Subdomain{" "}
+                <span className="text-red" aria-hidden="true">
+                  *
+                </span>
               </label>
-              <input
+              <Input
                 id="slug"
                 value={slug}
                 onChange={(e) => {
@@ -200,98 +201,72 @@ export default function NewClientPage() {
                 }}
                 onBlur={(e) => checkSlug(e.target.value)}
                 placeholder="acme-corp"
-                className={`${inputClass} ${fieldErrors.slug ? "border-red focus:border-red focus:ring-red/20" : ""}`}
+                invalid={!!fieldErrors.slug}
               />
-              <p className="mt-1.5 font-mono text-[0.7rem] text-txt-muted">
+              <p className="font-mono text-[0.7rem] text-ink-muted">
                 {slug || "slug"}.talentstream.co.za
-                {slugChecking && <span className="ml-2 text-txt-muted">checking...</span>}
+                {slugChecking && <span className="ml-2 text-ink-muted">checking…</span>}
               </p>
-              {fieldErrors.slug && <p className="mt-1 text-xs text-red">{fieldErrors.slug}</p>}
+              {fieldErrors.slug && <p className="text-xs text-red">{fieldErrors.slug}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="contact_name" className={labelClass}>Contact Name</label>
-                <input id="contact_name" name="contact_name" type="text" placeholder="Jane Smith" className={inputClass} />
-              </div>
-              <div>
-                <label htmlFor="contact_email" className={labelClass}>Contact Email</label>
-                <input id="contact_email" name="contact_email" type="email" placeholder="jane@acme.com" className={inputClass} />
-              </div>
+              <Field label="Contact name" htmlFor="contact_name">
+                <Input id="contact_name" name="contact_name" type="text" placeholder="Jane Smith" />
+              </Field>
+              <Field label="Contact email" htmlFor="contact_email">
+                <Input id="contact_email" name="contact_email" type="email" placeholder="jane@acme.com" />
+              </Field>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="contact_phone" className={labelClass}>Phone</label>
-                <input id="contact_phone" name="contact_phone" type="tel" placeholder="+27 82 123 4567" className={inputClass} />
-              </div>
-              <div>
-                <label htmlFor="billing_email" className={labelClass}>Billing Email</label>
-                <input id="billing_email" name="billing_email" type="email" placeholder="accounts@acme.com" className={inputClass} />
-              </div>
+              <Field label="Phone" htmlFor="contact_phone">
+                <Input id="contact_phone" name="contact_phone" type="tel" placeholder="+27 82 123 4567" />
+              </Field>
+              <Field label="Billing email" htmlFor="billing_email">
+                <Input id="billing_email" name="billing_email" type="email" placeholder="accounts@acme.com" />
+              </Field>
             </div>
 
-            <div>
-              <label htmlFor="notes" className={labelClass}>Notes</label>
-              <textarea
-                id="notes"
-                name="notes"
-                rows={3}
-                placeholder="Internal notes about this brand..."
-                className="w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-cobalt focus:ring-1 focus:ring-cobalt/20 resize-none"
-              />
-            </div>
+            <Field label="Notes" htmlFor="notes">
+              <Textarea id="notes" name="notes" rows={3} placeholder="Internal notes about this brand..." />
+            </Field>
           </div>
-        </div>
+        </Card>
 
-        {/* ── Subscription Tier (inherited — operator-set) ──────── */}
-        <div className="rounded-xl border border-border bg-surface p-8">
-          <h2 className="font-display mb-2 text-base font-medium text-charcoal">
-            Subscription Tier
-          </h2>
-          <p className="mb-5 text-[0.75rem] text-txt-muted">
+        {/* ── Subscription tier (inherited — operator-set) ──────── */}
+        <Card padding="lg">
+          <h2 className="mb-2 text-base font-semibold text-ink">Subscription tier</h2>
+          <p className="mb-5 text-[0.75rem] text-ink-muted">
             New brands inherit your organisation&apos;s plan, which is set by
             TalentStream and applies across every brand.
           </p>
-          <div className="flex items-center gap-3 rounded-lg bg-cream/60 px-4 py-3">
+          <div className="flex items-center gap-3 rounded-lg bg-canvas/60 px-4 py-3">
             <TierBadge tier={tenant.orgTier} size="md" />
-            <span className="text-[0.75rem] text-txt-muted">
+            <span className="text-[0.75rem] text-ink-muted">
               Contact TalentStream to change your plan.
             </span>
           </div>
-        </div>
+        </Card>
 
         {/* ── Branding + Preview ────────────────────────────────── */}
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-          <div className="rounded-xl border border-border bg-surface p-8">
+          <Card padding="lg">
             <BrandingSection clientId={draftId} values={branding} onChange={patchBranding} />
-          </div>
-          <div className="rounded-xl border border-border bg-surface p-6">
+          </Card>
+          <Card>
             <LiveCampaignPreview values={branding} clientName={name} clientSlug={slug} />
-          </div>
+          </Card>
         </div>
 
         {/* ── Actions ───────────────────────────────────────────── */}
         <div className="flex items-center justify-end gap-3">
-          <Link
-            href="/clients"
-            className="inline-flex h-9 items-center rounded-lg px-4 text-[0.8rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal"
-          >
+          <Link href="/clients" className={buttonVariants({ variant: "ghost" })}>
             Cancel
           </Link>
-          <button
-            type="submit"
-            disabled={loading}
-            className="inline-flex h-9 items-center gap-2 rounded-lg bg-cobalt px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-cobalt-deep disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-          >
-            {loading && (
-              <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            )}
+          <Button type="submit" loading={loading}>
             Create brand
-          </button>
+          </Button>
         </div>
       </form>
     </div>

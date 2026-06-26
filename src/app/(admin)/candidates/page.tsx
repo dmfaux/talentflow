@@ -62,10 +62,10 @@ export default async function RejectionReviewPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="font-serif text-2xl italic text-charcoal">
+        <h1 className="font-serif text-2xl italic text-ink">
           Rejection review
         </h1>
-        <p className="mt-2 text-sm text-txt-secondary">
+        <p className="mt-2 text-sm text-ink-soft">
           Candidates the AI recommended rejecting. Nobody is rejected until you
           accept it.
         </p>

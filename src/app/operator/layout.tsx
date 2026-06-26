@@ -38,7 +38,7 @@ export default async function OperatorLayout({
                 <span className="absolute inline-flex h-full w-full rounded-full bg-vermillion opacity-60 pulse-dot" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-vermillion" />
               </span>
-              <span className="font-mono text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-paper">
+              <span className="font-mono text-[0.7rem] font-semibold uppercase tracking-[0.28em] text-white">
                 Talentstream
                 <span className="ml-2 text-vermillion">Operator</span>
               </span>
@@ -46,20 +46,20 @@ export default async function OperatorLayout({
             <nav className="hidden items-center gap-1 sm:flex">
               <Link
                 href="/operator"
-                className="rounded-md px-2.5 py-1 text-[0.72rem] font-medium text-paper/55 transition-colors hover:bg-white/10 hover:text-paper"
+                className="rounded-md px-2.5 py-1 text-[0.72rem] font-medium text-white/55 transition-colors hover:bg-white/10 hover:text-white"
               >
                 Organisations
               </Link>
               <Link
                 href="/operator/themes"
-                className="rounded-md px-2.5 py-1 text-[0.72rem] font-medium text-paper/55 transition-colors hover:bg-white/10 hover:text-paper"
+                className="rounded-md px-2.5 py-1 text-[0.72rem] font-medium text-white/55 transition-colors hover:bg-white/10 hover:text-white"
               >
                 Themes
               </Link>
             </nav>
           </div>
           <div className="flex items-center gap-3">
-            <span className="hidden font-mono text-[0.68rem] text-paper/45 md:inline">
+            <span className="hidden font-mono text-[0.68rem] text-white/45 md:inline">
               {operatorName}
             </span>
             <OperatorLogout />

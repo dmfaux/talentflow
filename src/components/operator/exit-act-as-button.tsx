@@ -20,7 +20,7 @@ export function ExitActAsButton({ tone = "light" }: { tone?: "light" | "dark" })
   const styles =
     tone === "dark"
       ? "border-ink/30 text-ink hover:bg-ink/10"
-      : "border-paper/40 text-paper hover:bg-paper/15";
+      : "border-white/40 text-white hover:bg-white/15";
 
   return (
     <button

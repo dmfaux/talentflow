@@ -51,7 +51,7 @@ export function ImpersonateButton({ orgId, orgName, status }: Props) {
     <>
       <button
         onClick={() => setConfirming(true)}
-        className="inline-flex h-10 items-center gap-2 rounded-lg bg-ink px-5 text-[0.8rem] font-medium text-paper transition-colors hover:bg-cobalt-deep cursor-pointer"
+        className="inline-flex h-10 items-center gap-2 rounded-lg bg-ink px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-cobalt-deep cursor-pointer"
       >
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="8" cy="5.5" r="2.5" />

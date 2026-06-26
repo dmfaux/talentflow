@@ -5,6 +5,11 @@ import { LiveCampaignPreview } from "@/components/admin/live-campaign-preview";
 import { ThemeCard, type Theme } from "@/components/admin/theme-card";
 import { TierBadge } from "@/components/admin/tier-badge";
 import { useTenant } from "@/components/admin/tenant-provider";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/card";
+import { Callout } from "@/components/ui/callout";
+import { Field, Input, Textarea } from "@/components/ui/field";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
@@ -149,118 +154,116 @@ export default function EditClientPage() {
   }
 
   if (loading) {
-    return <div className="py-20 text-center text-sm text-txt-muted">Loading...</div>;
+    return (
+      <div className="mx-auto max-w-5xl">
+        <Skeleton className="mb-6 h-4 w-56" />
+        <div className="space-y-6">
+          <Skeleton className="h-80 rounded-xl" />
+          <Skeleton className="h-32 rounded-xl" />
+          <Skeleton className="h-48 rounded-xl" />
+        </div>
+      </div>
+    );
   }
 
   if (loadError || !client) {
-    return <div className="py-20 text-center text-sm text-red">{loadError || "Brand not found"}</div>;
+    return (
+      <div className="mx-auto max-w-5xl py-20 text-center">
+        <p className="text-sm font-medium text-ink">{loadError || "Brand not found"}</p>
+        <p className="mt-1 text-sm text-ink-muted">
+          This brand may have been removed, or you don&rsquo;t have access to it.
+        </p>
+        <Link
+          href="/clients"
+          className={`${buttonVariants({ variant: "secondary", size: "sm" })} mt-5`}
+        >
+          Back to brands
+        </Link>
+      </div>
+    );
   }
-
-  const inputClass =
-    "h-10 w-full rounded-lg border border-border bg-cream/40 px-3.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-cobalt focus:ring-1 focus:ring-cobalt/20";
-  const labelClass =
-    "mb-1.5 block text-[0.7rem] font-medium uppercase tracking-[0.12em] text-txt-muted";
 
   return (
     <div className="mx-auto max-w-5xl">
       {/* Breadcrumb */}
-      <div className="mb-6 flex items-center gap-2 text-xs text-txt-muted">
-        <Link href="/clients" className="hover:text-charcoal transition-colors">
+      <div className="mb-6 flex items-center gap-2 text-xs text-ink-muted">
+        <Link href="/clients" className="hover:text-ink transition-colors">
           Brands
         </Link>
         <span>/</span>
-        <Link href={`/clients/${id}`} className="hover:text-charcoal transition-colors">
+        <Link href={`/clients/${id}`} className="hover:text-ink transition-colors">
           {client.name}
         </Link>
         <span>/</span>
-        <span className="text-txt-secondary">Edit</span>
+        <span className="text-ink-soft">Edit</span>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* ── Details ───────────────────────────────────────────── */}
-        <div className="rounded-xl border border-border bg-surface p-8">
-          <h1 className="font-display mb-6 text-xl font-medium text-charcoal">Edit brand</h1>
+        <Card padding="lg">
+          <h1 className="mb-6 text-xl font-semibold text-ink">Edit brand</h1>
 
           {saveError && (
-            <div className="mb-5 rounded-lg bg-red-light px-4 py-2.5 text-sm text-red">
+            <Callout tone="error" className="mb-5">
               {saveError}
-            </div>
+            </Callout>
           )}
 
           <div className="space-y-5">
-            <div>
-              <label htmlFor="name" className={labelClass}>
-                Company Name <span className="text-red">*</span>
-              </label>
-              <input
+            <Field label="Company name" htmlFor="name" required>
+              <Input
                 id="name"
                 name="name"
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className={inputClass}
               />
+            </Field>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Contact name" htmlFor="contact_name">
+                <Input id="contact_name" name="contact_name" type="text" defaultValue={client.contact_name ?? ""} />
+              </Field>
+              <Field label="Contact email" htmlFor="contact_email">
+                <Input id="contact_email" name="contact_email" type="email" defaultValue={client.contact_email ?? ""} />
+              </Field>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="contact_name" className={labelClass}>Contact Name</label>
-                <input id="contact_name" name="contact_name" type="text" defaultValue={client.contact_name ?? ""} className={inputClass} />
-              </div>
-              <div>
-                <label htmlFor="contact_email" className={labelClass}>Contact Email</label>
-                <input id="contact_email" name="contact_email" type="email" defaultValue={client.contact_email ?? ""} className={inputClass} />
-              </div>
+              <Field label="Phone" htmlFor="contact_phone">
+                <Input id="contact_phone" name="contact_phone" type="tel" defaultValue={client.contact_phone ?? ""} />
+              </Field>
+              <Field label="Billing email" htmlFor="billing_email">
+                <Input id="billing_email" name="billing_email" type="email" defaultValue={client.billing_email ?? ""} />
+              </Field>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="contact_phone" className={labelClass}>Phone</label>
-                <input id="contact_phone" name="contact_phone" type="tel" defaultValue={client.contact_phone ?? ""} className={inputClass} />
-              </div>
-              <div>
-                <label htmlFor="billing_email" className={labelClass}>Billing Email</label>
-                <input id="billing_email" name="billing_email" type="email" defaultValue={client.billing_email ?? ""} className={inputClass} />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="notes" className={labelClass}>Notes</label>
-              <textarea
-                id="notes"
-                name="notes"
-                rows={3}
-                defaultValue={client.notes ?? ""}
-                className="w-full rounded-lg border border-border bg-cream/40 px-3.5 py-2.5 text-sm text-charcoal placeholder:text-txt-muted outline-none transition-colors focus:border-cobalt focus:ring-1 focus:ring-cobalt/20 resize-none"
-              />
-            </div>
+            <Field label="Notes" htmlFor="notes">
+              <Textarea id="notes" name="notes" rows={3} defaultValue={client.notes ?? ""} />
+            </Field>
           </div>
-        </div>
+        </Card>
 
-        {/* ── Subscription Tier (read-only — operator-set) ──────── */}
-        <div className="rounded-xl border border-border bg-surface p-8">
-          <h2 className="font-display mb-2 text-base font-medium text-charcoal">
-            Subscription Tier
-          </h2>
-          <p className="mb-5 text-[0.75rem] text-txt-muted">
+        {/* ── Subscription tier (read-only — operator-set) ──────── */}
+        <Card padding="lg">
+          <h2 className="mb-2 text-base font-semibold text-ink">Subscription tier</h2>
+          <p className="mb-5 text-[0.75rem] text-ink-muted">
             The plan is set by TalentStream for the whole organisation and
             can&apos;t be changed here.
           </p>
-          <div className="flex items-center gap-3 rounded-lg bg-cream/60 px-4 py-3">
+          <div className="flex items-center gap-3 rounded-lg bg-canvas/60 px-4 py-3">
             <TierBadge tier={tier} size="md" />
-            <span className="text-[0.75rem] text-txt-muted">
+            <span className="text-[0.75rem] text-ink-muted">
               Contact TalentStream to change your plan.
             </span>
           </div>
-        </div>
+        </Card>
 
         {/* ── Default campaign theme (CT3) ──────────────────────── */}
-        <div className="rounded-xl border border-border bg-surface p-8">
-          <h2 className="font-display mb-2 text-base font-medium text-charcoal">
-            Default Campaign Theme
-          </h2>
-          <p className="mb-5 text-[0.75rem] text-txt-muted">
+        <Card padding="lg">
+          <h2 className="mb-2 text-base font-semibold text-ink">Default campaign theme</h2>
+          <p className="mb-5 text-[0.75rem] text-ink-muted">
             The look new campaigns inherit unless a campaign picks its own. Active
             campaigns keep the theme they were published with.
           </p>
@@ -289,39 +292,26 @@ export default function EditClientPage() {
               );
             })}
           </div>
-        </div>
+        </Card>
 
         {/* ── Branding + Preview ────────────────────────────────── */}
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-          <div className="rounded-xl border border-border bg-surface p-8">
+          <Card padding="lg">
             <BrandingSection clientId={client.id} values={branding} onChange={patchBranding} />
-          </div>
-          <div className="rounded-xl border border-border bg-surface p-6">
+          </Card>
+          <Card>
             <LiveCampaignPreview values={branding} clientName={name} clientSlug={client.slug} />
-          </div>
+          </Card>
         </div>
 
         {/* ── Actions ───────────────────────────────────────────── */}
         <div className="flex items-center justify-end gap-3">
-          <Link
-            href={`/clients/${id}`}
-            className="inline-flex h-9 items-center rounded-lg px-4 text-[0.8rem] font-medium text-txt-secondary transition-colors hover:bg-cream hover:text-charcoal"
-          >
+          <Link href={`/clients/${id}`} className={buttonVariants({ variant: "ghost" })}>
             Cancel
           </Link>
-          <button
-            type="submit"
-            disabled={saving}
-            className="inline-flex h-9 items-center gap-2 rounded-lg bg-cobalt px-5 text-[0.8rem] font-medium text-white transition-colors hover:bg-cobalt-deep disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
-          >
-            {saving && (
-              <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            )}
-            Save Changes
-          </button>
+          <Button type="submit" loading={saving}>
+            Save changes
+          </Button>
         </div>
       </form>
     </div>

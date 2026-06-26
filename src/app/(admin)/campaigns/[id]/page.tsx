@@ -8,15 +8,19 @@ import { CampaignTabs } from "@/components/admin/campaign-tabs";
 import { CampaignUrl } from "@/components/admin/campaign-url";
 import { CandidateTable } from "@/components/admin/candidate-table";
 import { ShortlistTab } from "@/components/admin/shortlist-tab";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/card";
 import { canAccessBrand, orgScope, requireTenant } from "@/lib/tenant";
 import { getCampaignSpend } from "@/lib/pricing";
 import { Suspense } from "react";
 
 const zarFmt = (n: number) => "R" + Math.round(n).toLocaleString("en-ZA");
+// Distinct AA-safe hues per tier (gold token is the teal misnomer — too faint as
+// a bar fill on light, so the top tier reads in saffron).
 const TIER_BAR: Record<string, string> = {
-  essential: "bg-green",
-  professional: "bg-accent",
-  executive: "bg-gold",
+  essential: "bg-moss",
+  professional: "bg-cobalt",
+  executive: "bg-saffron",
 };
 
 interface Props {
@@ -24,12 +28,13 @@ interface Props {
   searchParams: Promise<Record<string, string | undefined>>;
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  draft: "bg-cream text-txt-secondary",
-  active: "bg-green-light text-green",
-  paused: "bg-warning-light text-warning",
-  closed: "bg-red-light text-red",
-  archived: "bg-cream text-txt-muted",
+// Shared with the dashboard + list so a status reads identically everywhere.
+const STATUS_TONE: Record<string, BadgeTone> = {
+  draft: "neutral",
+  active: "moss",
+  paused: "saffron",
+  closed: "red",
+  archived: "neutral",
 };
 
 function daysAgo(date: Date): string {
@@ -159,10 +164,10 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
     den > 0 ? Math.round((num / den) * 100) : 0;
 
   const pipeline = [
-    { label: "Applied", value: totalApplied, barClass: "bg-charcoal/85" },
-    { label: "Passed gating", value: passedGating, barClass: "bg-accent/80" },
-    { label: "AI scored", value: aiScored, barClass: "bg-gold/75" },
-    { label: "Shortlisted", value: shortlisted, barClass: "bg-green/85" },
+    { label: "Applied", value: totalApplied, barClass: "bg-ink/85" },
+    { label: "Passed gating", value: passedGating, barClass: "bg-cobalt/80" },
+    { label: "AI scored", value: aiScored, barClass: "bg-saffron/80" },
+    { label: "Shortlisted", value: shortlisted, barClass: "bg-moss/85" },
   ];
   const maxPipeline = Math.max(totalApplied, 1);
   const conversions = [
@@ -184,24 +189,24 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
   return (
     <div>
       {/* Breadcrumb */}
-      <div className="mb-6 flex items-center gap-2 text-xs text-txt-muted">
-        <Link href="/campaigns" className="hover:text-charcoal transition-colors">Campaigns</Link>
+      <div className="mb-6 flex items-center gap-2 text-xs text-ink-muted">
+        <Link href="/campaigns" className="hover:text-ink transition-colors">Campaigns</Link>
         <span>/</span>
-        <span className="text-txt-secondary">{campaign.role_title}</span>
+        <span className="text-ink-soft">{campaign.role_title}</span>
       </div>
 
       {/* Header */}
       <div className="mb-8 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="font-serif text-2xl italic text-charcoal">{campaign.role_title}</h1>
-            <span className={`inline-block rounded-full px-3 py-0.5 text-[0.7rem] font-medium ${STATUS_STYLES[campaign.status] ?? STATUS_STYLES.draft}`}>
+            <h1 className="font-serif text-2xl italic text-ink">{campaign.role_title}</h1>
+            <Badge tone={STATUS_TONE[campaign.status] ?? "neutral"} dot className="capitalize">
               {campaign.status}
-            </span>
+            </Badge>
           </div>
-          <div className="mt-2 flex items-center gap-3 text-xs text-txt-secondary">
+          <div className="mt-2 flex items-center gap-3 text-xs text-ink-soft">
             <span>{campaign.client?.name ?? "\u2014"}</span>
-            <span className="text-txt-muted">&middot;</span>
+            <span className="text-ink-muted">&middot;</span>
             <span>
               {campaign.status === "draft"
                 ? "Not started"
@@ -209,7 +214,7 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
                   ? daysAgo(new Date(campaign.campaign_start))
                   : "\u2014"}
             </span>
-            <span className="text-txt-muted">&middot;</span>
+            <span className="text-ink-muted">&middot;</span>
             <CampaignUrl url={campaignUrl} />
           </div>
         </div>
@@ -217,12 +222,12 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
       </div>
 
       {/* Overview — pipeline funnel + quality rail */}
-      <div className="mb-6 grid grid-cols-1 overflow-hidden rounded-2xl border border-border bg-surface lg:grid-cols-[1.6fr_1fr]">
+      <div className="mb-6 grid grid-cols-1 overflow-hidden rounded-2xl border border-rule bg-surface lg:grid-cols-[1.6fr_1fr]">
         {/* Funnel */}
-        <div className="relative px-7 py-6 lg:border-r lg:border-border">
+        <div className="relative px-7 py-6 lg:border-r lg:border-rule">
           <div className="mb-5 flex items-baseline justify-between">
-            <span className="eyebrow text-txt-muted">Pipeline</span>
-            <span className="font-mono text-[0.65rem] uppercase tracking-[0.14em] text-txt-muted">
+            <span className="eyebrow text-ink-muted">Pipeline</span>
+            <span className="font-mono text-[0.65rem] uppercase tracking-[0.14em] text-ink-muted">
               {hasApplicants ? `${totalApplied} total` : "awaiting intake"}
             </span>
           </div>
@@ -238,26 +243,26 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
                   <div key={stage.label}>
                     {prev && (
                       <div className="flex items-center gap-3 py-1 pl-24">
-                        <span className="h-3 w-px bg-border-strong/60" />
-                        <span className="font-mono text-[0.63rem] uppercase tracking-[0.12em] text-txt-muted">
+                        <span className="h-3 w-px bg-rule-strong/60" />
+                        <span className="font-mono text-[0.63rem] uppercase tracking-[0.12em] text-ink-muted">
                           {convoPct}% through
                           {dropped > 0 && (
-                            <span className="ml-2 text-txt-muted/70">&middot; {dropped} dropped</span>
+                            <span className="ml-2 text-ink-muted/70">&middot; {dropped} dropped</span>
                           )}
                         </span>
                       </div>
                     )}
                     <div className="flex items-center gap-4">
-                      <span className="w-20 shrink-0 font-serif text-[0.82rem] italic text-txt-secondary">
+                      <span className="w-20 shrink-0 text-[0.78rem] font-medium text-ink-soft">
                         {stage.label}
                       </span>
-                      <div className="relative flex-1 h-9 rounded-md bg-cream/70">
+                      <div className="relative flex-1 h-9 rounded-md bg-canvas/70">
                         <div
                           className={`h-full rounded-md ${stage.barClass} transition-[width] duration-700 ease-out`}
                           style={{ width: `${Math.max(pct, stage.value > 0 ? 3 : 0)}%` }}
                         />
                       </div>
-                      <span className="w-12 shrink-0 text-right font-mono text-sm font-semibold text-charcoal tabular-nums">
+                      <span className="w-12 shrink-0 text-right font-mono text-sm font-semibold text-ink tabular-nums">
                         {stage.value}
                       </span>
                     </div>
@@ -267,10 +272,10 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
             </div>
           ) : (
             <div className="flex flex-col items-start gap-3 py-6">
-              <p className="font-serif text-lg italic text-txt-secondary">
+              <p className="font-serif text-lg italic text-ink-soft">
                 No applicants yet.
               </p>
-              <p className="max-w-sm text-sm text-txt-muted">
+              <p className="max-w-sm text-sm text-ink-muted">
                 Once your campaign URL starts collecting responses, the funnel
                 will chart each stage&rsquo;s volume and the conversion between them.
               </p>
@@ -278,7 +283,7 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
                 href={campaignUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-1 inline-flex items-center gap-1.5 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-accent hover:underline"
+                className="mt-1 inline-flex items-center gap-1.5 font-mono text-[0.7rem] uppercase tracking-[0.14em] text-cobalt hover:underline"
               >
                 Preview campaign <span aria-hidden>&rarr;</span>
               </a>
@@ -287,49 +292,49 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
         </div>
 
         {/* Quality rail */}
-        <div className="relative flex flex-col justify-between gap-6 bg-gradient-to-br from-cream/60 via-surface to-surface px-7 py-6">
+        <div className="relative flex flex-col justify-between gap-6 bg-gradient-to-br from-canvas/60 via-surface to-surface px-7 py-6">
           <div>
-            <span className="eyebrow text-txt-muted">Top score</span>
+            <span className="eyebrow text-ink-muted">Top score</span>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="font-serif text-[3.5rem] leading-none italic text-charcoal tabular-nums">
+              <span className="font-mono text-[3.25rem] font-medium leading-none tracking-tight text-ink tabular-nums">
                 {topScoreFormatted ?? (
-                  <span className="text-txt-muted">&mdash;</span>
+                  <span className="text-ink-muted">&mdash;</span>
                 )}
               </span>
               {topScoreFormatted && (
-                <span className="font-mono text-xs text-txt-muted">/ 10</span>
+                <span className="font-mono text-xs text-ink-muted">/ 10</span>
               )}
             </div>
             {topScorer?.name ? (
-              <p className="mt-1 truncate text-xs text-txt-secondary">
+              <p className="mt-1 truncate text-xs text-ink-soft">
                 {topScorer.name}
                 {topScorer.confidence && (
-                  <span className="ml-1.5 font-mono uppercase tracking-[0.12em] text-txt-muted">
+                  <span className="ml-1.5 font-mono uppercase tracking-[0.12em] text-ink-muted">
                     &middot; {topScorer.confidence} confidence
                   </span>
                 )}
               </p>
             ) : (
-              <p className="mt-1 text-xs text-txt-muted">No scored candidates yet.</p>
+              <p className="mt-1 text-xs text-ink-muted">No scored candidates yet.</p>
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-x-5 gap-y-4 border-t border-border/70 pt-5">
+          <div className="grid grid-cols-2 gap-x-5 gap-y-4 border-t border-rule/70 pt-5">
             <div>
-              <span className="eyebrow text-txt-muted">Avg score</span>
-              <p className="mt-1 font-mono text-xl font-semibold text-charcoal">
-                {avgScoreFormatted ?? <span className="text-txt-muted">&mdash;</span>}
+              <span className="eyebrow text-ink-muted">Avg score</span>
+              <p className="mt-1 font-mono text-xl font-semibold text-ink">
+                {avgScoreFormatted ?? <span className="text-ink-muted">&mdash;</span>}
               </p>
-              <p className="mt-0.5 text-[0.7rem] text-txt-muted">
+              <p className="mt-0.5 text-[0.7rem] text-ink-muted">
                 across {aiScored} scored
               </p>
             </div>
             <div>
-              <span className="eyebrow text-txt-muted">Shortlist rate</span>
-              <p className="mt-1 font-mono text-xl font-semibold text-charcoal">
-                {hasApplicants ? `${shortlistRate}%` : <span className="text-txt-muted">&mdash;</span>}
+              <span className="eyebrow text-ink-muted">Shortlist rate</span>
+              <p className="mt-1 font-mono text-xl font-semibold text-ink">
+                {hasApplicants ? `${shortlistRate}%` : <span className="text-ink-muted">&mdash;</span>}
               </p>
-              <p className="mt-0.5 text-[0.7rem] text-txt-muted">
+              <p className="mt-0.5 text-[0.7rem] text-ink-muted">
                 of {totalApplied} applied
               </p>
             </div>
@@ -339,26 +344,26 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
 
       {/* Attention strip */}
       {(awaitingReview > 0 || flagged > 0) && (
-        <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-border bg-surface/60 px-5 py-3">
-          <span className="eyebrow text-txt-muted">Needs a look</span>
+        <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-rule bg-surface/60 px-5 py-3">
+          <span className="eyebrow text-ink-muted">Needs a look</span>
           {awaitingReview > 0 && (
             <Link
               href={`/campaigns/${id}?status=scored`}
-              className="group inline-flex items-baseline gap-2 text-xs text-txt-secondary hover:text-charcoal"
+              className="group inline-flex items-baseline gap-2 text-xs text-ink-soft hover:text-ink"
             >
-              <span className="font-mono text-base font-semibold text-accent">
+              <span className="font-mono text-base font-semibold text-cobalt">
                 {awaitingReview}
               </span>
               <span>awaiting your review</span>
-              <span className="arrow-slide text-accent" aria-hidden>&rarr;</span>
+              <span className="arrow-slide text-cobalt" aria-hidden>&rarr;</span>
             </Link>
           )}
           {awaitingReview > 0 && flagged > 0 && (
-            <span className="h-3 w-px bg-border-strong/60" aria-hidden />
+            <span className="h-3 w-px bg-rule-strong/60" aria-hidden />
           )}
           {flagged > 0 && (
-            <span className="inline-flex items-baseline gap-2 text-xs text-txt-secondary">
-              <span className="font-mono text-base font-semibold text-warning">
+            <span className="inline-flex items-baseline gap-2 text-xs text-ink-soft">
+              <span className="font-mono text-base font-semibold text-saffron-deep">
                 {flagged}
               </span>
               <span>flagged by AI</span>
@@ -372,37 +377,37 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
 
       {/* Tab content */}
       {activeTab === "spend" && campaignSpend ? (
-        <div className="rounded-xl border border-border bg-surface p-6">
+        <div className="rounded-xl border border-rule bg-surface p-6">
           <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 className="font-serif text-lg text-charcoal">AI spend for this campaign</h2>
-              <p className="mt-0.5 text-xs text-txt-muted">
+              <h2 className="text-sm font-semibold text-ink">AI spend for this campaign</h2>
+              <p className="mt-0.5 text-xs text-ink-muted">
                 All-time, estimated from metered usage. Final amounts appear on the org invoice.
               </p>
             </div>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-cream px-2.5 py-1 text-[0.72rem] text-txt-secondary">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-rule bg-canvas px-2.5 py-1 text-[0.72rem] text-ink-soft">
               Scoring tier:{" "}
-              <span className="font-medium capitalize text-charcoal">
+              <span className="font-medium capitalize text-ink">
                 {campaign.selected_model_tier}
               </span>
             </span>
           </div>
 
           <div className="mb-6 grid gap-4 sm:grid-cols-2">
-            <div className="rounded-lg border border-border bg-cream/40 p-4">
-              <p className="text-[0.7rem] uppercase tracking-[0.12em] text-txt-muted">Spend (incl. VAT)</p>
-              <p className="mt-1.5 font-serif text-2xl tabular-nums text-charcoal">{zarFmt(campaignSpend.totalInclVat)}</p>
-              <p className="mt-1 text-[0.72rem] text-txt-muted">
+            <div className="rounded-lg bg-canvas/60 p-4">
+              <p className="text-[0.7rem] uppercase tracking-[0.12em] text-ink-muted">Spend (incl. VAT)</p>
+              <p className="mt-1.5 font-mono text-2xl font-medium tabular-nums text-ink">{zarFmt(campaignSpend.totalInclVat)}</p>
+              <p className="mt-1 text-[0.72rem] text-ink-muted">
                 {Math.round(campaignSpend.totalCredits).toLocaleString("en-ZA")} cr ·{" "}
                 {zarFmt(campaignSpend.subtotalExVat)} + {zarFmt(campaignSpend.vat)} VAT
               </p>
             </div>
-            <div className="rounded-lg border border-border bg-cream/40 p-4">
-              <p className="text-[0.7rem] uppercase tracking-[0.12em] text-txt-muted">≈ Candidates analysed</p>
-              <p className="mt-1.5 font-serif text-2xl tabular-nums text-charcoal">
+            <div className="rounded-lg bg-canvas/60 p-4">
+              <p className="text-[0.7rem] uppercase tracking-[0.12em] text-ink-muted">≈ Candidates analysed</p>
+              <p className="mt-1.5 font-mono text-2xl font-medium tabular-nums text-ink">
                 {Math.round(campaignSpend.estCandidates).toLocaleString("en-ZA")}
               </p>
-              <p className="mt-1 text-[0.72rem] text-txt-muted">≈ 3–18 credits each, by tier</p>
+              <p className="mt-1 text-[0.72rem] text-ink-muted">≈ 3–18 credits each, by tier</p>
             </div>
           </div>
 
@@ -415,29 +420,29 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
                   return (
                     <div key={t.tier}>
                       <div className="mb-1.5 flex items-baseline justify-between">
-                        <span className="text-[0.85rem] text-txt-secondary">{t.label}</span>
-                        <span className="font-mono text-[0.85rem] text-charcoal">
+                        <span className="text-[0.85rem] text-ink-soft">{t.label}</span>
+                        <span className="font-mono text-[0.85rem] text-ink">
                           {zarFmt(t.zar)}
-                          <span className="ml-2 text-[0.74rem] text-txt-muted">
+                          <span className="ml-2 text-[0.74rem] text-ink-muted">
                             {Math.round(t.credits).toLocaleString("en-ZA")} cr
                           </span>
                         </span>
                       </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-cream">
+                      <div className="h-2 overflow-hidden rounded-full bg-canvas">
                         <div
-                          className={`h-full rounded-full ${TIER_BAR[t.tier] ?? "bg-accent"}`}
+                          className={`h-full rounded-full ${TIER_BAR[t.tier] ?? "bg-cobalt"}`}
                           style={{ width: `${(t.zar / max) * 100}%` }}
                         />
                       </div>
                     </div>
                   );
                 })}
-              <p className="mt-4 border-t border-border pt-4 font-mono text-[0.68rem] uppercase tracking-wide text-txt-muted">
+              <p className="mt-4 border-t border-rule pt-4 font-mono text-[0.68rem] uppercase tracking-wide text-ink-muted">
                 Candidate chats always bill at Essential
               </p>
             </div>
           ) : (
-            <p className="text-sm text-txt-muted">No AI spend recorded for this campaign yet.</p>
+            <p className="text-sm text-ink-muted">No AI spend recorded for this campaign yet.</p>
           )}
         </div>
       ) : activeTab === "shortlist" ? (
@@ -455,7 +460,25 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
           }))}
         />
       ) : (
-        <Suspense fallback={<div className="rounded-xl border border-border bg-surface p-10 text-center text-sm text-txt-muted">Loading...</div>}>
+        <Suspense
+          fallback={
+            <div className="overflow-hidden rounded-xl border border-rule bg-surface">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-4 border-b border-rule px-5 py-4 last:border-b-0"
+                >
+                  <Skeleton className="h-8 w-8 rounded-full" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-2.5 w-56" />
+                  </div>
+                  <Skeleton className="h-5 w-12" />
+                </div>
+              ))}
+            </div>
+          }
+        >
           <CandidateTable
             campaignId={id}
             candidates={candidateRows.map((c) => ({
