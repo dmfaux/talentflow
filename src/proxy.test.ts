@@ -160,8 +160,16 @@ describe("app host", () => {
     expect(new URL(getRedirectUrl(res)!).pathname).toBe("/login");
   });
 
-  it("leaves the public login / reset / accept-invite pages alone", async () => {
-    for (const p of ["/", "/login", "/reset-password", "/accept-invite/abc"]) {
+  it("leaves the public login / reset / accept-invite / legal pages alone", async () => {
+    for (const p of [
+      "/",
+      "/login",
+      "/reset-password",
+      "/accept-invite/abc",
+      "/privacy",
+      "/popia",
+      "/terms",
+    ]) {
       const res = await proxy(req(`https://app.${APEX}${p}`, { host: `app.${APEX}` }));
       expect(getRedirectUrl(res)).toBeNull();
       expect(isRewrite(res)).toBe(false);

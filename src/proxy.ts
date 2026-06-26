@@ -5,8 +5,9 @@ import { verifyJwt } from "@/lib/token";
 const COOKIE_NAME = "admin_session";
 
 // Public on the APP host — reachable without a session: the marketing/login
-// landing, the login gateway, password-reset, and the invite-accept page the
-// invitee opens before they have any session (S8).
+// landing, the login gateway, password-reset, the invite-accept page the
+// invitee opens before they have any session (S8), and the public legal pages
+// (privacy, POPIA, terms) linked from the footer.
 function isPublicAppPath(pathname: string): boolean {
   return (
     pathname === "/" ||
@@ -14,7 +15,10 @@ function isPublicAppPath(pathname: string): boolean {
     pathname === "/reset-password" ||
     pathname.startsWith("/reset-password/") ||
     pathname === "/accept-invite" ||
-    pathname.startsWith("/accept-invite/")
+    pathname.startsWith("/accept-invite/") ||
+    pathname === "/privacy" ||
+    pathname === "/popia" ||
+    pathname === "/terms"
   );
 }
 
