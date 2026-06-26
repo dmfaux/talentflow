@@ -123,11 +123,6 @@ body {
   to { transform: scaleY(1); }
 }
 
-@keyframes ticker {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(-50%, 0, 0); }
-}
-
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
@@ -241,15 +236,6 @@ body {
   vertical-align: text-bottom;
   margin-left: 0.05em;
   animation: blink 1.1s steps(1, end) infinite;
-}
-
-/* ─── Ticker marquee ─── */
-.ticker-track {
-  animation: ticker 45s linear infinite;
-  will-change: transform;
-}
-.ticker-track:hover {
-  animation-play-state: paused;
 }
 
 /* ─── Hero grid overlay ─── */

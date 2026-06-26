@@ -299,17 +299,9 @@ function Navbar() {
 function Hero() {
   return (
     <section className="relative pt-32 sm:pt-40 pb-16 sm:pb-20 overflow-hidden">
-      {/* Subtle radial wash */}
+      {/* Quiet blueprint grid — the only ambient texture in the hero. */}
       <div
         className="pointer-events-none absolute inset-0 hero-grid"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(ellipse 60% 50% at 80% 20%, rgba(255, 200, 0, 0.11) 0%, transparent 60%), radial-gradient(ellipse 50% 40% at 10% 80%, rgba(230, 57, 23, 0.05) 0%, transparent 60%)",
-        }}
         aria-hidden
       />
 
@@ -335,7 +327,7 @@ function Hero() {
             <div className="load-fade load-4 mt-10 sm:mt-12 flex flex-wrap items-center gap-3 sm:gap-4">
               <a
                 href="#start"
-                className="arrow-parent group inline-flex items-center gap-2.5 h-[52px] px-7 bg-cobalt text-white text-[0.95rem] font-medium rounded-lg hover:bg-cobalt-deep transition-colors duration-300 lift shadow-[0_8px_24px_-8px_rgba(44,91,255,0.35)]"
+                className="arrow-parent group inline-flex items-center gap-2.5 h-[52px] px-7 bg-cobalt text-white text-[0.95rem] font-medium rounded-lg hover:bg-cobalt-deep transition-colors duration-300 lift"
               >
                 Start a campaign
                 <span className="arrow-slide">→</span>
@@ -356,7 +348,7 @@ function Hero() {
         </div>
       </div>
 
-      {/* Live ticker strip */}
+      {/* Live snapshot strip */}
       <div className="load-fade load-6 relative mt-20 sm:mt-28">
         <LiveTicker />
       </div>
@@ -406,45 +398,32 @@ function HeroStat() {
 }
 
 function LiveTicker() {
+  // A calm, static snapshot of today's funnel — no perpetual marquee. Liveness is
+  // carried by a single pulse dot, not by motion that never stops. Figures stay
+  // monochrome so the strip reads as quiet proof, not a scoreboard.
   const items = [
-    { label: "Gating passed", value: "+47", tone: "moss" as const },
-    { label: "Scored", value: "+89", tone: "cobalt" as const },
-    { label: "Shortlisted", value: "+14", tone: "moss" as const },
-    { label: "Follow-up sent", value: "+22", tone: "saffron" as const },
-    { label: "Applied today", value: "+312", tone: "ink" as const },
-    { label: "Confidence ≥ 80%", value: "+18", tone: "cobalt" as const },
-    { label: "POPIA consent", value: "100%", tone: "moss" as const },
-    { label: "Active campaigns", value: "11", tone: "vermillion" as const },
+    { label: "Applied today", value: "+312" },
+    { label: "Scored", value: "+89" },
+    { label: "Gating passed", value: "+47" },
+    { label: "Shortlisted", value: "+14" },
+    { label: "Confidence ≥ 80%", value: "+18" },
+    { label: "Active campaigns", value: "11" },
   ];
-  const toneClass = {
-    moss: "text-moss-deep",
-    cobalt: "text-cobalt",
-    saffron: "text-saffron-deep",
-    vermillion: "text-cobalt",
-    ink: "text-ink",
-  };
   return (
-    <div className="relative border-y border-rule bg-paper/60 overflow-hidden">
-      <div
-        className="pointer-events-none absolute inset-y-0 left-0 w-24 z-10"
-        style={{ background: "linear-gradient(to right, var(--color-canvas), transparent)" }}
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-y-0 right-0 w-24 z-10"
-        style={{ background: "linear-gradient(to left, var(--color-canvas), transparent)" }}
-        aria-hidden
-      />
-      <div className="ticker-track flex gap-10 py-4 whitespace-nowrap">
-        {[...items, ...items].map((it, i) => (
-          <div key={i} className="flex items-center gap-3 shrink-0">
-            <span className="eyebrow text-[0.62rem] text-ink-muted">{it.label}</span>
-            <span className={`font-mono text-[0.88rem] font-medium ${toneClass[it.tone]}`}>
-              {it.value}
-            </span>
-            <span className="text-ink-muted">·</span>
+    <div className="border-y border-rule bg-paper/60">
+      <div className="mx-auto max-w-[1240px] px-6 sm:px-10 py-5">
+        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
+          <div className="flex items-center gap-2">
+            <span className="relative w-1.5 h-1.5 rounded-full bg-moss pulse-dot" aria-hidden />
+            <span className="eyebrow text-[0.62rem] text-ink-muted">Live now</span>
           </div>
-        ))}
+          {items.map((it, i) => (
+            <div key={i} className="flex items-baseline gap-2">
+              <span className="font-mono text-[0.88rem] font-medium text-ink">{it.value}</span>
+              <span className="eyebrow text-[0.62rem] text-ink-muted">{it.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -684,18 +663,15 @@ function Benefits() {
 
 function Stats() {
   const [ref, inView] = useInView<HTMLDivElement>();
+  // Quiet by default: the figures read in near-white against the navy band, with a
+  // single rationed teal accent on the lead stat (teal is the brand's dark-surface
+  // signal). One thing to notice, not four competing colours.
   const stats = [
-    { value: useCountUp(58, 1700, inView), suffix: "%", label: "Lower cost than per-placement fees", tone: "moss" as const },
-    { value: useCountUp(850, 1500, inView), suffix: "", label: "Candidates analysed per campaign", tone: "cobalt" as const },
-    { value: useCountUp(100, 1600, inView), suffix: "%", label: "POPIA compliant, ZA-hosted", tone: "vermillion" as const },
-    { value: useCountUp(3, 1200, inView), suffix: "", label: "AI intelligence tiers per campaign", tone: "saffron" as const },
+    { value: useCountUp(58, 1700, inView), suffix: "%", label: "Lower cost than per-placement fees" },
+    { value: useCountUp(850, 1500, inView), suffix: "", label: "Candidates analysed per campaign" },
+    { value: useCountUp(100, 1600, inView), suffix: "%", label: "POPIA compliant, ZA-hosted" },
+    { value: useCountUp(3, 1200, inView), suffix: "", label: "AI intelligence tiers per campaign" },
   ];
-  const toneText = {
-    cobalt: "text-cobalt",
-    moss: "text-moss",
-    vermillion: "text-vermillion",
-    saffron: "text-saffron",
-  };
 
   return (
     <section ref={ref} className="py-20 sm:py-28 bg-ink text-canvas relative overflow-hidden">
@@ -712,7 +688,7 @@ function Stats() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-12">
           {stats.map((s, i) => (
             <div key={i} className="border-l border-canvas/15 pl-5 sm:pl-6">
-              <p className={`font-display text-[3rem] sm:text-[4rem] lg:text-[4.75rem] leading-[0.95] tracking-[-0.03em] font-medium tabular-nums ${toneText[s.tone]}`}>
+              <p className={`font-display text-[3rem] sm:text-[4rem] lg:text-[4.75rem] leading-[0.95] tracking-[-0.03em] font-medium tabular-nums ${i === 0 ? "text-vermillion" : "text-canvas"}`}>
                 {s.value}
                 <span className="text-canvas/70 text-[0.35em] ml-1 font-sans font-normal align-super">{s.suffix}</span>
               </p>
@@ -804,7 +780,7 @@ function Pricing() {
               {tier.featured && (
                 <div className="absolute -top-3 left-8">
                   <span className="inline-flex items-center gap-1.5 bg-vermillion text-ink text-[0.66rem] font-semibold uppercase tracking-[0.12em] px-3 py-1.5 rounded-full">
-                    <span className="w-1 h-1 rounded-full bg-ink pulse-dot" />
+                    <span className="w-1 h-1 rounded-full bg-ink" />
                     Most chosen
                   </span>
                 </div>
@@ -924,17 +900,9 @@ function Pricing() {
 
             {/* Executive — flagship */}
             <div className="animate-on-scroll stagger-4 relative flex flex-col rounded-2xl border border-ink bg-ink text-canvas p-7 transition-all lift shadow-[0_12px_48px_-12px_rgba(11,15,28,0.3)]">
-              <div
-                className="pointer-events-none absolute inset-0 rounded-2xl"
-                style={{
-                  background:
-                    "radial-gradient(ellipse 70% 60% at 85% 0%, rgba(255,200,0,0.16) 0%, transparent 60%)",
-                }}
-                aria-hidden
-              />
               <div className="absolute -top-3 left-7">
                 <span className="inline-flex items-center gap-1.5 bg-saffron text-ink text-[0.62rem] font-semibold uppercase tracking-[0.12em] px-3 py-1.5 rounded-full">
-                  <span className="w-1 h-1 rounded-full bg-ink pulse-dot" />
+                  <span className="w-1 h-1 rounded-full bg-ink" />
                   Flagship
                 </span>
               </div>
@@ -1016,14 +984,6 @@ function FinalCTA() {
 
   return (
     <section ref={ref} id="start" className="py-24 sm:py-36 bg-paper border-t border-rule relative overflow-hidden scroll-mt-20">
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(ellipse 80% 60% at 50% 50%, rgba(255, 200, 0, 0.07) 0%, transparent 70%)",
-        }}
-        aria-hidden
-      />
       <div className="relative mx-auto max-w-[1240px] px-6 sm:px-10">
         <div className="max-w-[820px] mx-auto text-center">
           <div className="animate-on-scroll inline-flex items-center gap-2 mb-8 px-4 py-2 border border-rule rounded-full bg-canvas">
@@ -1097,7 +1057,7 @@ function FinalCTA() {
                   <button
                     type="submit"
                     disabled={status === "submitting"}
-                    className="arrow-parent group h-[56px] px-7 bg-cobalt text-white font-medium text-[0.95rem] rounded-lg hover:bg-cobalt-deep transition-colors duration-300 shrink-0 inline-flex items-center justify-center gap-2.5 lift shadow-[0_8px_24px_-8px_rgba(44,91,255,0.35)] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:bg-cobalt"
+                    className="arrow-parent group h-[56px] px-7 bg-cobalt text-white font-medium text-[0.95rem] rounded-lg hover:bg-cobalt-deep transition-colors duration-300 shrink-0 inline-flex items-center justify-center gap-2.5 lift disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:bg-cobalt"
                   >
                     {status === "submitting" ? "Sending…" : "Request access"}
                     {status !== "submitting" && <span className="arrow-slide">→</span>}
