@@ -307,9 +307,12 @@ body {
 }
 
 /* ─── Typography refinements ─── */
+/* Display type balances its lines (even ragged edges on headlines); the rest of
+   the page inherits `text-wrap: pretty` from <main> to trim prose orphans. */
 .font-display {
   font-family: var(--font-fraunces), Georgia, serif;
   font-optical-sizing: auto;
+  text-wrap: balance;
 }
 .font-display-italic {
   font-family: var(--font-fraunces), Georgia, serif;
@@ -352,6 +355,20 @@ html {
   color: #ffffff;
 }
 
+/* ─── Keyboard focus ─── */
+/* One consistent, on-brand focus ring for keyboard users (mouse clicks stay
+   ring-free via :focus-visible). Cobalt clears 3:1 against both the light canvas
+   and the navy frame, so it reads on every surface. The email field keeps its own
+   box-shadow focus ring (set in the markup); this outline sits outside it. */
+:focus-visible {
+  outline: 2px solid var(--color-cobalt);
+  outline-offset: 2px;
+  border-radius: 4px; /* rounded-sm — smallest documented radius */
+}
+/* Programmatically-focused containers (e.g. the skip-link target <main>) take
+   focus for screen readers but shouldn't draw a page-wide ring. */
+[tabindex="-1"]:focus { outline: none; }
+
 /* ─── Reduce motion ─── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -359,5 +376,6 @@ html {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-  .ticker-track { animation: none !important; }
+  /* Anchor jumps shouldn't smooth-scroll for users who asked for less motion. */
+  html { scroll-behavior: auto; }
 }

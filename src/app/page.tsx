@@ -908,7 +908,7 @@ function Pricing() {
               </div>
               <div className="relative flex items-center justify-between mb-5">
                 <span className="eyebrow text-saffron text-[0.64rem]">Executive</span>
-                <span className="font-mono text-[0.7rem] text-canvas/45">tier 03</span>
+                <span className="font-mono text-[0.7rem] text-canvas/60">tier 03</span>
               </div>
               <h4 className="relative font-display text-canvas text-[1.3rem] leading-[1.15] tracking-[-0.01em] mb-2.5">
                 Our sharpest mind
@@ -917,10 +917,10 @@ function Pricing() {
                 The deepest reasoning we offer, for your most senior and highest-stakes hires. Worth every cent when the seat truly matters.
               </p>
               <div className="relative mt-auto pt-5 border-t border-canvas/15">
-                <p className="text-[0.68rem] text-canvas/45 mb-1.5">Draws from your allowance</p>
+                <p className="text-[0.68rem] text-canvas/60 mb-1.5">Draws from your allowance</p>
                 <div className="flex items-baseline gap-1.5">
                   <span className="font-mono text-[1.4rem] text-saffron font-medium tracking-tight">≈ 18</span>
-                  <span className="font-mono text-[0.76rem] text-canvas/45">credits / candidate</span>
+                  <span className="font-mono text-[0.76rem] text-canvas/60">credits / candidate</span>
                 </div>
               </div>
             </div>
@@ -1148,8 +1148,14 @@ function Footer() {
 export default function Home() {
   return (
     <>
+      <a
+        href="#main-content"
+        className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:left-4 focus-visible:top-4 focus-visible:z-[60] focus-visible:rounded-lg focus-visible:bg-ink focus-visible:px-4 focus-visible:py-2.5 focus-visible:text-[0.85rem] focus-visible:font-medium focus-visible:text-canvas"
+      >
+        Skip to content
+      </a>
       <Navbar />
-      <main className="bg-canvas">
+      <main id="main-content" tabIndex={-1} className="bg-canvas text-pretty">
         <Hero />
         <Problem />
         <Method />
