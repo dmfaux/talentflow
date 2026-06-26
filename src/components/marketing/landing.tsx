@@ -474,16 +474,16 @@ function Problem() {
 
   const pains = [
     {
-      title: "Per-placement fees scale with salary, not with effort",
-      body: "Percentage-of-salary pricing ties cost to the role, not the work involved. For high-volume or senior hiring, that adds up fast.",
+      title: "Screening every applicant by hand doesn't scale",
+      body: "Reading and scoring CVs one at a time eats days per role. Quality drifts between reviewers, and strong candidates slip through the pile unseen.",
     },
     {
       title: "Internal hiring burns your team out",
       body: "HR drowns in unqualified applications. Every open role becomes a second full-time job for someone.",
     },
     {
-      title: "Contingency models pressure speed over fit",
-      body: "When revenue depends on who fills the seat first, depth of assessment is the first thing to give. Everyone involved deserves better tooling.",
+      title: "Speed and depth pull against each other",
+      body: "Rush the shortlist and you miss good people; assess properly and the role stays open for weeks. Without the right tooling, something always gives.",
     },
   ];
 
