@@ -328,6 +328,11 @@ export const candidates = pgTable(
     chat_token_hash: text("chat_token_hash"),
     gating_answers: jsonb("gating_answers"),
     gating_passed: boolean("gating_passed"),
+    /** Provenance of the gating decision for recruiter-added candidates:
+     *  null                 = candidate self-answered on the public form;
+     *  "recruiter_override" = recruiter vouched, gating bypassed;
+     *  "recruiter_answered" = recruiter filled the answers (evaluated normally). */
+    gating_source: text("gating_source"),
     cv_url: text("cv_url"),
     cv_text: text("cv_text"),
     ai_score: real("ai_score"),
@@ -356,6 +361,19 @@ export const candidates = pgTable(
     follow_up_notes: text("follow_up_notes"),
     shortlist_notes: text("shortlist_notes"),
     source: text("source"),
+    /** Recruiter consent attestation for the skip/vouch path of a manual add.
+     *  These record that a recruiter attested they hold the candidate's consent;
+     *  popia_consent_at stays NULL until the candidate personally confirms. */
+    consent_attested_by: uuid("consent_attested_by").references(() => users.id, {
+      onDelete: "set null", // attestation record outlives the recruiter account
+    }),
+    consent_attested_at: timestamp("consent_attested_at"),
+    consent_basis: text("consent_basis"), // verbal|written|prior_application|existing_relationship|other
+    consent_basis_note: text("consent_basis_note"), // required when consent_basis = "other"
+    /** Denormalised mirror of the invite token's expiry (source of truth:
+     *  chat_tokens.expires_at) so the recruiter list shows pending/expired
+     *  without a join. Set on invite issue/resend; null for non-invite rows. */
+    invite_expires_at: timestamp("invite_expires_at"),
     popia_consent_at: timestamp("popia_consent_at"),
     data_purge_at: timestamp("data_purge_at"),
     purged_at: timestamp("purged_at"),

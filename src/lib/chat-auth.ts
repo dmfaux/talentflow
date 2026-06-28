@@ -5,7 +5,10 @@ import { eq, and, gt, isNull } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
 const CHAT_TOKEN_HEADER = "x-chat-token";
-const MAGIC_LINK_TTL_MS = 60 * 60 * 1000; // 1 hour
+const MAGIC_LINK_TTL_MS = 60 * 60 * 1000; // 1 hour (chat re-access link)
+/** Recruiter "invite to apply" links live far longer than a chat-access link —
+ *  the candidate completes the public form on their own time. */
+export const INVITE_TOKEN_TTL_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
 
 // ── Token generation (mirrors auth.ts pattern) ──────────────────────
 
@@ -42,20 +45,32 @@ export async function verifyChatAuth(request: NextRequest) {
 
 // ── Magic link tokens ───────────────────────────────────────────────
 
-export function generateMagicLinkToken(): {
+export function generateMagicLinkToken(ttlMs: number = MAGIC_LINK_TTL_MS): {
   raw: string;
   hash: string;
   expiresAt: Date;
 } {
   const raw = randomBytes(32).toString("hex");
   const hash = hashChatToken(raw);
-  const expiresAt = new Date(Date.now() + MAGIC_LINK_TTL_MS);
+  const expiresAt = new Date(Date.now() + ttlMs);
   return { raw, hash, expiresAt };
 }
 
+/**
+ * Resolve a magic-link / invite token to its candidate id, or null if it is
+ * unknown, already consumed, or expired.
+ *
+ * `consume` (default true) marks the token used on a successful match — correct
+ * for one-shot chat-access links. Pass `consume: false` to merely *check* a
+ * token without burning it: the recruiter invite-to-apply flow verifies on GET
+ * to render the pre-filled form, then consumes only when the candidate actually
+ * submits. Consuming on the GET would invalidate the link the moment it opened.
+ */
 export async function verifyMagicLinkToken(
-  raw: string
+  raw: string,
+  opts: { consume?: boolean } = {}
 ): Promise<string | null> {
+  const consume = opts.consume ?? true;
   const hash = hashChatToken(raw);
 
   const [token] = await db
@@ -72,11 +87,12 @@ export async function verifyMagicLinkToken(
 
   if (!token) return null;
 
-  // Mark as used
-  await db
-    .update(chatTokens)
-    .set({ used_at: new Date() })
-    .where(eq(chatTokens.id, token.id));
+  if (consume) {
+    await db
+      .update(chatTokens)
+      .set({ used_at: new Date() })
+      .where(eq(chatTokens.id, token.id));
+  }
 
   return token.candidate_id;
 }

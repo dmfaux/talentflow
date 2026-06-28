@@ -295,6 +295,13 @@
       "when": 1782473664908,
       "tag": "0041_hot_falcon",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1782547359395,
+      "tag": "0042_whole_owl",
+      "breakpoints": true
     }
   ]
 }

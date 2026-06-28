@@ -38,6 +38,20 @@ export async function processNewCandidate(
     return;
   }
 
+  // A recruiter-added (skip-path) candidate may arrive with pasted CV text and
+  // no uploaded file. Score directly from the text we already hold rather than
+  // treating the absent cv_url as a missing CV. Public applicants reach this
+  // function with cv_text empty (it is populated by extraction below), so this
+  // only short-circuits the paste path.
+  if (candidate.cv_text && candidate.cv_text.trim()) {
+    await db
+      .update(candidates)
+      .set({ status: "scoring", updated_at: new Date() })
+      .where(eq(candidates.id, candidateId));
+    await scoreCandidate(candidateId);
+    return;
+  }
+
   if (!candidate.cv_url) {
     // Storage being unconfigured (local dev, missing env) means CVs are
     // discarded at upload — flagging the candidate would be terminal and
