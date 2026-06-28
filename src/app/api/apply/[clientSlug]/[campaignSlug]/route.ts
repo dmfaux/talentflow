@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { campaigns, candidates, clients } from "@/db/schema";
 import { uploadCV } from "@/lib/azure-storage";
-import { generateChatToken } from "@/lib/chat-auth";
+import { generateChatToken, verifyMagicLinkToken } from "@/lib/chat-auth";
 import {
   applicationReceivedEmail,
   brandEmailIdentity,
@@ -81,6 +81,9 @@ export async function POST(
     let answers: Record<string, string> = {};
     let source: string | undefined;
     let cvFile: File | null = null;
+    // Set when the candidate arrived via a recruiter's invite-to-apply link
+    // (?invite=token): we upgrade their existing stub rather than insert.
+    let inviteToken: string | undefined;
 
     if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
       const formData = await request.formData();
@@ -90,6 +93,7 @@ export async function POST(
       whatsappOptIn = formData.get("whatsapp_opt_in") === "true" || formData.get("whatsapp_opt_in") === "on";
       popiaConsent = formData.get("popia_consent") === "true" || formData.get("popia_consent") === "on";
       source = (formData.get("source") as string) || undefined;
+      inviteToken = (formData.get("invite_token") as string) || undefined;
 
       const answersRaw = formData.get("answers");
       if (answersRaw && typeof answersRaw === "string") {
@@ -112,6 +116,7 @@ export async function POST(
       popiaConsent = !!body.popia_consent;
       answers = body.answers ?? {};
       source = body.source || undefined;
+      inviteToken = body.invite_token || undefined;
     }
 
     // Validation
@@ -134,12 +139,6 @@ export async function POST(
       }
     }
 
-    const existing = await db.query.candidates.findFirst({
-      where: and(eq(candidates.campaign_id, campaign.id), eq(candidates.email, trimmedEmail)),
-      columns: { id: true },
-    });
-    if (existing) return json({ error: "You have already applied for this role" }, 409);
-
     const gatingConfig = campaign.gating_config as GatingQuestion[];
     const gatingPassed = evaluateGating(answers, gatingConfig);
 
@@ -147,27 +146,76 @@ export async function POST(
     const purgeAt = new Date(now);
     purgeAt.setMonth(purgeAt.getMonth() + 12);
 
-    const [newCandidate] = await db.insert(candidates).values({
-      // Public write: stamp org_id explicitly from the resolved campaign
-      // rather than relying on the DB trigger (dropped in S13).
-      org_id: campaign.org_id,
-      campaign_id: campaign.id,
-      name: name.trim(),
-      email: trimmedEmail,
-      phone: phone?.trim() || null,
-      whatsapp_opted_in: whatsappOptIn,
-      gating_answers: answers,
-      gating_passed: gatingPassed,
-      status: gatingPassed ? "gating_passed" : "gating_failed",
-      source: source || null,
-      popia_consent_at: now,
-      data_purge_at: purgeAt,
-    }).returning({ id: candidates.id });
+    let candidateId: string;
+    if (inviteToken) {
+      // Invite completion: upgrade the recruiter-created stub instead of
+      // inserting. Verify WITHOUT consuming first so an invalid/expired token
+      // is a clean 410; the token is burned only once the upgrade commits, so
+      // a failed submission can be retried with the same link.
+      const stubId = await verifyMagicLinkToken(inviteToken, { consume: false });
+      const stub = stubId
+        ? await db.query.candidates.findFirst({
+            where: eq(candidates.id, stubId),
+            columns: { id: true, campaign_id: true, status: true },
+          })
+        : null;
+      if (
+        !stub ||
+        stub.campaign_id !== campaign.id ||
+        stub.status !== "invited"
+      ) {
+        return json({ error: "This invite link is invalid or has expired" }, 410);
+      }
+      await db
+        .update(candidates)
+        .set({
+          name: name.trim(),
+          email: trimmedEmail,
+          phone: phone?.trim() || null,
+          whatsapp_opted_in: whatsappOptIn,
+          gating_answers: answers,
+          gating_passed: gatingPassed,
+          status: gatingPassed ? "gating_passed" : "gating_failed",
+          // The candidate completed the form themselves → real first-party
+          // consent. `source` stays "recruiter_manual" (not overwritten).
+          popia_consent_at: now,
+          data_purge_at: purgeAt,
+          invite_expires_at: null,
+          updated_at: now,
+        })
+        .where(eq(candidates.id, stub.id));
+      // Burn the token now that the upgrade is committed.
+      await verifyMagicLinkToken(inviteToken, { consume: true });
+      candidateId = stub.id;
+    } else {
+      const existing = await db.query.candidates.findFirst({
+        where: and(eq(candidates.campaign_id, campaign.id), eq(candidates.email, trimmedEmail)),
+        columns: { id: true },
+      });
+      if (existing) return json({ error: "You have already applied for this role" }, 409);
+
+      const [newCandidate] = await db.insert(candidates).values({
+        // Public write: stamp org_id explicitly from the resolved campaign
+        // rather than relying on the DB trigger (dropped in S13).
+        org_id: campaign.org_id,
+        campaign_id: campaign.id,
+        name: name.trim(),
+        email: trimmedEmail,
+        phone: phone?.trim() || null,
+        whatsapp_opted_in: whatsappOptIn,
+        gating_answers: answers,
+        gating_passed: gatingPassed,
+        status: gatingPassed ? "gating_passed" : "gating_failed",
+        source: source || null,
+        popia_consent_at: now,
+        data_purge_at: purgeAt,
+      }).returning({ id: candidates.id });
+      candidateId = newCandidate.id;
+    }
 
     const candidateName = name.trim();
     const roleTitle = campaign.role_title;
     const clientName = campaign.client_name ?? "the company";
-    const candidateId = newCandidate.id;
 
     // Volume counter — one candidate_created per application (S10, best-effort).
     recordUsageEvent({

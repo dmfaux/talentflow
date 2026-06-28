@@ -8,6 +8,10 @@ import {
   recordTopicProgress,
   withdrawConversation,
 } from "@/lib/chat";
+import {
+  recordConsentConfirmed,
+  RECRUITER_MANUAL_SOURCE,
+} from "@/lib/manual-candidate";
 import { buildChatSystemPrompt } from "@/lib/ai/chat-prompt";
 import { getChatModel, getChatModelMeta } from "@/lib/ai/chat-provider";
 import { extractUsage, type TokenUsage } from "@/lib/ai";
@@ -61,6 +65,21 @@ export async function POST(
       { error: "conversation_closed" },
       { status: 403 }
     );
+  }
+
+  // A recruiter-added (skip-path) candidate's POPIA consent was ATTESTED by the
+  // recruiter, not given by the candidate — so popia_consent_at stayed null.
+  // The candidate authenticating here (their own chat) is them personally
+  // engaging, which upgrades the attestation to real consent. Idempotent: only
+  // the first call flips the timestamp + audits.
+  if (
+    candidate.source === RECRUITER_MANUAL_SOURCE &&
+    !candidate.popia_consent_at
+  ) {
+    await recordConsentConfirmed({
+      orgId: candidate.org_id,
+      candidateId: candidate.id,
+    });
   }
 
   // Reactivate dormant conversations

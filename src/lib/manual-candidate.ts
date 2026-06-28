@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { candidateActionAudit, candidates, chatTokens } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import {
   generateChatToken,
   generateMagicLinkToken,
@@ -411,7 +411,8 @@ export async function recordCandidateNotified(opts: {
 
 /** Flip a skip-path candidate's NULL popia_consent_at to a real timestamp when
  *  they personally confirm (first portal/chat access), and audit it. Idempotent:
- *  the WHERE guard no-ops if consent is already recorded. */
+ *  the `isNull` guard makes a second call a no-op, so callers can fire it on
+ *  every authenticated candidate action without re-stamping or re-auditing. */
 export async function recordConsentConfirmed(opts: {
   orgId: string;
   candidateId: string;
@@ -420,9 +421,14 @@ export async function recordConsentConfirmed(opts: {
   const [row] = await db
     .update(candidates)
     .set({ popia_consent_at: now, updated_at: now })
-    .where(eq(candidates.id, opts.candidateId))
+    .where(
+      and(
+        eq(candidates.id, opts.candidateId),
+        isNull(candidates.popia_consent_at)
+      )
+    )
     .returning({ id: candidates.id });
-  if (!row) return false;
+  if (!row) return false; // already confirmed (or gone) — no-op, no audit
   await appendAudit({
     orgId: opts.orgId,
     candidateId: opts.candidateId,

@@ -356,6 +356,19 @@ describe.skipIf(!RUN)("recruiter-added candidates (DB-backed)", () => {
 
     const audit = await auditFor(res.candidateId);
     expect(audit.some((a) => a.action === "consent_confirmed")).toBe(true);
+
+    // Idempotent: a second call (every chat message would fire it) no-ops —
+    // no re-stamp, no duplicate audit row.
+    const firstConfirmedAt = c?.popia_consent_at;
+    const again = await recordConsentConfirmed({
+      orgId: fx.orgA,
+      candidateId: res.candidateId,
+    });
+    expect(again).toBe(false);
+    const c2 = await candidateRow(res.candidateId);
+    expect(c2?.popia_consent_at?.getTime()).toBe(firstConfirmedAt?.getTime());
+    const audit2 = await auditFor(res.candidateId);
+    expect(audit2.filter((a) => a.action === "consent_confirmed")).toHaveLength(1);
   });
 
   it("recordOptOut audits the objection", async () => {
