@@ -78,6 +78,12 @@ const DEFAULT_EMAIL_PER_TYPE: Record<EmailTemplateType, EmailCopyPerType> = {
   chatNudge: { subject: "Reminder — {{campaign.role_title}}" },
   noResponse: { subject: "Application update — {{campaign.role_title}}" },
   rejectionConfirmation: { subject: "Application update — {{campaign.role_title}}" },
+  recruiterInvite: {
+    subject: "You're invited to apply — {{campaign.role_title}}",
+  },
+  recruiterAddedNotice: {
+    subject: "You've been added — {{campaign.role_title}}",
+  },
 };
 
 export const DEFAULT_EMAIL_COPY: EmailCopy = {

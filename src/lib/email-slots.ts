@@ -9,7 +9,8 @@
 // The two NON-themed system emails (passwordReset, invitation) are out of
 // scope: they have no brand context and always render DEFAULT_EMAIL_THEME.
 
-/** The nine candidate-facing campaign emails. Order is the canonical order. */
+/** The eleven candidate-facing campaign emails. Order is the canonical order;
+ *  the last two cover recruiter-added candidates (invite + "you've been added"). */
 export const EMAIL_TEMPLATE_TYPES = [
   "applicationReceived",
   "gatingPassed",
@@ -20,6 +21,8 @@ export const EMAIL_TEMPLATE_TYPES = [
   "chatNudge",
   "noResponse",
   "rejectionConfirmation",
+  "recruiterInvite",
+  "recruiterAddedNotice",
 ] as const;
 
 export type EmailTemplateType = (typeof EMAIL_TEMPLATE_TYPES)[number];

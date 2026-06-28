@@ -71,8 +71,8 @@ export type ConsentValidationResult =
  * null unless the basis is "other"), so the persisted shape is canonical.
  */
 export function validateConsent(input: {
-  version: unknown;
-  basis: unknown;
+  version?: unknown;
+  basis?: unknown;
   note?: unknown;
 }): ConsentValidationResult {
   if (!isAttestationVersion(input.version)) {

@@ -969,6 +969,71 @@ export function chatAccessEmail(
   });
 }
 
+// ── Recruiter-added candidate templates ─────────────────────────────
+
+/** Invite path: a recruiter sourced this person and is asking them to formally
+ *  apply. Neutral, branded; the button is the magic-link to the campaign's
+ *  application form (the form pre-attaches the candidate via ?invite=token). */
+export function recruiterInviteEmail(
+  theme: EmailTheme,
+  candidateName: string,
+  roleTitle: string,
+  clientName: string,
+  applyUrl: string
+): string {
+  const { emailP, emailInfoCard, emailBtn, emailFallbackLink } =
+    makeEmailKit(theme);
+  return renderThemedEmail({
+    type: "recruiterInvite",
+    theme,
+    data: {
+      candidate: { name: candidateName },
+      campaign: { role_title: roleTitle },
+      client: { name: clientName },
+      action: { url: applyUrl },
+    },
+    heading: { label: "You&rsquo;re invited", title: "Apply for this role" },
+    defaultMessageHtml: emailP(
+      `<strong>${clientName}</strong> would like you to apply for the <strong>${roleTitle}</strong> role. Follow the link below to share your CV and answer a few quick questions &mdash; it only takes a few minutes.`
+    ),
+    extrasHtml: `${emailInfoCard([["Role", roleTitle], ["Company", clientName]])}\n    ${emailBtn("Apply now", applyUrl)}\n    ${emailFallbackLink(applyUrl)}`,
+  });
+}
+
+/** Skip path: a recruiter added this person directly. Transparent by design
+ *  (POPIA) — it states who added them and why, links to their application, and
+ *  always carries an opt-out (objection) link. The view link doubles as the
+ *  consent-confirmation CTA (clicking through sets popia_consent_at). */
+export function recruiterAddedNoticeEmail(
+  theme: EmailTheme,
+  candidateName: string,
+  roleTitle: string,
+  clientName: string,
+  viewUrl: string,
+  optOutUrl: string
+): string {
+  const { emailP, emailBtn, emailFallbackLink, emailNote } = makeEmailKit(theme);
+  return renderThemedEmail({
+    type: "recruiterAddedNotice",
+    theme,
+    data: {
+      candidate: { name: candidateName },
+      campaign: { role_title: roleTitle },
+      client: { name: clientName },
+      action: { url: viewUrl },
+    },
+    heading: { label: "You&rsquo;ve been added", title: "You&rsquo;re in the running" },
+    defaultMessageHtml: `${emailP(
+      `A recruiter at <strong>${clientName}</strong> has added you to the hiring process for the <strong>${roleTitle}</strong> role, based on your interest or an earlier conversation.`
+    )}\n    ${emailP(
+      "You can view your application and follow its progress using the link below."
+    )}`,
+    extrasHtml: `${emailBtn("View your application", viewUrl)}\n    ${emailFallbackLink(viewUrl)}\n    ${emailNote(
+      `Under POPIA you can object at any time. If you didn&rsquo;t consent to this or want to be removed, <a href="${optOutUrl}">opt out and delete your information</a>.`
+    )}`,
+  });
+}
+
 // ── Nudge / no-response / rejection-confirmation templates ─────────
 
 /** Reminder fired partway through the follow-up window for ghost candidates.

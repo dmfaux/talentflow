@@ -10,6 +10,8 @@ import {
   noResponseEmail,
   passwordResetEmail,
   pendingRejectionReminderEmail,
+  recruiterAddedNoticeEmail,
+  recruiterInviteEmail,
   rejectionConfirmationEmail,
   rejectionEmail,
   resolveEmailSubject,
@@ -37,6 +39,8 @@ const CHAT_URL = "https://app.talentstream.co.za/c/acme/senior-backend/chat?t=ab
 const RESET_URL = "https://app.talentstream.co.za/reset?token=tok_reset_123";
 const ACCEPT_URL = "https://app.talentstream.co.za/invite?token=tok_invite_456";
 const MAGIC_URL = "https://app.talentstream.co.za/api/chat/verify?token=tok_magic_789";
+const APPLY_URL = "https://app.talentstream.co.za/c/acme/senior-backend?invite=tok_invite_abc";
+const OPT_OUT_URL = "https://app.talentstream.co.za/api/candidates/opt-out/tok_optout_xyz";
 const CLOSE_BY = "12 July 2026";
 const ADMIN_REASON = "Strong CV, but we've gone with someone closer to the \"must-have\" stack.";
 
@@ -132,6 +136,31 @@ describe("email templates — byte-identical default render", () => {
   });
 });
 
+// ── Recruiter-added candidate templates ──────────────────────────────
+// Fresh snapshots (no pre-refactor baseline). The added-notice exercises a
+// second action URL (opt-out link) embedded in the closing note.
+describe("recruiter-added candidate emails", () => {
+  it("recruiterInviteEmail", () => {
+    expect(
+      recruiterInviteEmail(DEFAULT_EMAIL_THEME, NAME, ROLE, CLIENT, APPLY_URL)
+    ).toMatchSnapshot();
+  });
+
+  it("recruiterAddedNoticeEmail carries the opt-out link", () => {
+    const html = recruiterAddedNoticeEmail(
+      DEFAULT_EMAIL_THEME,
+      NAME,
+      ROLE,
+      CLIENT,
+      CHAT_URL,
+      OPT_OUT_URL
+    );
+    expect(html).toContain(OPT_OUT_URL);
+    expect(html).toContain(CHAT_URL);
+    expect(html).toMatchSnapshot();
+  });
+});
+
 // ── New branded path (locks the theme-bound rendering) ───────────────
 // A bespoke theme: distinct palette, an explicit logo, white-label footer. This
 // describe block has its own fresh snapshots (no pre-refactor baseline) and
@@ -207,6 +236,12 @@ describe("resolveEmailSubject", () => {
     );
     expect(resolveEmailSubject("rejectionConfirmation", data)).toBe(
       `Application update — ${ROLE}`
+    );
+    expect(resolveEmailSubject("recruiterInvite", data)).toBe(
+      `You're invited to apply — ${ROLE}`
+    );
+    expect(resolveEmailSubject("recruiterAddedNotice", data)).toBe(
+      `You've been added — ${ROLE}`
     );
   });
 

@@ -22,8 +22,8 @@ describe("DEFAULT_EMAIL_COPY", () => {
     );
   });
 
-  it("provides a subject for all nine template types containing the role-title slot", () => {
-    expect(EMAIL_TEMPLATE_TYPES).toHaveLength(9);
+  it("provides a subject for all eleven template types containing the role-title slot", () => {
+    expect(EMAIL_TEMPLATE_TYPES).toHaveLength(11);
     for (const type of EMAIL_TEMPLATE_TYPES) {
       const entry = DEFAULT_EMAIL_COPY.perType[type];
       expect(entry, `missing default for ${type}`).toBeDefined();

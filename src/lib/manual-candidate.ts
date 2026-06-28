@@ -233,10 +233,14 @@ export interface SkipPathInput {
   email: string;
   phone?: string | null;
   /** One of cvText / cvUrl is REQUIRED (the route enforces it before calling).
-   *  cvUrl is the blob path of a file the route already uploaded; cvText is
-   *  pasted text. cvFilename is provenance for the cv_provided audit row. */
+   *  cvText is pasted text; uploadCv is a deferred blob write for the file path.
+   *  cvFilename is provenance for the cv_provided audit row. */
   cvText?: string | null;
-  cvUrl?: string | null;
+  /** Deferred CV upload. The blob path is keyed by candidate id, so the route
+   *  supplies this callback and the module invokes it only once the row exists;
+   *  it returns the stored blob path (cv_url) or null. Omitted for the paste
+   *  path. Kept as a callback so this module stays free of blob I/O. */
+  uploadCv?: (candidateId: string) => Promise<string | null>;
   cvFilename?: string | null;
   cvProvenance: CvProvenance;
   /** null ⇒ recruiter override (bypass); otherwise evaluated normally. */
@@ -287,7 +291,7 @@ export async function addCandidateBySkip(
       gating_passed: gating.gatingPassed,
       gating_source: gating.gatingSource,
       cv_text: input.cvText?.trim() || null,
-      cv_url: input.cvUrl || null,
+      cv_url: null, // set below once the candidate-id-keyed blob path is known
       status,
       source: RECRUITER_MANUAL_SOURCE,
       consent_attested_by: input.actorUserId,
@@ -300,6 +304,19 @@ export async function addCandidateBySkip(
     .returning({ id: candidates.id });
 
   const candidateId = row.id;
+
+  // Deferred CV upload: the blob path is keyed by candidate id, so it can only
+  // run now the row exists. The route owns the actual blob write via uploadCv.
+  let cvUrl: string | null = null;
+  if (input.uploadCv) {
+    cvUrl = await input.uploadCv(candidateId);
+    if (cvUrl) {
+      await db
+        .update(candidates)
+        .set({ cv_url: cvUrl, updated_at: new Date() })
+        .where(eq(candidates.id, candidateId));
+    }
+  }
 
   // Audit trail: one discrete row per facet of the add, mirroring rejection.ts.
   await appendAudit({
@@ -349,7 +366,7 @@ export async function addCandidateBySkip(
   // Auto-score, mirroring the public route: only when gating passed, a CV is
   // present, and the org is under its spend ceiling (a cap-raise drains the
   // backlog otherwise). The worker owns the move to 'scoring'.
-  const hasCv = Boolean(input.cvUrl || input.cvText?.trim());
+  const hasCv = Boolean(cvUrl || input.cvText?.trim());
   let enqueuedProcessing = false;
   if (gating.gatingPassed && hasCv) {
     const ceiling = await getCeilingStatus(input.orgId);

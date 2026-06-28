@@ -171,7 +171,7 @@ describe.skipIf(!RUN)("recruiter-added candidates (DB-backed)", () => {
       actorUserId: fx.userA,
       name: "Sourced Person",
       email: `sourced+${Math.floor(performance.now() * 1000)}@example.com`,
-      cvUrl: "cvs/org/brand/cand/cv.pdf",
+      uploadCv: async (id: string) => `cvs/org/brand/${id}/cv.pdf`,
       cvFilename: "cv.pdf",
       cvProvenance: "file" as const,
       gatingAnswers: null,
@@ -232,7 +232,7 @@ describe.skipIf(!RUN)("recruiter-added candidates (DB-backed)", () => {
   it("skip + pasted CV text: scores from the text, no blob file", async () => {
     const res = await addCandidateBySkip(
       skipInput({
-        cvUrl: null,
+        uploadCv: undefined,
         cvText: "Ten years building distributed systems.",
         cvProvenance: "paste",
         cvFilename: null,
