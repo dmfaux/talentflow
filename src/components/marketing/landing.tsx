@@ -651,12 +651,12 @@ function Benefits() {
       ),
     },
     {
-      title: "BEE reporting ready",
-      body: "Shortlist demographics captured and reported to support your transformation objectives.",
+      title: "Conversational screening",
+      body: "Candidates answer in a guided chat, not a dead-end form. The AI fields their questions and digs deeper when an answer is thin.",
       tone: "vermillion" as const,
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 12h4l3-9 4 18 3-9h4" />
+          <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" />
         </svg>
       ),
     },
