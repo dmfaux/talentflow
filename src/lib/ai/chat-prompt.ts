@@ -11,6 +11,9 @@ interface ChatPromptParams {
   gatingAnswers: Record<string, string> | null;
   topics: Array<{ flag: string; topic: string; covered: boolean }>;
   lifecycle: string;
+  /** Candidate provenance. "recruiter_manual" candidates were sourced by a
+   *  recruiter and never applied — the prompt must not claim they did. */
+  source: string | null;
 }
 
 export function reframeFlag(flag: string): string {
@@ -47,7 +50,10 @@ export function buildChatSystemPrompt(params: ChatPromptParams): string {
     gatingAnswers,
     topics,
     lifecycle,
+    source,
   } = params;
+
+  const recruiterAdded = source === "recruiter_manual";
 
   const pendingTopics = topics.filter((t) => !t.covered);
   const coveredTopics = topics.filter((t) => t.covered);
@@ -80,7 +86,7 @@ ${coveredTopics.length > 0 ? `Already covered: ${coveredTopics.map((t) => t.topi
   };
   const lifecycleInstructions = lifecycleMap[lifecycle] ?? lifecycleMap.dormant;
 
-  return `You are a friendly, professional recruitment assistant for ${companyName}. You are chatting with ${candidateName} who applied for the ${roleTitle} position.
+  return `You are a friendly, professional recruitment assistant for ${companyName}. You are chatting with ${candidateName}, who ${recruiterAdded ? `was added to the ${roleTitle} role by a recruiter at ${companyName} (they did not apply themselves, so never thank them for applying or imply they submitted an application)` : `applied for the ${roleTitle} position`}.
 
 ## Your Role
 - You are NOT conducting an interview. You have a short list of factual questions the recruitment team needs answered — ask each one, accept the answer, and move on

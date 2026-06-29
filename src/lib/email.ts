@@ -1026,9 +1026,9 @@ export function recruiterAddedNoticeEmail(
     defaultMessageHtml: `${emailP(
       `A recruiter at <strong>${clientName}</strong> has added you to the hiring process for the <strong>${roleTitle}</strong> role, based on your interest or an earlier conversation.`
     )}\n    ${emailP(
-      "You can view your application and follow its progress using the link below."
+      "Open the link below to confirm you&rsquo;re happy to be considered. If the team would like to know more, you&rsquo;ll get a separate email with a few questions &mdash; there&rsquo;s nothing else you need to do for now."
     )}`,
-    extrasHtml: `${emailBtn("View your application", viewUrl)}\n    ${emailFallbackLink(viewUrl)}\n    ${emailNote(
+    extrasHtml: `${emailBtn("Confirm and view status", viewUrl)}\n    ${emailFallbackLink(viewUrl)}\n    ${emailNote(
       `Under POPIA you can object at any time. If you didn&rsquo;t consent to this or want to be removed, <a href="${optOutUrl}">opt out and delete your information</a>.`
     )}`,
   });

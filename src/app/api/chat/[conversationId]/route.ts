@@ -204,6 +204,7 @@ export async function POST(
     gatingAnswers: candidate.gating_answers as Record<string, string> | null,
     topics,
     lifecycle: conv.lifecycle,
+    source: candidate.source,
   });
 
   // Stream response

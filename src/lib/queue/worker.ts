@@ -241,7 +241,8 @@ async function handleChatInvitation(
     candidate.campaign.role_title,
     clientName,
     lifecycle,
-    flags
+    flags,
+    candidate.source
   );
 
   // Build chat URL

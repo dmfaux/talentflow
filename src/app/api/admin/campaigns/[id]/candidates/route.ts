@@ -344,9 +344,12 @@ export async function POST(
     });
 
     // The persistent chat token authenticates the candidate's own surfaces: the
-    // "view application" link doubles as the consent-confirmation CTA, and the
-    // opt-out link is their POPIA objection.
-    const viewUrl = `${origin}/c/${campaign.client_slug}/${campaign.slug}/chat#chat_token=${result.chatTokenRaw}`;
+    // "view application" link lands on the status portal (which fires the
+    // consent-confirmation CTA before any chat exists), and the opt-out link is
+    // their POPIA objection. The portal — not the chat — is the right target:
+    // a recruiter-added candidate has no conversation until scoring flags them
+    // for follow-up, at which point the normal chat-invitation email is sent.
+    const viewUrl = `${origin}/c/${campaign.client_slug}/${campaign.slug}/application#chat_token=${result.chatTokenRaw}`;
     const optOutUrl = `${origin}/api/candidates/opt-out?t=${result.chatTokenRaw}`;
     const messageId = await sendCandidateEmail(
       email.trim().toLowerCase(),

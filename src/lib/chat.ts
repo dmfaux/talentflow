@@ -22,7 +22,11 @@ export async function createConversation(
   roleTitle: string,
   companyName: string,
   lifecycle: string,
-  flags: string[]
+  flags: string[],
+  /** Provenance of the candidate. "recruiter_manual" candidates were sourced by
+   *  a recruiter and never filled in an application, so the greeting must not
+   *  thank them for applying. */
+  source?: string | null
 ): Promise<string> {
   const topics: Topic[] = flags.slice(0, 4).map((flag) => ({
     flag,
@@ -40,12 +44,24 @@ export async function createConversation(
     })
     .returning({ id: conversations.id });
 
-  // Insert initial greeting message
+  // Insert initial greeting message. Recruiter-sourced candidates didn't apply,
+  // so they get an "added you to the role" opener instead of "thanks for
+  // applying"; the applicant wording is left untouched.
   const topicCount = topics.length;
-  const greeting =
-    topicCount > 0
-      ? `Hi ${candidateName}! Thanks for applying for the ${roleTitle} position at ${companyName}. I just have ${topicCount} quick question${topicCount === 1 ? "" : "s"} to help the team get a clearer picture of your application. Let me know when you're ready!`
-      : `Hi ${candidateName}! Thanks for applying for the ${roleTitle} position at ${companyName}. The recruitment team would like to learn a bit more about your background. Let me know when you're ready and we can get started!`;
+  const recruiterAdded = source === "recruiter_manual";
+  let greeting: string;
+  if (recruiterAdded) {
+    const opener = `Hi ${candidateName}! A recruiter at ${companyName} added you to the ${roleTitle} role`;
+    greeting =
+      topicCount > 0
+        ? `${opener}. I just have ${topicCount} quick question${topicCount === 1 ? "" : "s"} to help the team get a clearer picture of your background. Let me know when you're ready!`
+        : `${opener}, and the recruitment team would like to learn a bit more about your background. Let me know when you're ready and we can get started!`;
+  } else {
+    greeting =
+      topicCount > 0
+        ? `Hi ${candidateName}! Thanks for applying for the ${roleTitle} position at ${companyName}. I just have ${topicCount} quick question${topicCount === 1 ? "" : "s"} to help the team get a clearer picture of your application. Let me know when you're ready!`
+        : `Hi ${candidateName}! Thanks for applying for the ${roleTitle} position at ${companyName}. The recruitment team would like to learn a bit more about your background. Let me know when you're ready and we can get started!`;
+  }
 
   await db.insert(chatMessages).values({
     org_id: orgId,

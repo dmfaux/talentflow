@@ -59,7 +59,8 @@ export async function POST(
       candidate.campaign.role_title,
       clientName,
       lifecycle,
-      flags
+      flags,
+      candidate.source
     );
 
     // Send invitation email via queue

@@ -38,6 +38,7 @@ import {
   campaigns,
   candidateActionAudit,
   candidates,
+  chatMessages,
   clients,
   organizations,
   users,
@@ -52,6 +53,8 @@ import { POST as applyPost } from "@/app/api/apply/[clientSlug]/[campaignSlug]/r
 import { POST as optOutPost } from "@/app/api/candidates/opt-out/route";
 import { POST as resendPost } from "@/app/api/admin/candidates/[id]/resend-invite/route";
 import { GET as exportGet } from "@/app/api/admin/candidates/[id]/audit/export/route";
+import { GET as statusGet } from "@/app/api/candidates/status/route";
+import { createConversation } from "@/lib/chat";
 import { eq } from "drizzle-orm";
 
 const RUN = !!process.env.DATABASE_URL;
@@ -283,5 +286,97 @@ describe.skipIf(!RUN)("recruiter-add endpoints (DB-backed)", () => {
     expect(body).toContain("consent_attested");
     expect(body).toContain("manual_add");
     expect(body.split("\r\n")[0]).toContain("timestamp,action");
+  });
+
+  // ── View-application status portal ─────────────────────────────────
+
+  const statusReq = (token: string | null) =>
+    new NextRequest("http://localhost/api/candidates/status", {
+      headers: token ? { "x-chat-token": token } : {},
+    });
+
+  it("status portal confirms a skip-path candidate's consent (idempotent) and reports in_review", async () => {
+    const added = await addCandidateBySkip(skipInput("portal@example.com"));
+    const before = await candidateRow(added.candidateId);
+    expect(before?.popia_consent_at).toBeNull(); // attested, not yet confirmed
+
+    const res = await statusGet(statusReq(added.chatTokenRaw));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ state: "in_review" });
+
+    const after = await candidateRow(added.candidateId);
+    expect(after?.popia_consent_at).not.toBeNull();
+    expect(await auditActions(added.candidateId)).toContain("consent_confirmed");
+    const confirmedAt = after?.popia_consent_at;
+
+    // Second visit is a no-op: timestamp frozen, no duplicate audit.
+    await statusGet(statusReq(added.chatTokenRaw));
+    const after2 = await candidateRow(added.candidateId);
+    expect(after2?.popia_consent_at?.getTime()).toBe(confirmedAt?.getTime());
+    const confirmCount = (await auditActions(added.candidateId)).filter(
+      (a) => a === "consent_confirmed"
+    ).length;
+    expect(confirmCount).toBe(1);
+  });
+
+  it("status portal points the candidate into a live conversation when one exists", async () => {
+    const added = await addCandidateBySkip(skipInput("portalchat@example.com"));
+    const convId = await createConversation(
+      fx.orgA,
+      added.candidateId,
+      "Skip Person",
+      "Engineer",
+      "End Brand",
+      "dormant",
+      [],
+      "recruiter_manual"
+    );
+
+    const res = await statusGet(statusReq(added.chatTokenRaw));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      state: "chat_ready",
+      conversationId: convId,
+    });
+  });
+
+  it("status portal reports withdrawn for a withdrawn candidate", async () => {
+    const added = await addCandidateBySkip(
+      skipInput("portalwithdrawn@example.com")
+    );
+    await db
+      .update(candidates)
+      .set({ status: "withdrawn" })
+      .where(eq(candidates.id, added.candidateId));
+
+    const res = await statusGet(statusReq(added.chatTokenRaw));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ state: "withdrawn" });
+  });
+
+  it("status portal rejects an unknown token with 401", async () => {
+    const res = await statusGet(statusReq("not-a-real-token"));
+    expect(res.status).toBe(401);
+  });
+
+  it("createConversation greets a recruiter-added candidate without thanking them for applying", async () => {
+    const added = await addCandidateBySkip(skipInput("greeting@example.com"));
+    const convId = await createConversation(
+      fx.orgA,
+      added.candidateId,
+      "Skip Person",
+      "Engineer",
+      "End Brand",
+      "dormant",
+      [],
+      "recruiter_manual"
+    );
+    const [msg] = await db
+      .select({ content: chatMessages.content })
+      .from(chatMessages)
+      .where(eq(chatMessages.conversation_id, convId))
+      .limit(1);
+    expect(msg?.content).toContain("added you to the Engineer role");
+    expect(msg?.content).not.toContain("Thanks for applying");
   });
 });
