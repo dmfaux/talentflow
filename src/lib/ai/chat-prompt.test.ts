@@ -33,3 +33,30 @@ describe("buildChatSystemPrompt source awareness", () => {
     expect(prompt).not.toContain("who applied for the Engineer position");
   });
 });
+
+describe("buildChatSystemPrompt question handling", () => {
+  it("keeps the AI as the point of contact and never defers questions to a human", () => {
+    const prompt = buildChatSystemPrompt({ ...base, source: null });
+    // Answers must be grounded in the role info, not punted to "the team".
+    expect(prompt).toContain("Role Information and job description");
+    expect(prompt).toContain("point of contact for questions");
+    expect(prompt).not.toContain("recruiting team will be able to help you");
+  });
+});
+
+describe("buildChatSystemPrompt bounded digging", () => {
+  const withTopic = {
+    ...base,
+    source: null,
+    topics: [{ flag: "tenure", topic: "Confirm the reason for short tenure", covered: false }],
+  };
+
+  it("invites a follow-up for thin answers but caps the digging", () => {
+    const prompt = buildChatSystemPrompt(withTopic);
+    expect(prompt).toContain("follow-up");
+    expect(prompt).toMatch(/move on/i);
+    // The old "accept the first answer, do not probe" stance is gone.
+    expect(prompt).not.toContain("Accept the candidate's first answer");
+    expect(prompt).not.toContain("do NOT probe");
+  });
+});

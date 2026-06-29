@@ -710,7 +710,8 @@ export function ChatInterface({
                   className="mt-2 max-w-xs text-sm leading-relaxed"
                   style={{ color: c.textMuted }}
                 >
-                  The recruitment assistant will be with you shortly.
+                  Your assistant answers questions about this role — send a
+                  message to get started.
                 </p>
               </div>
             )}

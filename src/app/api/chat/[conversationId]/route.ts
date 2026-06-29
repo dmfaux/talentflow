@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { chatMessages, conversations } from "@/db/schema";
 import { verifyChatAuth } from "@/lib/chat-auth";
 import {
+  MAX_TOPIC_ASKS,
   reactivateConversation,
   recordTopicProgress,
   withdrawConversation,
@@ -151,9 +152,23 @@ export async function POST(
   const client = campaign.client;
   let topics = (conv.topics ?? []) as Topic[];
 
+  // Topics the candidate has already been asked the maximum number of times
+  // without giving a solid answer. We stop digging and treat them as covered so
+  // the flow moves on. Resolved on the turn AFTER the final follow-up (the
+  // candidate's next reply), so the topic is retired by a graceful wrap-up
+  // rather than by closing the chat right after the assistant poses a question.
+  const exhaustedIndices = topics
+    .map((topic, index) => ({ topic, index }))
+    .filter(
+      ({ topic }) => !topic.covered && (topic.askCount ?? 0) >= MAX_TOPIC_ASKS
+    )
+    .map(({ index }) => index);
+
   const pendingTopics = topics
     .map((topic, index) => ({ ...topic, index }))
-    .filter((topic) => !topic.covered);
+    .filter(
+      (topic) => !topic.covered && !exhaustedIndices.includes(topic.index)
+    );
 
   // Decide coverage now so this response's prompt reflects it — when the
   // candidate has just answered the final topic the model must see zero
@@ -182,13 +197,18 @@ export async function POST(
         candidateId: conv.candidate_id,
       });
     }
-    if (coveredIndices.length > 0) {
-      topics = topics.map((topic, index) =>
-        coveredIndices.includes(index)
-          ? { ...topic, covered: true, asked: false }
-          : topic
-      );
-    }
+  }
+
+  // Retire freshly-answered AND exhausted topics together, in the prompt's view
+  // and (below) in the persisted state, so the model and the stored progress
+  // always agree on what's still pending.
+  const newlyCovered = [...new Set([...coveredIndices, ...exhaustedIndices])];
+  if (newlyCovered.length > 0) {
+    topics = topics.map((topic, index) =>
+      newlyCovered.includes(index)
+        ? { ...topic, covered: true, asked: false }
+        : topic
+    );
   }
 
   const systemPrompt = buildChatSystemPrompt({
@@ -276,7 +296,7 @@ export async function POST(
       // withdrawal-request messages, so there is no final transition to
       // record on a withdrawing candidate's message.
       await recordTopicProgress(conversationId, conv.org_id, {
-        coveredIndices,
+        coveredIndices: newlyCovered,
         askedIndex,
       });
 

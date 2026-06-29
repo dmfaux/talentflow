@@ -11,7 +11,17 @@ export interface Topic {
   topic: string;
   covered: boolean;
   asked?: boolean;
+  /** How many times the assistant has posed this (still-uncovered) topic. Drives
+   *  bounded digging: a thin answer leaves the topic pending so the assistant
+   *  follows up for detail, but once this reaches MAX_TOPIC_ASKS the topic is
+   *  treated as covered so a non-committal candidate can't loop the chat. */
+  askCount?: number;
 }
+
+/** Initial ask plus up to two gentle follow-ups before the assistant stops
+ *  digging a topic and moves on. Enough to give the candidate a real chance to
+ *  elaborate, capped so persistent non-commitment doesn't trap the conversation. */
+export const MAX_TOPIC_ASKS = 3;
 
 // ── Create conversation ─────────────────────────────────────────────
 
@@ -54,12 +64,12 @@ export async function createConversation(
     const opener = `Hi ${candidateName}! A recruiter at ${companyName} added you to the ${roleTitle} role`;
     greeting =
       topicCount > 0
-        ? `${opener}. I just have ${topicCount} quick question${topicCount === 1 ? "" : "s"} to help the team get a clearer picture of your background. Let me know when you're ready!`
+        ? `${opener}. I just have ${topicCount} quick question${topicCount === 1 ? "" : "s"} to help the team get a clearer picture of your background. The more detail you can share, the better — it gives you the best chance to show your experience. Let me know when you're ready!`
         : `${opener}, and the recruitment team would like to learn a bit more about your background. Let me know when you're ready and we can get started!`;
   } else {
     greeting =
       topicCount > 0
-        ? `Hi ${candidateName}! Thanks for applying for the ${roleTitle} position at ${companyName}. I just have ${topicCount} quick question${topicCount === 1 ? "" : "s"} to help the team get a clearer picture of your application. Let me know when you're ready!`
+        ? `Hi ${candidateName}! Thanks for applying for the ${roleTitle} position at ${companyName}. I just have ${topicCount} quick question${topicCount === 1 ? "" : "s"} to help the team get a clearer picture of your application. The more detail you can share, the better — it gives you the best chance to show your experience. Let me know when you're ready!`
         : `Hi ${candidateName}! Thanks for applying for the ${roleTitle} position at ${companyName}. The recruitment team would like to learn a bit more about your background. Let me know when you're ready and we can get started!`;
   }
 
@@ -164,7 +174,14 @@ export async function recordTopicProgress(
 
     if (progress.askedIndex !== undefined) {
       const topic = topics[progress.askedIndex];
-      if (topic && !topic.covered) topic.asked = true;
+      if (topic && !topic.covered) {
+        topic.asked = true;
+        // Count each time we pose a still-uncovered topic. Once this hits
+        // MAX_TOPIC_ASKS the route stops re-asking and folds it into the
+        // covered set on the next turn (see the chat POST handler), so the
+        // wrap-up — not a dangling question — is what closes the topic.
+        topic.askCount = (topic.askCount ?? 0) + 1;
+      }
     }
 
     const allCovered = topics.length > 0 && topics.every((t) => t.covered);
