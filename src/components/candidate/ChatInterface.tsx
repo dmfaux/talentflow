@@ -13,6 +13,7 @@ import {
 import type { UIMessage } from "ai";
 import { marked } from "marked";
 import { buildPalette, hexToRgb, type BrandColours } from "./palette";
+import { isTerminalChatStatus } from "./chat-status";
 
 /* ── Types ─────────────────────────────────────────────────────────── */
 
@@ -63,6 +64,11 @@ export function ChatInterface({
   const [mobileInfoOpen, setMobileInfoOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [initialLoading, setInitialLoading] = useState(true);
+  // The auth token or conversation is permanently gone — e.g. the candidate
+  // opted out and their data was purged (token revoked, conversation deleted),
+  // so every authed call 401s/404s. Show a calm terminal notice instead of a
+  // chat that errors on send and polls forever.
+  const [linkInactive, setLinkInactive] = useState(false);
 
   const c = useMemo(() => buildPalette(brandColours), [brandColours]);
 
@@ -102,6 +108,8 @@ export function ChatInterface({
             );
             setMessages(uiMessages);
           }
+        } else if (isTerminalChatStatus(res.status)) {
+          setLinkInactive(true);
         }
       } catch {
         /* silent */
@@ -127,7 +135,7 @@ export function ChatInterface({
   /* ── Poll for conversation status changes ───────────────────────────── */
 
   useEffect(() => {
-    if (!conversationId || initialLoading) return;
+    if (!conversationId || initialLoading || linkInactive) return;
 
     const interval = setInterval(async () => {
       try {
@@ -140,6 +148,10 @@ export function ChatInterface({
           if (data.status && data.status !== convStatus) {
             setConvStatus(data.status);
           }
+        } else if (isTerminalChatStatus(res.status)) {
+          // Token/conversation revoked mid-session — stop polling (the effect
+          // re-runs and bails on linkInactive) and show the terminal notice.
+          setLinkInactive(true);
         }
       } catch {
         /* silent */
@@ -147,7 +159,7 @@ export function ChatInterface({
     }, 10_000);
 
     return () => clearInterval(interval);
-  }, [conversationId, chatToken, convStatus, initialLoading]);
+  }, [conversationId, chatToken, convStatus, initialLoading, linkInactive]);
 
   /* ── Textarea auto-resize ─────────────────────────────────────────── */
 
@@ -198,6 +210,85 @@ export function ChatInterface({
       : convStatus === "dormant"
         ? "Paused"
         : "Online";
+
+  /* ── Initial load ─────────────────────────────────────────────────── */
+
+  // Until the first messages fetch resolves we don't know whether this is a
+  // live chat or a dead link, so show a neutral full-page spinner rather than
+  // the full chat layout — otherwise the branded sidebar flashes in for a
+  // moment before a stale link swaps to the terminal notice.
+  if (initialLoading) {
+    return (
+      <div
+        className="flex min-h-screen items-center justify-center"
+        style={{ backgroundColor: c.chatBg }}
+      >
+        <div
+          className="h-6 w-6 animate-spin rounded-full border-2"
+          style={{ borderColor: c.spinnerTrack, borderTopColor: c.spinnerHead }}
+        />
+      </div>
+    );
+  }
+
+  /* ── Stale / inactive link state ──────────────────────────────────── */
+
+  if (linkInactive) {
+    return (
+      <div
+        className="relative flex min-h-screen items-center justify-center overflow-hidden"
+        style={{ backgroundColor: c.chatBg }}
+      >
+        <div className="paper-grid pointer-events-none absolute inset-0 opacity-40" />
+        <div
+          className="pointer-events-none absolute left-1/2 top-1/3 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]"
+          style={{ backgroundColor: c.primaryTint, opacity: 0.6 }}
+        />
+
+        <div
+          className="relative z-10 mx-auto max-w-md px-6 text-center"
+          style={{ animation: "fadeInUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both" }}
+        >
+          {logoUrl && (
+            <div className="mb-8">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={logoUrl}
+                alt={companyName}
+                className="mx-auto h-10 max-w-[180px] object-contain"
+              />
+            </div>
+          )}
+          <div
+            className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl"
+            style={{ backgroundColor: c.primaryTint }}
+          >
+            <svg
+              width="32" height="32" viewBox="0 0 24 24" fill="none"
+              stroke={c.primary} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 8v4M12 16h.01" />
+            </svg>
+          </div>
+          <h2
+            className="font-display-italic text-2xl"
+            style={{ color: c.textStrong }}
+          >
+            This link is no longer active
+          </h2>
+          <p
+            className="mt-3 text-sm leading-relaxed"
+            style={{ color: c.textMuted }}
+          >
+            We don&apos;t have an active conversation for this link, so there&apos;s
+            nothing more to show here. If you think this is a mistake, please reply
+            to the most recent email you received from the team.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   /* ── No conversation state ────────────────────────────────────────── */
 
@@ -571,21 +662,9 @@ export function ChatInterface({
             <div className="paper-grid pointer-events-none absolute inset-0 opacity-30" />
 
             <div className="relative z-10 mx-auto max-w-2xl px-4 py-8 sm:px-6">
-            {/* Loading spinner */}
-            {initialLoading && (
-              <div className="flex items-center justify-center py-24">
-                <div
-                  className="h-7 w-7 animate-spin rounded-full border-2"
-                  style={{
-                    borderColor: c.spinnerTrack,
-                    borderTopColor: c.spinnerHead,
-                  }}
-                />
-              </div>
-            )}
-
-            {/* Empty state */}
-            {!initialLoading && messages.length === 0 && !isStreaming && (
+            {/* Empty state — initial load is handled by the full-page spinner
+                above, so the layout only renders once messages are resolved. */}
+            {messages.length === 0 && !isStreaming && (
               <div
                 className="flex flex-col items-center justify-center py-24 text-center"
                 style={{
