@@ -51,6 +51,17 @@ export function Modal({
   const panelRef = React.useRef<HTMLDivElement>(null);
   const titleId = React.useId();
 
+  // Keep the latest onClose/dismissible in refs so the focus-trap effect below
+  // can depend on [open] alone. Otherwise it re-runs on every render that hands
+  // Modal a fresh onClose identity — e.g. a form modal re-rendering on each
+  // keystroke — and its panelRef.focus() yanks focus off the active field.
+  const onCloseRef = React.useRef(onClose);
+  const dismissibleRef = React.useRef(dismissible);
+  React.useEffect(() => {
+    onCloseRef.current = onClose;
+    dismissibleRef.current = dismissible;
+  });
+
   React.useEffect(() => {
     if (!open) return;
 
@@ -59,8 +70,8 @@ export function Modal({
     panelRef.current?.focus();
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && dismissible) {
-        onClose();
+      if (e.key === "Escape" && dismissibleRef.current) {
+        onCloseRef.current();
         return;
       }
       // Keep Tab cycling within the panel.
@@ -94,7 +105,7 @@ export function Modal({
       document.body.style.overflow = prevOverflow;
       previouslyFocused?.focus?.();
     };
-  }, [open, dismissible, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
