@@ -18,7 +18,13 @@
   - **`consent_confirmed` hook** — wired into the candidate chat POST (`/api/chat/[conversationId]`), the first authenticated candidate surface; idempotent flip via `recordConsentConfirmed` (now `isNull`-guarded). Covers "first chat access"; the notice-CTA-before-chat flip is finalised with the phase-3 portal surface.
   - **POPIA audit CSV export** — `GET /api/admin/candidates/[id]/audit/export` (recruiter+, org-scoped) over `getCandidateAuditTrail`.
   - Tests: `manual-candidate-endpoints.itest.ts` (6) + idempotency assertion; suites green: 437 unit, 236 integration.
-- **Phase 3 (last):** the UI — add-candidate modal, campaign-page button, candidate-table `invited`/`recruiter_manual` affordances, `ApplicationForm` `?invite=` handling + the candidate portal "view application" surface that fires `consent_confirmed` before chat (mandatory `frontend-design` skill).
+- **Phase 3 — recruiter UI + invite handling: DELIVERED** (obeys DESIGN.md; composes `Modal`/`Field`/`Input`/`Select`/`Textarea`/`Button`/`Badge`; `Add candidate` is a secondary button so the campaign's Cobalt Publish/Resume stays the single signal).
+  - `src/components/admin/add-candidate-modal.tsx` — path toggle (Invite / Add directly); skip branch adds CV file-or-paste, an optional screening-questions expander (campaign `gating_config`), and the consent block (versioned attestation checkbox + basis picklist + conditional note). Submits multipart (file) or JSON.
+  - Campaign page (`campaigns/[id]/page.tsx`) — the gated `Add candidate` entry point beside `CampaignActions`; passes `source`/`invite_expires_at` to the table.
+  - `candidate-table.tsx` — `invited` status tone + filter, a "Sourced" badge on `recruiter_manual` rows, and an inline expiry + Resend control on invited rows.
+  - `ApplicationForm.tsx` — forwards the `?invite=` token on submit so the apply route upgrades the stub.
+  - Verified: tsc + lint clean on authored files; 437 unit / 236 integration still green; impeccable design hook clean on the new modal + table.
+- **Phase 3 — remaining (candidate portal):** a brand-themed "view application" page behind the persistent chat token that shows status and fires `consent_confirmed` *before* the candidate ever chats (today the notice's view link lands on the chat page, and consent confirms on first chat). Self-contained follow-on; needs brand-theme resolution like `ApplicationForm`.
 
 ---
 

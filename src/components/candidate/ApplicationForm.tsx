@@ -288,6 +288,14 @@ export function ApplicationForm({ clientSlug, campaign, brandColours, clientName
       formData.append("answers", JSON.stringify(fields.answers));
       if (cvFile) formData.append("cv", cvFile);
 
+      // Recruiter invite-to-apply: forward the ?invite= token so the server
+      // upgrades the candidate's existing stub instead of creating a new record.
+      const inviteToken =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("invite")
+          : null;
+      if (inviteToken) formData.append("invite_token", inviteToken);
+
       const res = await fetch(`/api/apply/${clientSlug}/${campaignSlug}`, {
         method: "POST",
         body: formData,

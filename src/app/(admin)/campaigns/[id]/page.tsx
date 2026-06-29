@@ -6,8 +6,10 @@ import { and, desc, asc, eq, sql } from "drizzle-orm";
 import { CampaignActions } from "@/components/admin/campaign-actions";
 import { CampaignTabs } from "@/components/admin/campaign-tabs";
 import { CampaignUrl } from "@/components/admin/campaign-url";
+import { AddCandidateModal } from "@/components/admin/add-candidate-modal";
 import { CandidateTable } from "@/components/admin/candidate-table";
 import { ShortlistTab } from "@/components/admin/shortlist-tab";
+import type { GatingQuestion } from "@/lib/gating";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/card";
 import { canAccessBrand, orgScope, requireTenant } from "@/lib/tenant";
@@ -218,7 +220,15 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
             <CampaignUrl url={campaignUrl} />
           </div>
         </div>
-        <CampaignActions campaignId={campaign.id} status={campaign.status} canManage={canManageCampaign} />
+        <div className="flex items-center gap-2">
+          <AddCandidateModal
+            campaignId={campaign.id}
+            status={campaign.status}
+            gatingConfig={(campaign.gating_config as GatingQuestion[]) ?? []}
+            canManage={canManageCampaign}
+          />
+          <CampaignActions campaignId={campaign.id} status={campaign.status} canManage={canManageCampaign} />
+        </div>
       </div>
 
       {/* Overview — pipeline funnel + quality rail */}
@@ -489,6 +499,10 @@ export default async function CampaignDetailPage({ params, searchParams }: Props
               ai_confidence: c.ai_confidence,
               ai_flags: c.ai_flags as unknown[] | null,
               status: c.status,
+              source: c.source,
+              invite_expires_at: c.invite_expires_at
+                ? c.invite_expires_at.toISOString()
+                : null,
               created_at: c.created_at.toISOString(),
             }))}
             total={candidateTotal}

@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/toast-provider";
 
 interface Candidate {
   id: string;
@@ -13,6 +14,8 @@ interface Candidate {
   ai_confidence: string | null;
   ai_flags: unknown[] | null;
   status: string;
+  source: string | null;
+  invite_expires_at: string | null;
   created_at: string;
 }
 
@@ -28,6 +31,8 @@ interface Props {
 // recommended rejection; no decision is made until a human accepts it.
 const STATUS_TONE: Record<string, BadgeTone> = {
   new: "neutral",
+  // Recruiter-invited, awaiting the candidate to complete the form.
+  invited: "saffron",
   gating_failed: "red",
   gating_passed: "moss",
   scoring: "saffron",
@@ -48,7 +53,7 @@ const CONFIDENCE_TONE: Record<string, BadgeTone> = {
   low: "red",
 };
 
-const STATUSES = ["all", "gating_passed", "scored", "follow_up", "pending_rejection", "shortlisted", "rejected", "no_response"] as const;
+const STATUSES = ["all", "invited", "gating_passed", "scored", "follow_up", "pending_rejection", "shortlisted", "rejected", "no_response"] as const;
 const SORT_OPTIONS = [
   { value: "score_desc", label: "Score (high to low)" },
   { value: "score_asc", label: "Score (low to high)" },
@@ -78,6 +83,24 @@ export function CandidateTable({ campaignId, candidates, total, limit, offset }:
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
+  const [resending, setResending] = useState<string | null>(null);
+
+  const resendInvite = useCallback(
+    async (id: string) => {
+      setResending(id);
+      try {
+        const res = await fetch(`/api/admin/candidates/${id}/resend-invite`, { method: "POST" });
+        toast(res.ok ? "Invite resent" : "Couldn't resend the invite", res.ok ? "success" : "error");
+        if (res.ok) router.refresh();
+      } catch {
+        toast("Couldn't reach the server", "error");
+      } finally {
+        setResending(null);
+      }
+    },
+    [router, toast]
+  );
 
   const currentSort = searchParams.get("sort") ?? "score_desc";
   const currentStatus = searchParams.get("status") ?? "all";
@@ -209,12 +232,19 @@ export function CandidateTable({ campaignId, candidates, total, limit, offset }:
                         {initials}
                       </span>
                       <div className="min-w-0">
-                        <Link
-                          href={`/candidates/${c.id}`}
-                          className="block truncate text-sm font-medium text-ink transition-colors group-hover:text-cobalt"
-                        >
-                          {c.name}
-                        </Link>
+                        <div className="flex items-center gap-1.5">
+                          <Link
+                            href={`/candidates/${c.id}`}
+                            className="truncate text-sm font-medium text-ink transition-colors group-hover:text-cobalt"
+                          >
+                            {c.name}
+                          </Link>
+                          {c.source === "recruiter_manual" && (
+                            <Badge tone="neutral" size="sm" className="shrink-0">
+                              Sourced
+                            </Badge>
+                          )}
+                        </div>
                         <p className="font-mono text-[0.65rem] text-ink-muted truncate">
                           {c.email}
                         </p>
@@ -248,9 +278,33 @@ export function CandidateTable({ campaignId, candidates, total, limit, offset }:
                     )}
                   </td>
                   <td className="px-5 py-3">
-                    <Badge tone={STATUS_TONE[c.status] ?? "neutral"} dot uppercase>
-                      {c.status.replace(/_/g, " ")}
-                    </Badge>
+                    <div className="flex flex-col items-start gap-1">
+                      <Badge tone={STATUS_TONE[c.status] ?? "neutral"} dot uppercase>
+                        {c.status.replace(/_/g, " ")}
+                      </Badge>
+                      {c.status === "invited" && (
+                        <div className="flex items-center gap-2">
+                          {c.invite_expires_at && (
+                            <span className="text-[0.62rem] text-ink-muted">
+                              {new Date(c.invite_expires_at) < new Date()
+                                ? "Invite expired"
+                                : `Expires ${new Date(c.invite_expires_at).toLocaleDateString("en-ZA")}`}
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              resendInvite(c.id);
+                            }}
+                            disabled={resending === c.id}
+                            className="text-[0.62rem] font-medium text-cobalt hover:underline cursor-pointer disabled:opacity-50"
+                          >
+                            {resending === c.id ? "Resending…" : "Resend"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td className="px-5 py-3 text-right font-mono text-[0.65rem] text-ink-muted">
                     {new Date(c.created_at).toLocaleDateString("en-ZA")}
